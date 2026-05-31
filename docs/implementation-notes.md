@@ -172,3 +172,43 @@
 - **内容**: `ROUTER_TIMEOUT_MS` と `ROUTER_MODEL` は router.ts、`ROUTER_CACHE_SIZE` は cache.ts に定義(タスク記載どおり)。
 - **判断**: タスク記載に沿う。
 - **反映**: 設計書変更は不要(必要なら constants.ts への集約を検討)。
+
+---
+
+## task_05(Conversation Layer)
+
+### N-05-1 🟡 `OsAction`/`OsCommand` の定義場所
+- **該当**: task_05 §1(conversation.ts に定義) vs 設計書 §3.4(「OsCommand は src/shared/types/os.ts で定義」)
+- **内容**: task_05 §1 は OsAction/OsCommand を conversation.ts に書いているが、設計書 §3.4 は os.ts を指す。task_06 でも os.ts が必要。
+- **判断**: 設計書 §3.4 に従い `src/shared/types/os.ts` に定義(OsCommandResult も)。conversation.ts は import。重複回避。
+- **反映**: task_05 §1 の型配置を os.ts 参照に修正。
+
+### N-05-2 🟡 Sonnet 呼び出し・トークンチェックを DI 可能に
+- **該当**: task_05 §7 `chat(userText, charContext, memoryContext, routerResult, apiKey)`
+- **内容**: テスト容易性のため任意6番目引数 `deps?: Partial<ChatDeps>`(`callModel` / `checkTokens`)を追加。実 API なしで4層防御フローを単体テスト可能。
+- **判断**: 公開シグネチャ維持 + DI 用任意引数。
+- **反映**: §3.4 に「LLM 呼び出しは差し替え可能」と注記。
+
+### N-05-3 🔴 **重要**: SDK ^0.30.x に `messages.countTokens` が無い → ローカル見積もりに変更
+- **該当**: 設計書 §3.4「トークン数計測の実装方針」(`client.messages.countTokens` 使用)/ token-counter.ts
+- **内容**: 固定中の `@anthropic-ai/sdk@^0.30.x` には countTokens API が存在しない(後発版で追加)。`countAndCheck(client, request)` がコンパイル不能。
+- **判断**: SDK 更新はバージョン規約(CLAUDE §2.4・^0.30 を超える)上ユーザー承認が要るため、MVP では **ローカルの簡易トークン見積もり**(`CHARS_PER_TOKEN=2.5`)でガードレールを実装。`countAndCheck` のシグネチャを `(prompt: BuiltPrompt) => TokenCheck` に変更。
+- **反映(要判断)**: 次のいずれか。(a) 厳密計測が必要なら `@anthropic-ai/sdk` を countTokens 対応版へ更新(§1.2 を承認のうえ変更)、(b) MVP は見積もりで十分として §3.4 を「ローカル見積もり」に更新。**ユーザー判断が必要**。
+
+### N-05-4 🟡 messages の交互列正規化(`normalizeAlternation`)を追加
+- **該当**: 設計書 §3.4 の messages 構造
+- **内容**: Claude Messages API は role が user/assistant で交互・先頭 user である必要がある。few-shot + 短期記憶 + 現在入力を素朴に並べると連続同 role が生じうる。
+- **判断**: prompt-builder で連続同 role を結合し先頭を user に揃える正規化を追加(その後に Prefill の assistant "{" を付与)。
+- **反映**: §3.4 に「messages は交互列に正規化する」と明記。
+
+### N-05-5 ⚪ 出力形式(JSON 仕様)は prompt-builder が付与(N-02-2 の帰結)
+- **該当**: 設計書 §3.4 / task_02 §4.4(N-02-2)
+- **内容**: JSON 応答形式は buildSystemPrompt(キャラ層)ではなく prompt-builder(会話層)で system に付与する、という N-02-2 の判断をここで実装。
+- **判断**: 出力形式は会話層に集約(疎結合)。
+- **反映**: N-02-2 と合わせて §3.1/§3.4 を整理。
+
+### N-05-6 ⚪ 誕生日 'forgotten' の few-shot 注入
+- **該当**: task_05 §3(system は 'today' のみ言及)/ 設計書 §3.1(forgotten 反応)
+- **内容**: birthdayHint が 'forgotten' の場合も、messages に forgotten 用 few-shot を1例注入する(today は祝福 few-shot + system 注記)。
+- **判断**: today/forgotten 双方を few-shot で表現(感情パラメータは持たない方針と整合)。
+- **反映**: §3.4 の messages 構造に forgotten ケースも明記。
