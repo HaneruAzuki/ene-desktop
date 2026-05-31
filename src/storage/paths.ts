@@ -92,6 +92,18 @@ export function getShortTermPath(): string {
   return path.join(getMemoryDir(), 'short-term.json');
 }
 
+// --- 同梱キャラ定義(読み取り専用・配布物に含まれる) ---
+
+/** 同梱キャラ定義のルート。dev/prod とも app.getAppPath() 配下の characters/。 */
+export function getCharactersDir(): string {
+  return path.join(app.getAppPath(), 'characters');
+}
+
+/** characters/{characterId}/ */
+export function getCharacterDir(characterId: string): string {
+  return path.join(getCharactersDir(), characterId);
+}
+
 // --- マシン固定データ(暗号化 API キーの保存先) ---
 
 /** %APPDATA%/ene-desktop/(環境問わず app.getPath('userData'))。 */
