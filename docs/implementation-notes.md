@@ -144,3 +144,31 @@
 - **内容**: `SHORT_TERM_MAX_ENTRIES=20` ほか記憶系定数を constants.ts に集約。
 - **判断**: 設計書 §2 のファイルに沿って配置。
 - **反映**: 設計書変更は不要。
+
+---
+
+## task_04(Knowledge Router)
+
+### N-04-1 🟡 `RouterResult` 型(task_04) vs 設計書 §3.2 `RoutingResult`
+- **該当**: 設計書 §3.2 `RoutingResult { topic, domain, behavior, fewshotKey }` vs task_04 `RouterResult { domain, behavior, fewshotKey, matchedTopic?, isFromCache, isFromFallback }`
+- **内容**: 型名が異なり、`topic` が `matchedTopic?` に、キャッシュ/フォールバック由来フラグが追加。
+- **判断**: task_04 の `RouterResult` を採用(キャッシュ/フォールバック可視化のため有用)。
+- **反映**: §3.2 の型を `RouterResult` に統一(`isFromCache`/`isFromFallback`/`matchedTopic` を反映)。
+
+### N-04-2 🟡 Haiku 呼び出しを DI 可能に(任意4番目引数)
+- **該当**: task_04 §3 `classifyTopic(userText, knowledgeDomains, apiKey)`
+- **内容**: テスト容易性のため、任意4番目引数 `llmCall: RouterLlmCall`(既定=実 Haiku 呼び出し)を追加。これで実 API なしで成功/タイムアウト/失敗/キャッシュを単体テスト可能。
+- **判断**: 公開シグネチャは維持しつつ DI 用の任意引数を追加。
+- **反映**: §3.2 に「LLM 呼び出しは差し替え可能(テスト/将来のマルチプロバイダ §11.7)」と注記。
+
+### N-04-3 🟡 判定プロンプトからキャラ名 `{name}` を省略
+- **該当**: task_04 §「判定プロンプトの構造」(冒頭が「キャラクター{name}」)
+- **内容**: `classifyTopic` は `knowledgeDomains` のみ受け取り `identity.name` を持たない。判定は topics で決まり名前は装飾的なので、「あるキャラクターの知識範囲を判定」と中立表現にした。
+- **判断**: 名前を使わない表現に。
+- **反映**: task_04 のプロンプト例から `{name}` 依存を外すか、必要なら identity/characterId を引数に追加する旨を明記。
+
+### N-04-4 ⚪ Router 定数の配置
+- **該当**: task_04(`ROUTER_TIMEOUT_MS=800` / `ROUTER_CACHE_SIZE=10`)
+- **内容**: `ROUTER_TIMEOUT_MS` と `ROUTER_MODEL` は router.ts、`ROUTER_CACHE_SIZE` は cache.ts に定義(タスク記載どおり)。
+- **判断**: タスク記載に沿う。
+- **反映**: 設計書変更は不要(必要なら constants.ts への集約を検討)。
