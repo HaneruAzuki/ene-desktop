@@ -40,7 +40,7 @@
 | 項目 | 採用技術 | バージョン | 選定理由 |
 |------|---------|-----------|---------|
 | 言語 | TypeScript | `^5.x`(strict) | 型安全・長期保守・Claude Code相性 |
-| ランタイム | Node.js | 20 LTS | Electronとの互換性 |
+| ランタイム | Node.js | 24 LTS | Electronとの互換性。2026年時点で LTS 系列が 24 に移行し、winget で 20 LTS が入手不可となったためユーザー承認のうえ 20→24 に更新(旧: 20 LTS) |
 | ビルドツール | Vite | `^5.x` | 高速・TypeScript標準対応 |
 | Electron統合 | electron-vite | `^2.x` | Electron + Vite + React の統合 |
 | ビルド/配布 | electron-builder | `^24.x` | Windows向けexe生成 |

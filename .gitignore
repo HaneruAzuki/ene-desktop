@@ -8,7 +8,18 @@ data/
 
 # 機密情報
 .env
+.env.local
 *.key
 
 # ログ
 *.log
+
+# OS 固有
+.DS_Store
+Thumbs.db
+
+# IDE 設定
+.vscode/
+.idea/
+
+# 注意: package-lock.json は .gitignore に含めない(CLAUDE.md §2.4)

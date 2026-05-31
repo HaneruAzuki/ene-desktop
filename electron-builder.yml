@@ -1,0 +1,10 @@
+appId: com.example.ene-desktop
+productName: ENE Desktop
+directories:
+  output: dist
+files:
+  - "out/**/*"
+  - "characters/**/*"     # 初期キャラを同梱
+win:
+  target: portable        # インストール不要のexe
+  icon: resources/icon.ico
