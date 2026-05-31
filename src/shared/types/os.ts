@@ -9,8 +9,17 @@ export interface OsCommand {
   target?: string; // open_browser: URL / open_folder: 絶対パス / open_notepad: 不要
 }
 
+// 実行失敗の理由(キャラ口調フォールバック文言の選択に使う・task_06 §5)。
+export type OsCommandFailureReason =
+  | 'invalid_action'
+  | 'invalid_target'
+  | 'path_traversal'
+  | 'outside_home'
+  | 'non_https'
+  | 'exec_error';
+
 export interface OsCommandResult {
-  success: boolean;
-  message?: string; // ユーザーに見せるキャラ口調メッセージ
-  error?: string; // ログ用の技術的エラー(ユーザーには見せない)
+  ok: boolean;
+  message?: string; // 実行失敗時のキャラ口調フォールバック文言(成功時は会話側の message を優先)
+  reason?: OsCommandFailureReason;
 }

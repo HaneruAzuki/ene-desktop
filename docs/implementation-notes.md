@@ -212,3 +212,23 @@
 - **内容**: birthdayHint が 'forgotten' の場合も、messages に forgotten 用 few-shot を1例注入する(today は祝福 few-shot + system 注記)。
 - **判断**: today/forgotten 双方を few-shot で表現(感情パラメータは持たない方針と整合)。
 - **反映**: §3.4 の messages 構造に forgotten ケースも明記。
+
+---
+
+## task_06(OS Integration Layer)
+
+### N-06-1 🟡 `OsCommandResult` の形(設計書 §3.5 vs task_06 §1)
+- **該当**: 設計書 §3.5 `OsCommandResult { success, message?, error? }` vs task_06 §1 `{ ok, message?, reason? }`
+- **内容**: 設計書は success/error、task_06 は ok と理由 enum(`invalid_action|invalid_target|path_traversal|outside_home|non_https|exec_error`)+ FALLBACK_MESSAGES。
+- **判断**: task_06 の `{ ok, message?, reason? }` を採用(理由別フォールバック文言が扱いやすい)。task_05 で作った os.ts を更新(consumer 未生成のため安全)。
+- **反映**: §3.5 の OsCommandResult を ok/reason ベースに更新。executor は失敗時に reason → キャラ口調 message を付与。
+
+### N-06-2 ⚪ OsAction/OsCommand の import 元
+- **該当**: task_06 §1(`import { OsAction, OsCommand } from "./conversation"`)
+- **内容**: N-05-1 で OsAction/OsCommand を os.ts に置いたため、OsCommandResult と同じファイル内。conversation からの import は不要。
+- **反映**: task_06 §1 の import 記述を os.ts 内定義に合わせる。
+
+### N-06-3 ⚪ child_process の import 指定子
+- **該当**: task_06 §2(`from "child_process"`)
+- **内容**: `from 'node:child_process'` を使用(モダンな node: プレフィックス)。`shell:true` は使わず引数配列固定。
+- **反映**: 設計書変更不要。
