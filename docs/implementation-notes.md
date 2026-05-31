@@ -88,3 +88,59 @@
 - **内容**: `gender: "female"` をそのまま日本語プロンプトに出すと「性別はfemale」と不自然。`ageAppearance: 少女` で十分伝わる。
 - **判断**: プロンプト本文から生 gender 出力を除外(identity.json のデータは保持)。
 - **反映**: 設計書変更は不要。必要なら identity.json の gender を日本語表現にする案もあるが現状維持。
+
+---
+
+## task_03(Memory Layer)
+
+### N-03-1 🟡 検索クエリの型名・フィールド差(`MemorySearchQuery` vs 設計書 §3.3 `SearchQuery`)
+- **該当**: 設計書 §3.3 `SearchQuery { tags, category, minImportance, fromDate, limit }` vs task_03 `MemorySearchQuery { tags, category, minImportance, yearFrom, yearTo, limit }`
+- **内容**: 型名が異なり、日付フィルタが「fromDate(単一)」→「yearFrom/yearTo(年範囲)」に変わっている。
+- **判断**: task_03 の `MemorySearchQuery`(年範囲)を採用。Episodic がキャラ別の {year} ディレクトリ階層を持つため、年フィルタの方が全走査と相性が良い。
+- **反映**: §3.3 の型名を `MemorySearchQuery` に統一し、日付フィルタを年範囲(yearFrom/yearTo)に更新。
+
+### N-03-2 🟡 `MemoryContext` のフィールド名・並び差
+- **該当**: 設計書 §3.3 `MemoryContext { shortTerm, semantic, episodic }` vs task_03 `{ semantic, shortTerm, relevantEpisodic }`
+- **内容**: `episodic` → `relevantEpisodic`(検索結果であることを明示)。
+- **判断**: task_03 を採用。
+- **反映**: §3.3 の `MemoryContext` を `relevantEpisodic` に更新。
+
+### N-03-3 🟡 短期記憶 API の差(`trimShortTerm` → 複数 API)
+- **該当**: 設計書 §3.3 `getShortTerm/appendShortTerm/trimShortTerm` vs task_03
+- **内容**: task_03 は `clearShortTerm` / `getUnextractedEntries` / `markAsExtracted` を持ち、`trimShortTerm` 単体は持たない(トリムは appendShortTerm 内部で行う)。`saveSemantic` も追加。
+- **判断**: task_03 の関数群を採用。
+- **反映**: §3.3 の関数シグネチャ一覧を task_03 の構成へ更新。
+
+### N-03-4 🟡 記憶抽出の Claude 呼び出しを依存性注入(DI)に / `characterContext` を省略
+- **該当**: 設計書 §3.3 / task_03 §5・§6 の extractor / extraction-trigger
+- **内容**:
+  - task_03 のシグネチャは `extractMemoryFromConversation(entries, characterContext)` だが、抽出は「中立的観察者」でキャラ非依存(task_03 自身が明記)。よって `characterContext` を引数から省略した。
+  - 代わりに Claude 呼び出しを `LlmComplete`(`(req)=>Promise<string>`)として注入する設計にした。これにより **task_03 が task_05(Conversation Layer の Claude クライアント)へ前方依存しない**。保存先キャラは paths.ts のキャッシュ済み characterId で解決されるため characterContext は不要。
+  - `LlmComplete` 型は暫定的に `src/memory/extractor.ts` に置いた(将来 §11.7 の `src/llm/types.ts` へ移す想定)。
+- **判断**: DI + characterContext 省略。
+- **反映**: §3.3 の extractor シグネチャを「未抽出エントリ + LLM 呼び出し関数(注入)」に更新。characterContext は不要と明記。LLM 抽象の置き場所(§11.7)に言及。
+
+### N-03-5 🟡 `appendShortTerm` の overflow 抽出をコールバック注入に
+- **該当**: task_03 §2(「20件超過時に抽出処理を呼んでからトリム」)
+- **内容**: short-term.ts が直接 extraction-trigger(→ Claude)を import すると前方依存・密結合になる。`appendShortTerm(entry, onOverflow?)` の形で overflow 時の抽出処理を注入する設計にした。Conversation Layer/起動統合が `onOverflow = () => extractFromShortTerm('overflow', complete)` を渡す。
+- **判断**: コールバック注入。
+- **反映**: §3.3 に「appendShortTerm は overflow ハンドラを受け取り、Memory 層は Claude へ直接依存しない」と明記。
+
+### N-03-6 🟡 Episodic ファイル名は `memory.date` から導出(`nowLocalIsoForFilename()` ではなく)
+- **該当**: task_03 §4(「filename は nowLocalIsoForFilename() を使う」) vs 設計書 §5.2 の例
+- **内容**: §5.2 の例ではファイル名が `date` フィールドと一致(`2026-05-10T17-30-00.json` ↔ date `2026-05-10T17:30:00+09:00`)。`nowLocalIsoForFilename()`(=現在時刻)を使うと、ディレクトリ年(date由来)とファイル名年がズレうる。
+- **判断**: `memory.date` から TZ を除き `:`→`-` 置換してファイル名を導出(§5.2 と一致)。なお date は抽出時に `nowLocalIso()` で付与するため実質現在時刻。
+- **反映**: task_03 §4 を「filename は memory.date から導出」に修正。
+
+### N-03-7 🟡 `validateSemantic` はコア型不一致を「無視」(例外を投げない)
+- **該当**: 設計書 §3.3 擬似コード(無視) vs task_03 §3 コメント(「コア違反は例外」)
+- **内容**: 2 箇所で方針が食い違う。壊れた semantic.json で例外を投げると記憶読込で会話が止まる(NF-REL-02「Memory読込失敗時も会話継続」に反する)。
+- **判断**: 設計書 §3.3 擬似コードに従い、型不一致のコアフィールドは無視して採用しない(例外なし)。version は既定 1。
+  - なお design §3.3 は「ログに警告」も求めるが、検証器を純粋関数に保つため警告ログは未実装(必要なら呼出側で対応)。
+- **反映**: task_03 §3 の「コア違反は例外」を「無視(継続性優先)」に統一。警告ログの要否を明記。
+
+### N-03-8 ⚪ 記憶定数を `src/shared/constants.ts` に配置
+- **該当**: 設計書 §2(`src/shared/constants.ts` が存在)
+- **内容**: `SHORT_TERM_MAX_ENTRIES=20` ほか記憶系定数を constants.ts に集約。
+- **判断**: 設計書 §2 のファイルに沿って配置。
+- **反映**: 設計書変更は不要。
