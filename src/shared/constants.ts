@@ -16,3 +16,11 @@ export const IMPORTANCE_MIN = 1;
 export const IMPORTANCE_MAX = 5;
 /** importance が不正値だった場合の既定値。 */
 export const IMPORTANCE_DEFAULT = 3;
+
+// --- ウィンドウ(設計書 §8.1) ---
+/** キャラ部分のウィンドウ幅。 */
+export const WINDOW_WIDTH = 240;
+/** キャラ部分のウィンドウ高さ。 */
+export const WINDOW_HEIGHT = 320;
+/** 画面端からの既定マージン(初回配置・右下)。 */
+export const WINDOW_EDGE_MARGIN = 20;

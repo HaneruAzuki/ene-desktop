@@ -10,6 +10,7 @@ import type { CharacterContext } from '../shared/types/character';
 import type { MemoryContext } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';
 import type { BuiltPrompt, ConversationResponse } from '../shared/types/conversation';
+import type { LlmComplete } from '../memory/extractor';
 
 // 本会話処理(設計書 §3.4「Conversation Layer の統合フロー」)。
 // AI自称防止の4層防御を統合する。Sonnet 呼び出し・トークン計測は DI 可能(テスト容易化)。
@@ -45,6 +46,23 @@ function makeDefaultDeps(apiKey: string): ChatDeps {
     },
     // トークン計測は SDK の countTokens が固定版に無いため、ローカル見積もりで判定する。
     checkTokens: async (prompt) => countAndCheck(prompt),
+  };
+}
+
+/**
+ * 記憶抽出など「単発で生テキストを得たい」用途の LLM 呼び出しを作る。
+ * Memory Layer の extractor へ注入する LlmComplete を満たす(設計書 §3.3 の抽出は Sonnet 使用)。
+ */
+export function makeLlmComplete(apiKey: string): LlmComplete {
+  const client = new Anthropic({ apiKey });
+  return async ({ system, user, maxTokens }) => {
+    const resp = await client.messages.create({
+      model: CONVERSATION_MODEL,
+      max_tokens: maxTokens ?? MAX_TOKENS,
+      system,
+      messages: [{ role: 'user', content: user }],
+    });
+    return resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
   };
 }
 

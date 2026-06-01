@@ -104,6 +104,16 @@ export function getCharacterDir(characterId: string): string {
   return path.join(getCharactersDir(), characterId);
 }
 
+/** ビルドリソース(アイコン等)のディレクトリ。app.getAppPath() 配下の resources/。 */
+export function getResourcesDir(): string {
+  return path.join(app.getAppPath(), 'resources');
+}
+
+/** タスクトレイ用アイコン(resources/tray-icon.png)。 */
+export function getTrayIconPath(): string {
+  return path.join(getResourcesDir(), 'tray-icon.png');
+}
+
 // --- マシン固定データ(暗号化 API キーの保存先) ---
 
 /** %APPDATA%/ene-desktop/(環境問わず app.getPath('userData'))。 */

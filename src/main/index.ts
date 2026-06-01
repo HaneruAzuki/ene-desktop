@@ -1,56 +1,70 @@
-import { join } from 'node:path';
-import { app, BrowserWindow } from 'electron';
+import { app, type BrowserWindow } from 'electron';
+import { log, initLogger } from '../shared/logger';
+import { getLogsDir } from '../storage/paths';
+import { acquireSingleInstanceLock } from './single-instance';
+import { createMainWindow } from './window';
+import { createTray } from './tray';
+import { registerIpcHandlers, type AppRuntime } from './ipc';
+import {
+  loadWindowPosition,
+  getDefaultPosition,
+  clampPositionToScreen,
+  saveWindowPosition,
+} from './window-position';
+import { buildCharacterContext } from '../character/context-builder';
+import { loadAndDecryptApiKey } from '../storage/encryption';
 
-// task_00 では「空の透過ウィンドウが起動する」最小構成のみを実装する。
-// 多重起動防止・記憶・APIキー等のライフサイクル処理は後続タスクで追加する。
+// Electron main エントリポイント(設計書 §7)。
+// task_07 では window / tray / IPC の最小統合 + charContext・apiKey の最小ロードまで。
+// クラウド警告・APIキーダイアログ・誕生日チェック・挨拶などの完全な起動シーケンスは task_10。
 
-const WINDOW_WIDTH = 240;
-const WINDOW_HEIGHT = 320;
-
-function createWindow(): void {
-  const win = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
-    // 透過ウィンドウ設定(設計書 §4.4 / §8.1)
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    resizable: false,
-    hasShadow: false,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-    },
-  });
-
-  // 開発時は electron-vite が dev サーバの URL を環境変数で渡す。
-  // 本番時は out/renderer/index.html を直接読み込む。
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (rendererUrl) {
-    void win.loadURL(rendererUrl);
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'));
-  }
-}
+let mainWindow: BrowserWindow | null = null;
 
 async function bootstrap(): Promise<void> {
   await app.whenReady();
-  createWindow();
+  initLogger(getLogsDir());
+  log.info('app starting');
 
-  app.on('activate', () => {
-    // macOS 互換(MVP は Windows 専用だが Electron の慣習に従う)
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+  // 実行時状態(task_10 で完全に構築)。失敗しても起動は継続する。
+  const runtime: AppRuntime = { charContext: null, apiKey: null };
+  try {
+    runtime.charContext = await buildCharacterContext();
+  } catch (e) {
+    log.error('failed to build character context', { name: (e as Error).name });
+  }
+  try {
+    runtime.apiKey = await loadAndDecryptApiKey();
+  } catch (e) {
+    log.warn('failed to load api key', { name: (e as Error).name });
+  }
+
+  // ウィンドウ位置(前回位置を復元 → 画面内補正 / 無ければ右下既定)
+  const saved = await loadWindowPosition();
+  const position = saved ? clampPositionToScreen(saved) : getDefaultPosition();
+  mainWindow = createMainWindow(position);
+  await saveWindowPosition(position.x, position.y);
+
+  createTray(mainWindow);
+  registerIpcHandlers(mainWindow, runtime);
+
+  log.info('app ready');
 }
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+if (!acquireSingleInstanceLock()) {
+  // 既に別プロセスが起動中 → 静かに終了(設計書 §7.1)
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
 
-void bootstrap();
+  app.on('window-all-closed', () => {
+    app.quit();
+  });
+
+  void bootstrap();
+}

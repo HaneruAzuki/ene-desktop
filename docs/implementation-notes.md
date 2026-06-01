@@ -232,3 +232,47 @@
 - **該当**: task_06 §2(`from "child_process"`)
 - **内容**: `from 'node:child_process'` を使用(モダンな node: プレフィックス)。`shell:true` は使わず引数配列固定。
 - **反映**: 設計書変更不要。
+
+---
+
+## task_07(Electron Main Process)
+
+### N-07-1 🟡 設計書 §2 の main/ ツリーに無いファイルを追加
+- **該当**: 設計書 §2(main/ は index/window/tray/ipc/lifecycle のみ)
+- **内容**: 実装で `src/main/` に `window-position.ts`(task_07 §4)・`character-context-menu.ts`(task_07 §6)・`single-instance.ts`(task_01/§8)・`api-key-dialog.ts`(task_07 §6 スタブ/§3.7)を追加。設計書 §2 ツリーには未記載。
+- **判断**: タスク仕様に従い追加。
+- **反映**: 設計書 §2 の main/ ツリーにこれらのファイルを追記。
+
+### N-07-2 🟡 起動シーケンスの一部(charContext/apiKey ロード)を task_07 で実施
+- **該当**: task_07 §9(「起動シーケンス全体は task_10」)/ 設計書 §7.1
+- **内容**: IPC(get-character-info / send-message)を機能させるため、index.ts で `buildCharacterContext()` と `loadAndDecryptApiKey()` の最小ロードを実施。クラウド警告・APIキーダイアログ・誕生日チェック・挨拶などの残りは task_10。
+- **判断**: 動作に必要な最小サブセットのみ先行実施(失敗しても起動継続)。
+- **反映**: §7.1 の起動シーケンスで「どこまでが task_07 / task_10 か」を整理(本質的な変更ではない)。
+
+### N-07-3 🟡 send-message の記憶検索は matchedTopic をタグに使う簡易検索
+- **該当**: 設計書 §3.4 / §3.3(関連中期記憶の検索)
+- **内容**: IPC の send-message で `buildMemoryContext({ tags: matchedTopic ? [matchedTopic] : undefined, limit: 5 })` を使用。意味的関連ではなく簡易タグ一致(MVP・ベクトル検索は §11.4 で将来)。
+- **判断**: MVP のタグ検索方針に沿う簡易実装。
+- **反映**: §3.4 に「会話時の Episodic 検索クエリの組み立て方(MVP は matchedTopic タグ)」を明記。
+
+### N-07-4 ⚪ `makeLlmComplete(apiKey)` を conversation/client.ts に追加
+- **該当**: 設計書 §3.3(extractor の LlmComplete 注入)
+- **内容**: 記憶抽出(overflow / 終了時)へ渡す Claude 呼び出しを生成するファクトリ。Sonnet を使用。
+- **判断**: extractor の DI(N-03-4)を満たす実体を会話層に置く。
+- **反映**: §3.3/§3.4 に LlmComplete の実体の置き場所を明記。
+
+### N-07-5 ⚪ `createMainWindow(position?)` に任意引数
+- **該当**: task_07 §3(`createMainWindow(): BrowserWindow`)
+- **内容**: ウィンドウ位置の読込が非同期のため、index.ts で位置を解決してから `createMainWindow(position)` に渡す形にした。
+- **反映**: §8.1 のシグネチャに任意 position 引数を反映。
+
+### N-07-6 🟡 **task_11 注意**: resources/ がパッケージに含まれていない
+- **該当**: electron-builder.yml の `files`(`out/**` と `characters/**` のみ)/ tray アイコン
+- **内容**: トレイアイコン等は `resources/` 配下だが、現状の electron-builder.yml は resources を同梱対象にしていない。dev では `app.getAppPath()/resources` で解決できるが、本番パッケージでアイコンが見つからない恐れ。
+- **判断**: dev は動作。本番同梱は task_11 で対応。
+- **反映**: **task_11 で `extraResources`(または files に resources/**)を追加**してアイコンを同梱する。
+
+### N-07-7 ⚪ window-all-closed → app.quit()
+- **該当**: task_07 §9
+- **内容**: タスクトレイ常駐アプリだが、task_09 §9 どおり window-all-closed で quit。実際にはウィンドウは hide 運用で close されないため、主に安全網。
+- **反映**: 設計書変更不要。
