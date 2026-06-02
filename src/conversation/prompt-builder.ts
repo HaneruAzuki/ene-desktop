@@ -68,6 +68,16 @@ function normalizeAlternation(messages: PromptMessage[]): PromptMessage[] {
   return out;
 }
 
+/**
+ * assistant ターンを出力形式(JSON)で提示する。
+ * few-shot / 短期記憶の assistant 応答をプレーン文のまま渡すと、モデルが履歴のスタイルを
+ * 真似てプレーン文で返し JSON が崩れる(パース失敗 → フォールバック)。
+ * 履歴の assistant も JSON 形式に揃えることで、出力形式を一貫させる。
+ */
+function assistantTurn(message: string): string {
+  return JSON.stringify({ type: 'chat', message });
+}
+
 export function buildPrompt(
   charContext: CharacterContext,
   memoryContext: MemoryContext,
@@ -105,22 +115,25 @@ export function buildPrompt(
   const examples = charContext.fewshot.examples[routerResult.fewshotKey] ?? [];
   for (const ex of examples.slice(0, FEWSHOT_MAX)) {
     raw.push({ role: 'user', content: ex.user });
-    raw.push({ role: 'assistant', content: ex.assistant });
+    raw.push({ role: 'assistant', content: assistantTurn(ex.assistant) });
   }
 
   // 誕生日の特別反応 few-shot
   const reactions = charContext.fewshot.birthdayReactions;
   if (charContext.birthdayHint === 'today' && reactions?.celebrated?.[0]) {
     raw.push({ role: 'user', content: reactions.celebrated[0].user });
-    raw.push({ role: 'assistant', content: reactions.celebrated[0].assistant });
+    raw.push({ role: 'assistant', content: assistantTurn(reactions.celebrated[0].assistant) });
   } else if (charContext.birthdayHint === 'forgotten' && reactions?.forgotten?.[0]) {
     raw.push({ role: 'user', content: reactions.forgotten[0].user });
-    raw.push({ role: 'assistant', content: reactions.forgotten[0].assistant });
+    raw.push({ role: 'assistant', content: assistantTurn(reactions.forgotten[0].assistant) });
   }
 
-  // 直近の短期記憶(実際の会話履歴)
+  // 直近の短期記憶(実際の会話履歴)。assistant ターンは JSON 形式で提示する。
   for (const entry of memoryContext.shortTerm) {
-    raw.push({ role: entry.role, content: entry.text });
+    raw.push({
+      role: entry.role,
+      content: entry.role === 'assistant' ? assistantTurn(entry.text) : entry.text,
+    });
   }
 
   // 現在の入力

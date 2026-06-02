@@ -360,3 +360,17 @@
 - **判断**: **Prefill を廃止**(会話・Router 双方)。会話は末尾を user メッセージで終える。JSON は「system プロンプトの強い指示(JSON 1個のみ・前後に文章を付けない)+ 三段構えパーサ(フェンス除去・`{...}`抽出)」で担保。実機で応答が `{` 始まりのクリーン JSON・`chat` としてパース成功を確認。
 - **反映(要)**: §3.4 の Prefill 方式・F-CONV-06、§3.2 の Router Prefill、`prompt-builder`/`client`/`router` のコード例から Prefill を削除し、「現行モデルは prefill 非対応。出力安定化は system 指示 + ロバストパーサで行う」に更新。必要なら将来 tool 出力(structured output)方式も検討。
 - **有効なモデル ID(2026-06 時点・このキーで確認)**: `claude-sonnet-4-6` / `claude-sonnet-4-5`(alias)/ `claude-sonnet-4-5-20250929` / `claude-haiku-4-5-20251001` / `claude-haiku-4-5`。無効(404): `claude-3-7-sonnet-20250219`、`claude-3-5-sonnet-20241022` 等の旧世代。
+
+### N-09-8 🔴 **重要(不具合修正)**: プロンプト内の assistant ターンを JSON 形式に統一(履歴でプレーン文を学習しパース失敗)
+- **該当**: 設計書 §3.4 の messages 構造(few-shot / 短期記憶)
+- **症状**: 数ターン会話した後、特に「パチンコの新台教えて」等で `…ごめん、なんか調子悪いみたい` が再発。空メモリでは成功、実メモリ(短期20件)で失敗。
+- **原因**: few-shot と短期記憶の **assistant メッセージをプレーン文のまま渡していた**。短期記憶には ENE の過去応答(=message 本文・プレーン)が並ぶため、モデルが履歴のスタイルを真似て **JSON ではなくプレーン文で返す** → `parseConversationResponse` が null → フォールバック(この経路はログに出ない)。少数の few-shot だけなら system の JSON 指示が勝つが、20件の履歴があると履歴側が勝つ。
+- **判断**: prompt-builder で **assistant ターン(few-shot・誕生日・短期記憶)を `{"type":"chat","message":"..."}` の JSON 形式で提示**し、履歴と出力形式を一致させた(`assistantTurn()`)。user ターンはプレーンのまま。実メモリ込みで `parsed=chat` に回復。
+- **反映(要)**: §3.4 の messages 例で「assistant ターンは出力形式(JSON)で提示する」を明記。
+- **教訓**: in-context の実例(履歴)は system 指示より強く効く。出力フォーマットを使う場合、履歴の assistant 側もそのフォーマットで提示すること。
+
+### N-09-9 🟡 Router の 800ms タイムアウトが実 Haiku レイテンシ(約1.5–2.5s)を下回り、毎回 fallback
+- **該当**: 設計書 §3.2 / NF-PERF-03(ROUTER_TIMEOUT_MS=800)
+- **内容**: 実機ログで `Router fallback used: domain=medium` が毎回。Haiku の往復が 800ms を超えるため、Router は実質的に常に fallback=medium になる。トピック判定が効かず、ドメイン別 few-shot(例: none/unknown_none)が使われない。
+- **緩和されている点**: キャラの知識境界(高校生が知らない領域=パチンコ等で自然に「知らない」)は **buildSystemPrompt(system)に含まれている**ため、medium 扱いでも ENE は「知らない」と返せる(成功基準4は system 側で担保)。診断でも確認済み。
+- **判断/反映(要検討)**: 次のいずれか。(a) タイムアウトを ~2000ms へ引き上げる(総応答が NF-PERF-02 の 3–5s を超えうる)、(b) Router を memory 構築と並列実行してレイテンシ吸収、(c) 現状の best-effort(fallback)を許容し Router を補助的位置づけのままにする。MVP は (c) で動作。task_12 のパフォーマンス確認時に再検討。

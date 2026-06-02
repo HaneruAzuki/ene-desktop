@@ -22,6 +22,25 @@ describe('buildPrompt (設計書 §3.4)', () => {
     expect(p.messages.some((m) => m.role === 'user' && m.content.includes('いまの質問'))).toBe(true);
   });
 
+  it('few-shot/短期記憶の assistant ターンは JSON 形式で提示される(履歴と出力形式の一致)', () => {
+    const mc = makeMemoryContext({
+      shortTerm: [
+        { role: 'user', text: '過去の質問', timestamp: 't1', extracted: true },
+        { role: 'assistant', text: '過去の返答', timestamp: 't2', extracted: true },
+      ],
+    });
+    const p = buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x');
+    // few-shot の assistant が JSON 化されている
+    const fewshotAssistant = p.messages.find((m) => m.content.includes('ふん、教えてあげるわよ'));
+    expect(fewshotAssistant?.content).toContain('"type":"chat"');
+    // 短期記憶の assistant も JSON 化されている
+    const stAssistant = p.messages.find((m) => m.content.includes('過去の返答'));
+    expect(stAssistant?.content).toContain('"type":"chat"');
+    // user ターンはプレーンのまま
+    const stUser = p.messages.find((m) => m.role === 'user' && m.content.includes('過去の質問'));
+    expect(stUser?.content).not.toContain('"type":"chat"');
+  });
+
   it('出力形式(os_command 仕様)が system に含まれる', () => {
     const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
     expect(p.system).toContain('os_command');
