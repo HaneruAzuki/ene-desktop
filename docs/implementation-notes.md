@@ -276,3 +276,44 @@
 - **該当**: task_07 §9
 - **内容**: タスクトレイ常駐アプリだが、task_09 §9 どおり window-all-closed で quit。実際にはウィンドウは hide 運用で close されないため、主に安全網。
 - **反映**: 設計書変更不要。
+
+---
+
+## task_08(Renderer UI)
+
+### N-08-1 🟡 `getCharacterInfo` は portrait を data URL で返す(portraitPath → portraitUrl)
+- **該当**: 設計書 §4.2 `getCharacterInfo(): { name, portraitPath }`
+- **内容**: Renderer は CSP(`img-src 'self' data:`)+ sandbox のため、ディスク絶対パスを `<img src>` で読めない。main 側で portrait.png を読み base64 data URL 化して返すよう変更(`CharacterInfo.portraitUrl`)。
+- **判断**: data URL 化。
+- **反映**: §4.2 の `CharacterInfo` を `portraitUrl`(data URL)に更新。
+
+### N-08-2 🔴 **要判断**: ウィンドウ 240×320 と吹き出し最大 400px の衝突
+- **該当**: 設計書 §8.1(window 240×320)/ §8.5(bubble max 400px)
+- **内容**: 240×320 のウィンドウ内に最大 400px の吹き出しは収まらない。吹き出し/入力欄はウィンドウ DOM 内に描画されるため、はみ出すと窓にクリップされる。
+- **判断(MVP)**: 吹き出しは上部・入力欄は下部にオーバーレイ配置し、`max-height: min(400px, calc(100vh - 90px))` でウィンドウ高に収める(キャラに重なる)。
+- **反映(要判断)**: (a) ウィンドウを大きくして吹き出し用スペースを確保(§8.1 変更・承認要)、(b) 吹き出し表示時にウィンドウを動的リサイズ(IPC 追加)、(c) MVP のオーバーレイで許容、のいずれか。**ユーザー判断が必要**。
+
+### N-08-3 🟡 move-window の位置保存をデバウンス
+- **該当**: task_07 §7(move-window で毎回 saveWindowPosition)
+- **内容**: ドラッグ中に毎フレーム JSON 保存すると過剰 I/O。setBounds は即時、保存は 400ms デバウンスに変更。Renderer 側は requestAnimationFrame で moveWindow をスロットル。
+- **反映**: §8.3 に「ドラッグ中の保存はデバウンス」と明記。
+
+### N-08-4 🟡 クリックスルー判定を App に集約(window mousemove)
+- **該当**: 設計書 §8.6
+- **内容**: 「キャラ不透明 OR 吹き出し OR 入力欄」の判定を App の window 級 mousemove で一元化。CharacterDisplay は `useImperativeHandle` で `isOpaqueAt(x,y)` を公開。値が変わった時のみ `setIgnoreMouseEvents` を呼ぶ(IPC 削減)。
+- **反映**: §8.6 の実装方針に集約版を反映。
+
+### N-08-5 ⚪ ドラッグは window 級 mousemove/mouseup で追従
+- **該当**: 設計書 §8.2(img の onMouseMove 例)
+- **内容**: 取りこぼし防止のため mousedown 時に window へ move/up を登録(同一クロージャで removeEventListener)。rAF スロットル + デバウンス保存。
+- **反映**: §8.2/§8.3 に補足。
+
+### N-08-6 ⚪ スタイル/エントリのパス
+- **該当**: task_08 §6/§7(styles.css)
+- **内容**: 既存配線に合わせ `src/renderer/styles/global.css` を使用(設計書 §2 のツリーと一致)。main.tsx は既存のまま。
+- **反映**: 設計書変更不要。
+
+### N-08-7 ⚪ React コンポーネントは単体テストせず dev 起動で検証
+- **該当**: 設計書 §1.2 / §10
+- **内容**: @vitejs/plugin-react / React Testing Library / jsdom を追加していない(§1.2 外・N-00-3)。コンポーネントは `npm run dev` + スクショで代理検証し、純粋ロジック(mouse-gesture)のみ単体テスト。インタラクション系はユーザーの手動確認。
+- **反映**: §10 のテスト戦略に「Renderer は手動 + 純粋ロジックのみ自動」と明記。

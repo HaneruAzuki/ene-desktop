@@ -1,4 +1,5 @@
 import { ipcMain, type BrowserWindow } from 'electron';
+import { promises as fs } from 'node:fs';
 import { nowLocalIso } from '../shared/datetime';
 import { log } from '../shared/logger';
 import { WINDOW_WIDTH, WINDOW_HEIGHT } from '../shared/constants';
@@ -28,6 +29,26 @@ const NOT_READY: ConversationResponse = {
   type: 'chat',
   message: '…ちょっと待ってね、まだ準備ができてないみたい。',
 };
+
+// ドラッグ中の move-window で位置保存を毎フレーム書かないようデバウンスする。
+const POSITION_SAVE_DEBOUNCE_MS = 400;
+let positionSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedSavePosition(x: number, y: number): void {
+  if (positionSaveTimer) clearTimeout(positionSaveTimer);
+  positionSaveTimer = setTimeout(() => {
+    void saveWindowPosition(x, y);
+  }, POSITION_SAVE_DEBOUNCE_MS);
+}
+
+/** portrait.png を data URL 化する(CSP 準拠で Renderer に渡すため)。 */
+async function readPortraitDataUrl(portraitPath: string): Promise<string> {
+  try {
+    const buf = await fs.readFile(portraitPath);
+    return `data:image/png;base64,${buf.toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
 
 const ERROR_RESPONSE: ConversationResponse = {
   type: 'chat',
@@ -91,10 +112,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     if (runtime.charContext) {
       return {
         name: runtime.charContext.identity.name,
-        portraitPath: runtime.charContext.portraitPath,
+        portraitUrl: await readPortraitDataUrl(runtime.charContext.portraitPath),
       };
     }
-    return { name: 'ENE', portraitPath: '' };
+    return { name: 'ENE', portraitUrl: '' };
   });
 
   ipcMain.handle('ene:has-api-key', async (): Promise<boolean> => isApiKeyAvailable());
@@ -107,7 +128,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   ipcMain.handle('ene:move-window', async (_event, x: number, y: number): Promise<void> => {
     mainWindow.setBounds({ x, y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
-    await saveWindowPosition(x, y);
+    // ドラッグ中の連続呼び出しに備え、保存はデバウンスする。
+    debouncedSavePosition(x, y);
   });
 
   ipcMain.handle('ene:reset-window-position', async (): Promise<void> => {

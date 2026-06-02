@@ -4,7 +4,8 @@ import type { ConversationResponse } from './conversation';
 
 export interface CharacterInfo {
   name: string;
-  portraitPath: string;
+  // portrait は CSP/サンドボックス制約のため data URL で渡す(main 側で PNG を base64 化)。
+  portraitUrl: string;
 }
 
 export interface EneAPI {

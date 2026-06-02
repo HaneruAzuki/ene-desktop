@@ -1,4 +1,8 @@
 /* 透過ウィンドウのため、背景は必ず透明にする(下のデスクトップが透ける)。 */
+* {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -8,28 +12,71 @@ body,
   height: 100%;
   background: transparent;
   overflow: hidden;
-  /* OS のテキスト選択カーソルを出さない(キャラ操作の邪魔になるため) */
+  /* ドラッグ時のテキスト選択を防ぐ */
+  user-select: none;
+  font-family: 'Segoe UI', 'Yu Gothic UI', 'Hiragino Sans', sans-serif;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* キャラ画像(ウィンドウ下部に配置。周囲の透明部分はクリックスルー対象) */
+.character {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  height: 320px;
+  -webkit-user-drag: none;
   user-select: none;
 }
 
-.app-root {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
+/* 応答吹き出し(キャラ上部・半透明白背景・黒文字) */
+.bubble {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 224px;
+  background: rgba(255, 255, 255, 0.93);
+  color: #1a1a1a;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: pointer;
+  z-index: 10;
 }
 
-/* task_00 用の暫定プレースホルダ表示。task_08 でキャラ画像に置き換える。 */
-.placeholder {
-  padding: 16px 24px;
-  border-radius: 12px;
-  background: rgba(90, 160, 220, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  color: #ffffff;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+/* 入力欄(キャラ下部) */
+.input-area {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 228px;
+  z-index: 20;
+}
+
+.input-field {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1a1a1a;
+  font-size: 13px;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.input-field::placeholder {
+  color: #888;
 }
