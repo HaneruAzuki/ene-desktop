@@ -1,6 +1,6 @@
 import { ipcMain, type BrowserWindow } from 'electron';
 import { promises as fs } from 'node:fs';
-import { nowLocalIso } from '../shared/datetime';
+import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
 import { log } from '../shared/logger';
 import { WINDOW_WIDTH, WINDOW_HEIGHT } from '../shared/constants';
 import { appendShortTerm } from '../memory/short-term';
@@ -9,6 +9,7 @@ import { extractFromShortTerm } from '../memory/extraction-trigger';
 import { classifyTopic } from '../router/router';
 import { chat, makeLlmComplete } from '../conversation/client';
 import { executeOsCommand } from '../os/executor';
+import { recordBirthdayCelebrated } from '../character/active-character';
 import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
 import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
@@ -20,10 +21,12 @@ import type { CharacterInfo } from '../shared/types/ipc';
 // IPC ハンドラ集約(設計書 §4)。
 // すべての業務ロジックは main 側。Renderer は IPC 経由でのみ呼ぶ(API キーも漏らさない)。
 
-/** 起動時に構築され、ハンドラから参照される実行時状態。task_10 で完全に組み立てる。 */
+/** 起動時に構築され、ハンドラから参照される実行時状態。 */
 export interface AppRuntime {
   charContext: CharacterContext | null;
   apiKey: string | null;
+  /** 起動挨拶(Renderer が getInitialGreeting で1回取得する)。 */
+  initialGreeting: string | null;
 }
 
 const NOT_READY: ConversationResponse = {
@@ -106,6 +109,14 @@ async function handleSendMessage(
     }
   }
 
+  // 7. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)
+  if (charContext.birthdayHint === 'today') {
+    const congrats = ['誕生日', 'おめでとう', 'ハッピーバースデー', 'Happy Birthday', 'バースデー'];
+    if (congrats.some((w) => text.includes(w))) {
+      await recordBirthdayCelebrated(todayLocalYmd().year);
+    }
+  }
+
   return response;
 }
 
@@ -128,6 +139,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       };
     }
     return { name: 'ENE', portraitUrl: '' };
+  });
+
+  // 起動挨拶を1回だけ返す(pull 方式。取得後はクリアして再表示しない)。
+  ipcMain.handle('ene:get-initial-greeting', async (): Promise<string | null> => {
+    const greeting = runtime.initialGreeting;
+    runtime.initialGreeting = null;
+    return greeting;
   });
 
   ipcMain.handle('ene:has-api-key', async (): Promise<boolean> => isApiKeyAvailable());

@@ -1,62 +1,26 @@
 import { app, type BrowserWindow } from 'electron';
-import { log, initLogger } from '../shared/logger';
-import { getLogsDir } from '../storage/paths';
+import { log } from '../shared/logger';
 import { acquireSingleInstanceLock } from './single-instance';
-import { createMainWindow } from './window';
-import { createTray } from './tray';
-import { registerIpcHandlers, type AppRuntime } from './ipc';
-import {
-  loadWindowPosition,
-  getDefaultPosition,
-  clampPositionToScreen,
-  saveWindowPosition,
-} from './window-position';
-import { buildCharacterContext } from '../character/context-builder';
-import { loadAndDecryptApiKey } from '../storage/encryption';
-import { openApiKeyDialog } from './api-key-dialog';
+import { runStartupSequence } from './lifecycle';
+import { runShutdownSequence } from './shutdown';
+import type { AppRuntime } from './ipc';
 
 // Electron main エントリポイント(設計書 §7)。
-// task_07 では window / tray / IPC の最小統合 + charContext・apiKey の最小ロードまで。
-// クラウド警告・APIキーダイアログ・誕生日チェック・挨拶などの完全な起動シーケンスは task_10。
+// 多重起動防止 → 起動シーケンス(lifecycle)→ 終了時に記憶抽出(shutdown)。
 
+const runtime: AppRuntime = { charContext: null, apiKey: null, initialGreeting: null };
 let mainWindow: BrowserWindow | null = null;
+let shuttingDown = false;
 
-async function bootstrap(): Promise<void> {
-  await app.whenReady();
-  initLogger(getLogsDir());
-  log.info('app starting');
-
-  // 実行時状態(task_10 で完全に構築)。失敗しても起動は継続する。
-  const runtime: AppRuntime = { charContext: null, apiKey: null };
+async function start(): Promise<void> {
   try {
-    runtime.charContext = await buildCharacterContext();
+    const result = await runStartupSequence(runtime);
+    mainWindow = result.mainWindow;
   } catch (e) {
-    log.error('failed to build character context', { name: (e as Error).name });
+    // 起動シーケンス内で app.quit() 済み。ここではログのみ。
+    log.error('startup failed', { name: (e as Error).name });
+    app.quit();
   }
-  try {
-    runtime.apiKey = await loadAndDecryptApiKey();
-  } catch (e) {
-    log.warn('failed to load api key', { name: (e as Error).name });
-  }
-
-  // ウィンドウ位置(前回位置を復元 → 画面内補正 / 無ければ右下既定)
-  const saved = await loadWindowPosition();
-  const position = saved ? clampPositionToScreen(saved) : getDefaultPosition();
-  mainWindow = createMainWindow(position);
-  await saveWindowPosition(position.x, position.y);
-
-  createTray(mainWindow);
-  registerIpcHandlers(mainWindow, runtime);
-
-  // F-KEY-03: APIキー未保存なら設定ダイアログを表示する。
-  // (クラウド警告・キャンセル時終了などを含む完全な起動シーケンスは task_10 で統合)
-  if (!runtime.apiKey) {
-    void openApiKeyDialog(mainWindow, (key) => {
-      runtime.apiKey = key;
-    });
-  }
-
-  log.info('app ready');
 }
 
 if (!acquireSingleInstanceLock()) {
@@ -75,5 +39,15 @@ if (!acquireSingleInstanceLock()) {
     app.quit();
   });
 
-  void bootstrap();
+  // 終了前に記憶抽出 + 短期記憶クリア(設計書 §7.2)。
+  // preventDefault して非同期処理を待ってから quit する。
+  app.on('before-quit', (event) => {
+    if (!shuttingDown && runtime.apiKey) {
+      event.preventDefault();
+      shuttingDown = true;
+      void runShutdownSequence(runtime).finally(() => app.quit());
+    }
+  });
+
+  void start();
 }

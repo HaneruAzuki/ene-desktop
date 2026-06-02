@@ -15,6 +15,9 @@ export interface EneAPI {
   // キャラクター関連
   getCharacterInfo(): Promise<CharacterInfo>;
 
+  // 起動挨拶(pull 方式・1回だけ取得)
+  getInitialGreeting(): Promise<string | null>;
+
   // 設定関連
   hasApiKey(): Promise<boolean>;
   saveApiKey(key: string): Promise<void>;

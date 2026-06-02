@@ -28,6 +28,13 @@ export function App(): React.ReactElement | null {
     void window.ene.getCharacterInfo().then(setCharacterInfo);
   }, []);
 
+  // 起動挨拶を1回取得して吹き出しに表示(設計書 §8.7)
+  useEffect(() => {
+    void window.ene.getInitialGreeting().then((greeting) => {
+      if (greeting) setBubble(greeting);
+    });
+  }, []);
+
   // トレイ / コンテキストメニューからのイベント
   useEffect(() => {
     window.ene.onOpenInputArea(() => setInputVisible(true));

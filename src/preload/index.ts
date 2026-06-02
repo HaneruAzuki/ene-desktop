@@ -7,6 +7,7 @@ import type { EneAPI } from '../shared/types/ipc';
 const eneAPI: EneAPI = {
   sendMessage: (text) => ipcRenderer.invoke('ene:send-message', text),
   getCharacterInfo: () => ipcRenderer.invoke('ene:get-character-info'),
+  getInitialGreeting: () => ipcRenderer.invoke('ene:get-initial-greeting'),
   hasApiKey: () => ipcRenderer.invoke('ene:has-api-key'),
   saveApiKey: (key) => ipcRenderer.invoke('ene:save-api-key', key),
   moveWindow: (x, y) => ipcRenderer.invoke('ene:move-window', x, y),

@@ -384,6 +384,40 @@
 
 ---
 
+## task_10(起動シーケンス統合)
+
+### N-10-1 🟡 `registerIpcHandlers` シグネチャは `(mainWindow, runtime)` を維持
+- **該当**: task_10 §1(`registerIpcHandlers(mainWindow, charContext, apiKey)`)
+- **内容**: 既存の `AppRuntime`(`{ charContext, apiKey, initialGreeting }`)パターンを維持し、`(mainWindow, runtime)` のままにした。APIキーダイアログ保存時に runtime.apiKey を更新でき、状態を1オブジェクトに集約できるため。
+- **反映**: task_10 §1 のシグネチャを runtime ベースに統一。
+
+### N-10-2 🟡 `extractFromShortTerm` は DI シグネチャ `(reason, makeLlmComplete(apiKey))`
+- **該当**: task_10 §1/§6(`extractFromShortTerm("shutdown", charContext)`)
+- **内容**: N-03-4 の DI 方針に従い、charContext ではなく LLM 呼び出し(`makeLlmComplete(apiKey)`)を注入する。Memory 層は Claude を直接知らない。
+- **反映**: task_10 のコード例を DI 版へ。
+
+### N-10-3 🟡 起動挨拶は pull 方式(`getInitialGreeting`)
+- **該当**: task_10 §3/§4(push: `did-finish-load` → `send('ene:initial-greeting')`)
+- **内容**: push は Renderer の useEffect 登録前に発火しうる競合がある。runtime.initialGreeting に挨拶を用意し、Renderer がマウント時に `getInitialGreeting()` で1回取得(取得後クリア)する pull 方式にした。実機で吹き出し「…おかえり。」表示を確認。
+- **反映**: §8.7 の挨拶受け渡しを pull 方式に更新(または push なら描画後送信を明記)。
+
+### N-10-4 ⚪ 誕生日「祝われた」記録を send-message に追加(§3.1 / §5.4)
+- **該当**: task_10 §5 ステップ7
+- **内容**: `birthdayHint === 'today'` かつユーザー入力に祝福語(おめでとう等)が含まれる場合、`recordBirthdayCelebrated(year)` を呼ぶ。
+- **反映**: 設計書 §3.1 の誕生日フローどおりの実装。
+
+### N-10-5 ⚪ 起動挨拶は 'forgotten' 誕生日にも対応
+- **該当**: task_10 §3 / 設計書 §3.1
+- **内容**: `birthdayHint === 'forgotten'` の場合、起動挨拶として forgotten 反応(fewshot)を返す。today の祝福は会話側の few-shot で扱う。
+- **反映**: §8.7 の挨拶ロジックに forgotten ケースを明記。
+
+### N-10-6 ⚪ before-quit で非同期終了処理(preventDefault + isQuitting ガード)
+- **該当**: task_10 §6/§7 / 設計書 §7.2
+- **内容**: `app.on('before-quit')` で preventDefault → runShutdownSequence(記憶抽出 + 短期記憶クリア)→ `app.quit()`。再入防止の isQuitting フラグ。runtime.apiKey がある時のみ実行。
+- **検証メモ**: 起動シーケンス(書込検証・APIキー・キャラ・記憶ディレクトリ・誕生日・ウィンドウ・挨拶)は実機で app starting→active character→app ready とエラー無しを確認。**graceful 終了時の抽出・短期記憶削除、初回起動挨拶(active-character.json 削除時)、誕生日反応、クラウド警告**はユーザーの手動確認に委ねる(実操作が必要)。
+
+---
+
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)
 
 MVP の動作自体は妨げないが、完成後に改善する項目(ユーザー方針で記録)。
