@@ -9,9 +9,11 @@ describe('buildPrompt (設計書 §3.4)', () => {
     expect(p.system).toContain('アシスタント');
   });
 
-  it('messages の最後は assistant の "{"(Prefill)', () => {
+  it('messages の最後は現在の user 入力(Prefill は使わない=現行モデル非対応)', () => {
     const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'こんにちは');
-    expect(p.messages[p.messages.length - 1]).toEqual({ role: 'assistant', content: '{' });
+    const last = p.messages[p.messages.length - 1];
+    expect(last?.role).toBe('user');
+    expect(last?.content).toContain('こんにちは');
   });
 
   it('few-shot 例と現在の入力が messages に含まれる', () => {

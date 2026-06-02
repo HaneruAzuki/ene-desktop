@@ -48,9 +48,8 @@ function makeDefaultDeps(apiKey: string): ChatDeps {
         system,
         messages,
       });
-      const text = resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
-      // 末尾 messages の Prefill "{" はレスポンスに含まれないため補完する。
-      return `{${text}`;
+      // Prefill は使わないので、応答テキストをそのまま返す(パーサが JSON を抽出する)。
+      return resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
     },
     // トークン計測は SDK の countTokens が固定版に無いため、ローカル見積もりで判定する。
     checkTokens: async (prompt) => countAndCheck(prompt),

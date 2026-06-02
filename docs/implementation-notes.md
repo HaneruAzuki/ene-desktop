@@ -351,3 +351,12 @@
 - **該当**: 実装ポリッシュ
 - **内容**: frame:true のダイアログに既定メニューバーが出るため `win.removeMenu()`、`win.center()` で中央配置。
 - **反映**: 設計書変更不要。
+
+### N-09-7 🔴 **重要(不具合修正)**: 現行モデルは assistant メッセージ Prefill 非対応 → Prefill 廃止
+- **該当**: 設計書 §3.4「JSON出力強制の実装方針(Prefill 方式)」/ §3.2 / §2.5 F-CONV-06
+- **症状**: 実機検証で全質問にフォールバック「…ごめん、なんか調子悪いみたい」。ログは `conversation model call failed`。
+- **原因**: `claude-sonnet-4-6`(および Haiku 4.5 等の現行 Claude 4.x)は、末尾を assistant メッセージ(`{role:'assistant', content:'{'}`=Prefill)にすると **400 invalid_request_error: "This model does not support assistant message prefill. The conversation must end with a user message."** を返す。設計書の Prefill 方式がそのまま使えない。
+  - 切り分け: モデル ID `claude-sonnet-4-6` 自体は有効(単純メッセージは 200)。Prefill 付き(実 buildPrompt 構造)で 400。
+- **判断**: **Prefill を廃止**(会話・Router 双方)。会話は末尾を user メッセージで終える。JSON は「system プロンプトの強い指示(JSON 1個のみ・前後に文章を付けない)+ 三段構えパーサ(フェンス除去・`{...}`抽出)」で担保。実機で応答が `{` 始まりのクリーン JSON・`chat` としてパース成功を確認。
+- **反映(要)**: §3.4 の Prefill 方式・F-CONV-06、§3.2 の Router Prefill、`prompt-builder`/`client`/`router` のコード例から Prefill を削除し、「現行モデルは prefill 非対応。出力安定化は system 指示 + ロバストパーサで行う」に更新。必要なら将来 tool 出力(structured output)方式も検討。
+- **有効なモデル ID(2026-06 時点・このキーで確認)**: `claude-sonnet-4-6` / `claude-sonnet-4-5`(alias)/ `claude-sonnet-4-5-20250929` / `claude-haiku-4-5-20251001` / `claude-haiku-4-5`。無効(404): `claude-3-7-sonnet-20250219`、`claude-3-5-sonnet-20241022` 等の旧世代。

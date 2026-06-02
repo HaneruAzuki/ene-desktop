@@ -45,7 +45,7 @@ function buildRouterSystemPrompt(knowledgeDomains: CharacterKnowledgeDomains): s
   ].join('\n');
 }
 
-/** 既定の Haiku 呼び出し(Prefill で JSON を強制)。 */
+/** 既定の Haiku 呼び出し。Prefill は現行モデルが非対応のため使わず、応答をそのままパースする。 */
 const defaultHaikuCall: RouterLlmCall = async ({ system, userText, apiKey }) => {
   const client = new Anthropic({ apiKey });
   const resp = await client.messages.create({
@@ -53,13 +53,9 @@ const defaultHaikuCall: RouterLlmCall = async ({ system, userText, apiKey }) => 
     max_tokens: 100,
     temperature: 0.0,
     system,
-    messages: [
-      { role: 'user', content: userText },
-      { role: 'assistant', content: '{' }, // Prefill
-    ],
+    messages: [{ role: 'user', content: userText }],
   });
-  const text = resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
-  return `{${text}`; // Prefill の "{" はレスポンスに含まれないので補完
+  return resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
 };
 
 function timeout(ms: number): Promise<never> {

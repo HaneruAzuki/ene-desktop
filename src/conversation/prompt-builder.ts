@@ -126,9 +126,9 @@ export function buildPrompt(
   // 現在の入力
   raw.push({ role: 'user', content: userText });
 
-  // 交互列に正規化してから Prefill を付ける(最後は必ず assistant の "{")
+  // 交互列に正規化する。末尾は必ず user メッセージ。
+  // (Prefill = 末尾 assistant "{" は現行モデルが非対応のため使わない。N-09-7 参照)
   const messages = normalizeAlternation(raw);
-  messages.push({ role: 'assistant', content: '{' });
 
   return { system, messages };
 }
