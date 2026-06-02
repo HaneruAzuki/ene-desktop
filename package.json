@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "package": "electron-builder",
+    "package": "electron-vite build && electron-builder",
+    "package:portable": "electron-vite build && electron-builder --win portable",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
@@ -17,7 +18,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
-    "electron": "^30.5.1",
     "electron-log": "^5.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -28,6 +28,7 @@
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
+    "electron": "^30.5.1",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "eslint": "^8.57.1",

@@ -2,9 +2,26 @@ appId: com.example.ene-desktop
 productName: ENE Desktop
 directories:
   output: dist
+  buildResources: resources
+# 配布物に含めるファイル。main/preload/renderer は out/ に自己完結バンドル済みなので
+# node_modules は同梱しない(electron ランタイムは electron-builder が別途同梱する)。
 files:
-  - "out/**/*"
-  - "characters/**/*"     # 初期キャラを同梱
+  - 'out/**/*'
+  - 'characters/**/*' # 初期キャラ(JSON + portrait)を同梱
+  - 'resources/**/*' # トレイアイコン等(実行時に nativeImage が読む・N-07-6)
+  - '!node_modules/**/*'
+asar: true
+asarUnpack:
+  - 'characters/**/*' # キャラ定義はユーザーがカスタマイズ可能なよう展開状態を維持
 win:
-  target: portable        # インストール不要のexe
+  target:
+    - target: portable
+      arch:
+        - x64
   icon: resources/icon.ico
+portable:
+  artifactName: ENE-Desktop-${version}.exe
+# 配布サイズ削減: 同梱するロケールを絞る(NF-SIZE-01)
+electronLanguages:
+  - ja
+  - en-US

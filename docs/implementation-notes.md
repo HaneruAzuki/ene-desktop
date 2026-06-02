@@ -418,10 +418,45 @@
 
 ---
 
+## task_11(ビルド・配布)
+
+### N-00-4 🟢 解決: Electron を devDependencies へ移動(ユーザー承認済み)
+- **該当**: CLAUDE §2.2 / 設計書 §1.2(Electron を「同梱=dependencies」に分類)
+- **内容**: `npm run package:portable` で `⨯ Package "electron" is only allowed in "devDependencies"` でビルド拒否(electron-builder の要件)。
+- **判断/反映**: ユーザー承認のうえ electron を devDependencies へ移動。CLAUDE §2.2 と設計書 §1.2 に「Electron は例外的に devDependencies、ただしランタイムは exe に同梱される」と注記済み。package-lock.json も更新。
+
+### N-11-1 🟡 winCodeSign の展開がシンボリックリンク権限不足で失敗(回避策あり)
+- **該当**: electron-builder のパッケージング(Windows・非管理者/開発者モード無効)
+- **内容**: winCodeSign アーカイブ内の macOS 用シンボリックリンク(`darwin/.../libcrypto.dylib`, `libssl.dylib`)作成に Windows のシンボリックリンク権限が必要で失敗 → ビルド全体が失敗。
+- **回避策(実施)**: winCodeSign の 7z を手動展開してキャッシュ `winCodeSign-2.6.0` に配置(darwin リンクの失敗は無視。Windows ツールは展開される)。
+- **恒久対策(要検討)**: Windows 開発者モード有効化 or 管理者ビルド。メモリ [[electron-binary-manual-extract]] にも記録。
+
+### N-11-2 🔴 **重要(不具合修正)**: portable exe のデータ保存先は `PORTABLE_EXECUTABLE_DIR`
+- **該当**: 設計書 §3.6 `getPortableDataDir()`(`path.dirname(process.execPath)`)/ F-LIFE-07
+- **症状**: portable exe 実行時、`data/` が exe の隣でなく %TEMP% の自己展開先に作られ終了時に消える(成功基準5を破る)。
+- **原因**: portable ターゲットは自己展開型で %TEMP% から実行するため `process.execPath` が一時ディレクトリ。元 exe の場所は環境変数 `PORTABLE_EXECUTABLE_DIR` で渡される。
+- **修正**: `getPortableDataDir()` で `process.env.PORTABLE_EXECUTABLE_DIR ?? path.dirname(process.execPath)`。実機で `dist\data\`(exe の隣)に config/memory 生成を確認。
+- **反映(要)**: 設計書 §3.6 の実装方針を `PORTABLE_EXECUTABLE_DIR` 優先に更新。
+
+### N-11-3 🟡 electron.vite.config は task_11 §1 の変更を採用せず(自己完結バンドル方式)
+- **該当**: task_11 §1(`externalizeDepsPlugin()` + `@vitejs/plugin-react`)
+- **内容**: §1 と §2 が矛盾(externalize すると node_modules が必要だが §2 は除外)。`@vitejs/plugin-react` も §1.2 外(N-00-3)。
+- **判断**: main/preload を自己完結バンドルにし、electron-builder の `files` で node_modules を除外(`!node_modules/**/*`)。`resources/**`(トレイアイコン)を同梱(N-07-6 解決)。
+- **結果**: `dist\ENE-Desktop-0.1.0.exe` = **60.9 MB**(NF-SIZE-01 の 100MB 以下を達成)。
+
+### N-11-4 🟡 パッケージ時のログ保存先が data/logs ではなく %APPDATA%(ブラッシュアップ)
+- **該当**: 設計書 §2 / F-LOG-06,07(ログは data/logs/)
+- **内容**: パッケージ版で `main.log` が `dist\data\logs\` ではなく `%APPDATA%\ene-desktop\logs\` に出力(dev では data/logs)。記憶・設定の永続化は正常。
+- **判断**: 動作に影響しないため MVP 後にブラッシュアップ。
+
+---
+
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)
 
 MVP の動作自体は妨げないが、完成後に改善する項目(ユーザー方針で記録)。
 
 - **[N-09-9] Router タイムアウト**: 800ms が実 Haiku レイテンシを下回り毎回 fallback。並列化 or タイムアウト調整を検討。
 - **[N-09-10] 記憶抽出の頻度**: 短期20件超過後は毎メッセージ抽出 → 追加 API 呼び出し。一定件数たまった時のみ/バッチ化/バックグラウンド化を検討。
+- **[N-11-1] winCodeSign 回避**: ビルドに手動キャッシュ配置が必要。開発者モード/CI 整備で恒久化。
+- **[N-11-4] パッケージ時のログ保存先**: %APPDATA% ではなく data/logs に出すよう electron-log 設定を見直す。
 - (随時追記)

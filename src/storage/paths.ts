@@ -44,8 +44,11 @@ export async function refreshActiveCharacterId(): Promise<string> {
 /** ポータブルデータのルート(本番: exe の隣 / 開発: プロジェクトルート)の data/。 */
 export function getPortableDataDir(): string {
   if (app.isPackaged) {
-    // 本番(exe実行時): exe と同じディレクトリの data/
-    return path.join(path.dirname(process.execPath), 'data');
+    // portable exe は自己展開されて %TEMP% から実行されるため、process.execPath は
+    // 一時ディレクトリを指す。電子-builder の portable ターゲットは元の exe の場所を
+    // PORTABLE_EXECUTABLE_DIR で渡すので、それを優先する(無ければ execPath の隣)。
+    const baseDir = process.env['PORTABLE_EXECUTABLE_DIR'] ?? path.dirname(process.execPath);
+    return path.join(baseDir, 'data');
   }
   // 開発(npm run dev時): プロジェクトルートの data/
   return path.join(process.cwd(), 'data');

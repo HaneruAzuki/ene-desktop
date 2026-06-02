@@ -46,7 +46,18 @@ describe('paths (設計書 §3.6 / §5.5)', () => {
 
   it('本番時(isPackaged)は exe ディレクトリ/data を返す', () => {
     setPackaged(true);
+    delete process.env.PORTABLE_EXECUTABLE_DIR;
     expect(getPortableDataDir()).toBe(path.join(path.dirname(process.execPath), 'data'));
+  });
+
+  it('portable 本番時は PORTABLE_EXECUTABLE_DIR/data を返す', () => {
+    setPackaged(true);
+    process.env.PORTABLE_EXECUTABLE_DIR = 'D:\\apps\\ENE';
+    try {
+      expect(getPortableDataDir()).toBe(path.join('D:\\apps\\ENE', 'data'));
+    } finally {
+      delete process.env.PORTABLE_EXECUTABLE_DIR;
+    }
   });
 
   it('getMemoryDir は active キャラ ID を反映する', () => {

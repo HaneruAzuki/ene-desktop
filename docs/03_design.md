@@ -29,7 +29,6 @@
 
 | 項目 | 採用技術 | バージョン | 選定理由 |
 |------|---------|-----------|---------|
-| アプリ基盤 | Electron | `^30.x` | 透過ウィンドウ・常駐表示・Windows互換性 |
 | UIフレームワーク | React | `^18.x` | 将来拡張性・コンポーネント化 |
 | Claude API | @anthropic-ai/sdk | `^0.30.x` | Anthropic公式SDK |
 | ロギング | electron-log | `^5.x` | Electron標準的なロガー |
@@ -39,6 +38,7 @@
 
 | 項目 | 採用技術 | バージョン | 選定理由 |
 |------|---------|-----------|---------|
+| アプリ基盤 | Electron | `^30.x` | 透過ウィンドウ・常駐表示・Windows互換性。electron-builder の要件で **devDependencies に置く**(`electron` を dependencies に置くとビルド拒否)。ランタイムは electron-builder が exe に同梱するため「配布物に含まれる」性質は保たれる。ユーザー承認済み・N-00-4 参照 |
 | 言語 | TypeScript | `^5.x`(strict) | 型安全・長期保守・Claude Code相性 |
 | ランタイム | Node.js | 24 LTS | Electronとの互換性。2026年時点で LTS 系列が 24 に移行し、winget で 20 LTS が入手不可となったためユーザー承認のうえ 20→24 に更新(旧: 20 LTS) |
 | ビルドツール | Vite | `^5.x` | 高速・TypeScript標準対応 |

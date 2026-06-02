@@ -35,8 +35,15 @@
 
 | 分類 | 配置場所 | 配布物への影響 | 例 |
 |------|---------|--------------|---|
-| **同梱ライブラリ** | `dependencies` | exe に含まれる(ユーザーに届く) | Electron, React, @anthropic-ai/sdk |
+| **同梱ライブラリ** | `dependencies` | exe に含まれる(ユーザーに届く) | React, @anthropic-ai/sdk |
 | **開発時のみ** | `devDependencies` | exe には含まれない | TypeScript, Vite, ESLint, Vitest |
+
+> ⚠️ **Electron の例外(ユーザー承認済み)**:Electron は概念上は「同梱」(exe に
+> ランタイムが含まれる)だが、**`devDependencies` に置く**。electron-builder が
+> `electron` を `dependencies` に置くとビルドを拒否する(`Package "electron" is only
+> allowed in "devDependencies"`)ため。Electron ランタイムは electron-builder が
+> 別途 exe に同梱するので「配布物に含まれる」性質は保たれる。
+> 詳細は `docs/implementation-notes.md` N-00-4 を参照。
 
 設計書 §1.2 で「同梱ライブラリ」「開発時のみ」と明示されているので、
 それに従って `package.json` に登録すること。判断に迷ったら設計書を見る。
