@@ -317,3 +317,37 @@
 - **該当**: 設計書 §1.2 / §10
 - **内容**: @vitejs/plugin-react / React Testing Library / jsdom を追加していない(§1.2 外・N-00-3)。コンポーネントは `npm run dev` + スクショで代理検証し、純粋ロジック(mouse-gesture)のみ単体テスト。インタラクション系はユーザーの手動確認。
 - **反映**: §10 のテスト戦略に「Renderer は手動 + 純粋ロジックのみ自動」と明記。
+
+---
+
+## task_09(APIキー管理ダイアログ)
+
+### N-09-1 🟡 `api-key-dialog-ipc.ts` を `api-key-dialog.ts` に統合
+- **該当**: task_09 §6(別ファイル `api-key-dialog-ipc.ts`)
+- **内容**: ダイアログのモジュール状態(現在のウィンドウ・onSaved・close 結果)を共有する必要があるため、IPC 登録(test/save/open-console/close)を `api-key-dialog.ts` に統合。グローバルハンドラは一度だけ登録(再登録エラー回避)。
+- **反映**: task_09 §6 の配置を統合版に合わせる。
+
+### N-09-2 🟡 electron-vite をマルチエントリ化(ダイアログ用 2nd renderer/preload)
+- **該当**: 設計書 §1.3 / electron.vite.config.ts
+- **内容**: ダイアログ専用ページ(`src/renderer/api-key-dialog/`)と専用 preload を持つため、renderer/preload の rollupOptions.input を 2 エントリに拡張。dev は `${ELECTRON_RENDERER_URL}/api-key-dialog/index.html` を読込。ビルド成功・ダイアログ表示を確認済み。
+- **反映**: §1.3/§9 に「マルチエントリ構成(メインUI + APIキーダイアログ)」を明記。
+
+### N-09-3 🟡 Renderer から `getErrorMessage` を import / `isValidKeyFormat` はインライン
+- **該当**: task_09 §4/§5(api-key-tester / api-key-error-messages)
+- **内容**: `api-key-tester.ts` は Anthropic SDK を import するため、Renderer から読むと SDK がダイアログバンドルに混入する。形式チェックはダイアログ内にインライン化(SDK 非混入・バンドル 4.2KB を確認)。`getErrorMessage`(純粋・SDK 非依存)のみ Renderer から import。
+- **反映**: §3.7 に「形式チェックは Renderer 内、疎通テストは main(SDK)」と分離を明記。
+
+### N-09-4 🟡 キー失効の自動再表示は `chat()` の onAuthError コールバックで配線
+- **該当**: task_09 §7 / 設計書 §6.1
+- **内容**: 層の疎結合を保つため、`chat()` に任意 `onAuthError(error)` を追加(401/402/429 検知時に呼ぶ・electron 非依存)。main 側(send-message IPC)が onAuthError でダイアログを再表示し、保存後 runtime.apiKey を更新する。Router(classifyTopic)へは未配線(同じ失効は chat 呼び出しでも顕在化するため)。
+- **反映**: §3.4/§6.1 に「auth エラーはコールバックで main へ通知」と明記。
+
+### N-09-5 🟡 F-KEY-03(起動時自動表示)を task_09 で実装(完全な起動列は task_10)
+- **該当**: task_09 §8 / 要件 F-KEY-03
+- **内容**: APIキー未保存時に起動時ダイアログを表示する処理を index.ts に追加(ダイアログを実際に到達可能にするため)。キャンセル時終了・クラウド警告・挨拶などの完全な起動シーケンスは task_10。
+- **反映**: §7.1 の起動シーケンスで task_09/task_10 の境界を整理。
+
+### N-09-6 ⚪ ダイアログ窓の磨き(メニュー除去・中央配置)
+- **該当**: 実装ポリッシュ
+- **内容**: frame:true のダイアログに既定メニューバーが出るため `win.removeMenu()`、`win.center()` で中央配置。
+- **反映**: 設計書変更不要。

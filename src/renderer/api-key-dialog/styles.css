@@ -1,0 +1,124 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #f5f6f8;
+  color: #1a1a1a;
+  font-family: 'Segoe UI', 'Yu Gothic UI', 'Hiragino Sans', sans-serif;
+  font-size: 14px;
+}
+
+.dialog {
+  padding: 20px 24px;
+}
+
+.dialog h1 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+.dialog p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.link-button {
+  margin: 8px 0;
+  padding: 8px 14px;
+  border: 1px solid #4a82c8;
+  border-radius: 6px;
+  background: #fff;
+  color: #2a5da0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.link-button:hover {
+  background: #eef4fc;
+}
+
+.steps {
+  margin: 8px 0 14px;
+  padding-left: 20px;
+  line-height: 1.7;
+  color: #444;
+}
+
+.key-input {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.key-input input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #c2c6cc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.key-input button,
+.buttons button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.key-input button {
+  background: #4a82c8;
+  color: #fff;
+}
+
+.key-input button:disabled,
+.buttons button:disabled {
+  background: #c9ccd1;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.status {
+  min-height: 20px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.status-success {
+  color: #1f8a4c;
+}
+
+.status-failed {
+  color: #c0392b;
+}
+
+.note {
+  margin: 14px 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.buttons .cancel {
+  background: #e3e5e8;
+  color: #333;
+}
+
+.buttons .save {
+  background: #2a7d46;
+  color: #fff;
+}

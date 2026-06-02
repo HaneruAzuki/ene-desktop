@@ -27,6 +27,14 @@ export type TokenChecker = (prompt: BuiltPrompt) => Promise<TokenCheck>;
 export interface ChatDeps {
   callModel: ModelCall;
   checkTokens: TokenChecker;
+  /** 401/402/429 等の認証系エラーを検知した時に呼ばれる(main 側でダイアログ再表示に使う)。 */
+  onAuthError?: (error: unknown) => void;
+}
+
+/** 認証系(401/402/429)エラーかを判定する(electron 非依存・純粋)。 */
+function isAuthLikeError(error: unknown): boolean {
+  const status = (error as { status?: number }).status;
+  return status === 401 || status === 402 || status === 429;
 }
 
 function makeDefaultDeps(apiKey: string): ChatDeps {
@@ -74,6 +82,7 @@ function resolveDeps(apiKey: string, deps?: Partial<ChatDeps>): ChatDeps {
   return {
     callModel: deps?.callModel ?? (base as ChatDeps).callModel,
     checkTokens: deps?.checkTokens ?? (hasCustomModel ? skipTokenCheck : (base as ChatDeps).checkTokens),
+    onAuthError: deps?.onAuthError,
   };
 }
 
@@ -85,7 +94,7 @@ export async function chat(
   apiKey: string,
   deps?: Partial<ChatDeps>,
 ): Promise<ConversationResponse> {
-  const { callModel, checkTokens } = resolveDeps(apiKey, deps);
+  const { callModel, checkTokens, onAuthError } = resolveDeps(apiKey, deps);
   const neverCallsSelf = charContext.identity.selfRecognition.neverCallsSelf;
 
   // 第1防御: プロンプトに neverCallsSelf を明示(buildPrompt 内)
@@ -104,6 +113,7 @@ export async function chat(
     raw = await callModel(prompt);
   } catch (e) {
     log.error('conversation model call failed', { name: (e as Error).name });
+    if (isAuthLikeError(e)) onAuthError?.(e); // 認証失効 → main 側でダイアログ再表示
     return fallbackResponse();
   }
 
@@ -129,6 +139,7 @@ export async function chat(
     raw2 = await callModel(enhanced);
   } catch (e) {
     log.error('conversation regeneration call failed', { name: (e as Error).name });
+    if (isAuthLikeError(e)) onAuthError?.(e);
     return fallbackResponse();
   }
 

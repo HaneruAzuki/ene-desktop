@@ -13,6 +13,7 @@ import {
 } from './window-position';
 import { buildCharacterContext } from '../character/context-builder';
 import { loadAndDecryptApiKey } from '../storage/encryption';
+import { openApiKeyDialog } from './api-key-dialog';
 
 // Electron main エントリポイント(設計書 §7)。
 // task_07 では window / tray / IPC の最小統合 + charContext・apiKey の最小ロードまで。
@@ -46,6 +47,14 @@ async function bootstrap(): Promise<void> {
 
   createTray(mainWindow);
   registerIpcHandlers(mainWindow, runtime);
+
+  // F-KEY-03: APIキー未保存なら設定ダイアログを表示する。
+  // (クラウド警告・キャンセル時終了などを含む完全な起動シーケンスは task_10 で統合)
+  if (!runtime.apiKey) {
+    void openApiKeyDialog(mainWindow, (key) => {
+      runtime.apiKey = key;
+    });
+  }
 
   log.info('app ready');
 }

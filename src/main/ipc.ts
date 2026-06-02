@@ -12,6 +12,7 @@ import { executeOsCommand } from '../os/executor';
 import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
 import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
+import { handleApiAuthError } from './api-key-auto-recovery';
 import type { CharacterContext } from '../shared/types/character';
 import type { ConversationResponse } from '../shared/types/conversation';
 import type { CharacterInfo } from '../shared/types/ipc';
@@ -56,11 +57,22 @@ const ERROR_RESPONSE: ConversationResponse = {
 };
 
 // send-message の統合フロー(設計書 §4.2 / task_07 §7)。
-async function handleSendMessage(text: string, runtime: AppRuntime): Promise<ConversationResponse> {
+async function handleSendMessage(
+  text: string,
+  runtime: AppRuntime,
+  mainWindow: BrowserWindow,
+): Promise<ConversationResponse> {
   const { charContext, apiKey } = runtime;
   if (!charContext || !apiKey) {
     return NOT_READY;
   }
+
+  // 認証失効(401/402/429)を検知したら APIキーダイアログを再表示し、保存後は runtime を更新。
+  const onAuthError = (error: unknown): void => {
+    void handleApiAuthError(error, mainWindow, (key) => {
+      runtime.apiKey = key;
+    });
+  };
 
   // 短期記憶 overflow 時の抽出(Claude 呼び出しを注入)。Memory 層は Claude を直接知らない。
   const onOverflow = (): Promise<void> => extractFromShortTerm('overflow', makeLlmComplete(apiKey));
@@ -77,8 +89,8 @@ async function handleSendMessage(text: string, runtime: AppRuntime): Promise<Con
     limit: 5,
   });
 
-  // 4. 本会話(4層防御込み)
-  const response = await chat(text, charContext, memoryContext, routerResult, apiKey);
+  // 4. 本会話(4層防御込み)。認証失効時はダイアログ再表示。
+  const response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError });
 
   // 5. assistant を短期記憶へ
   await appendShortTerm(
@@ -100,7 +112,7 @@ async function handleSendMessage(text: string, runtime: AppRuntime): Promise<Con
 export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRuntime): void {
   ipcMain.handle('ene:send-message', async (_event, text: string): Promise<ConversationResponse> => {
     try {
-      return await handleSendMessage(text, runtime);
+      return await handleSendMessage(text, runtime, mainWindow);
     } catch (err) {
       // IPC ハンドラから例外を漏らさない(Renderer をクラッシュさせない)。
       log.error('send-message handler failed', { name: (err as Error).name });
@@ -141,6 +153,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
 
   ipcMain.handle('ene:show-character-context-menu', async (): Promise<void> => {
-    showCharacterContextMenu(mainWindow);
+    showCharacterContextMenu(mainWindow, runtime);
   });
 }

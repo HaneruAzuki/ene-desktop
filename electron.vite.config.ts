@@ -20,7 +20,11 @@ export default defineConfig({
     build: {
       outDir: 'out/preload',
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') },
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          // APIキーダイアログ専用 preload(out/preload/api-key-dialog.js)
+          'api-key-dialog': resolve(__dirname, 'src/preload/api-key-dialog-preload.ts'),
+        },
       },
     },
   },
@@ -29,7 +33,11 @@ export default defineConfig({
     build: {
       outDir: 'out/renderer',
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/renderer/index.html') },
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          // APIキーダイアログ専用ページ(out/renderer/api-key-dialog/index.html)
+          apiKeyDialog: resolve(__dirname, 'src/renderer/api-key-dialog/index.html'),
+        },
       },
     },
     resolve: {
