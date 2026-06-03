@@ -1,5 +1,20 @@
 # 実装ノート(設計書への反映待ちリスト)
 
+> ## ✅ 設計書反映 完了(2026-06-03)
+> 本ファイルの **🟡 要反映** 項目は、ユーザー承認のうえ `docs/03_design.md` に一括反映済み。
+> 反映先(主な対応):§1.2(JSX/esbuild・N-00-3)、§1.3/§2(マルチエントリ・main ファイル群・N-09-2/N-07-1)、
+> §3.1(型名 CharacterKnowledgeDomains/CharacterFewshot・rationale 必須・リッチな CharacterContext・N-02-1/3)、
+> §3.2(RouterResult・classifyTopic DI・Prefill 廃止・N-04-1/2/3・N-09-7)、
+> §3.3(MemorySearchQuery・relevantEpisodic・短期 API・抽出 DI・N-03-1〜7)、
+> §3.4(ローカルトークン見積もり・Prefill 廃止・履歴 JSON 化・normalizeAlternation・onAuthError・N-05-2/3/4/5/6・N-09-4/7/8)、
+> §3.5(OsCommandResult ok/reason・N-06-1)、§3.6(characterId キャッシュ・PORTABLE_EXECUTABLE_DIR・N-01-1/N-11-2)、
+> §3.7(IPC 統合・SDK 分離・N-09-1/3)、§4.2(portraitUrl data URL・getInitialGreeting・N-08-1/N-10-3)、
+> §6.1(onAuthError)、§7.1(runtime 集約・N-07-2/N-09-5/N-10-1)、§8.1/8.3/8.6/8.7(position 引数・吹き出し許容・
+> デバウンス保存・クリックスルー集約・pull 挨拶・N-07-5/N-08-2/3/4/5/N-10-3/5)、§10(受入テスト方針・N-08-7/N-12-1/2)、§11.7(Prefill 注記)。
+> ⚪ 項目は「設計書変更不要」のため対象外。各項目の 🟡 マークは履歴として残置(上記のとおり反映済み)。
+> なお task ファイル側の表記ゆれ(N-00-2/N-00-5 等)は歴史的資料として未編集。
+> **MVP後ブラッシュアップ予定**(N-09-9/10・N-11-1/4・N-12-4)は本ファイル末尾の専用節を参照。
+
 > **このファイルの位置づけ**
 > 実装(task_00〜)の過程で生じた **設計判断** と、判明した **設計書(01/02/03/別添A)の
 > 不備・矛盾・曖昧さ** を記録する作業用ログ。
