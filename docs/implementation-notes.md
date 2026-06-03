@@ -463,6 +463,12 @@
 - **LLM応答の質・AIっぽさ(成功基準8)・UI体感**は `tests/acceptance/manual-check.md` の手動プロトコル(5質問×5項目=25)に分離。**自己合格させず、ユーザーが実機判定**(メモリ [[manual-check-division]])。
 - **反映(要検討)**: 設計書/タスクの受入テスト節に「人間判定項目は自動化しない」旨を明記。実 E2E(Playwright 等)は MVP スコープ外。
 
+### N-12-3 🟡 代理起動した exe のディスク書き込みは Claude コンテナに仮想化される(受入手順に影響)
+- **該当**: task_12 手動確認(基準6 の api-key.enc 位置・基準1 の位置復元・基準5 の data/ 永続化)
+- **内容**: 開発支援ツール(PowerShell/Start-Process)が Claude のパッケージ化(MSIX 風)コンテナ内で動作し、`%APPDATA%` への書き込みが `…\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\…` に仮想化される。代理起動した ENE のデータもそこへ入り、ユーザーの実 `%APPDATA%\ene-desktop` には現れない(実 Explorer で「場所が利用できません」)。
+- **影響**: **会話品質(成功基準8)は代理起動インスタンスでも有効**(GUI 表示・Claude API は正常)。一方、**ディスク所在の手動確認(基準1/5/6 の保存先)はユーザー自身による exe ダブルクリック起動で行う必要がある**。
+- **判断**: ENE 製品側の不具合ではなく、検証環境固有の制約。受入手順に「ディスク確認系はユーザー実機起動で実施」と明記する。api-key.enc の暗号化内容(平文 sk-ant- を含まない / v10 DPAPI マーカー)は代理でも機械確認済み=基準6 暗号化は合格。
+
 ### N-12-2 🟢 vitest は専用 config を持たずデフォルト include で acceptance も収集
 - **該当**: task_12 受入条件「`npm run test` で受入テストが含まれて実行される」
 - **内容**: 本プロジェクトは `vitest.config.*` を持たず(`electron.vite.config.ts` は vitest 非対象)、vitest デフォルト include(`**/*.test.ts` 再帰)で `tests/acceptance/automated/*.test.ts` も自動収集される。結果 175 tests(うち受入 13)が `npm run test` で実行・合格。
@@ -478,4 +484,5 @@ MVP の動作自体は妨げないが、完成後に改善する項目(ユーザ
 - **[N-09-10] 記憶抽出の頻度**: 短期20件超過後は毎メッセージ抽出 → 追加 API 呼び出し。一定件数たまった時のみ/バッチ化/バックグラウンド化を検討。
 - **[N-11-1] winCodeSign 回避**: ビルドに手動キャッシュ配置が必要。開発者モード/CI 整備で恒久化。
 - **[N-11-4] パッケージ時のログ保存先**: %APPDATA% ではなく data/logs に出すよう electron-log 設定を見直す。
+- **[N-12-4] 抽出が episodic を作りにくい**: 抽出 LLM は嗜好を semantic へ寄せ、雑談的発話を「長期的に意味のある出来事ではない」と判断して episodic=null にしがち(実機の5質問では semantic のみ更新・episodic 0件)。記憶自体は semantic で機能するが、ユーザーから見ると「中期記憶が残らない」体感になる。抽出プロンプトの基準緩和 or episodic/semantic の振り分け方針を再検討(1抽出=最大1 episodic の制約も含む)。動作上は正常のため MVP 後に調整。
 - (随時追記)
