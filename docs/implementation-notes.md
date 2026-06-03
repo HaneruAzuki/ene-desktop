@@ -449,6 +449,25 @@
 - **内容**: パッケージ版で `main.log` が `dist\data\logs\` ではなく `%APPDATA%\ene-desktop\logs\` に出力(dev では data/logs)。記憶・設定の永続化は正常。
 - **判断**: 動作に影響しないため MVP 後にブラッシュアップ。
 
+## task_12(受入テスト・成功基準8 の手動判定)
+
+### N-12-1 🟢 受入テストは「機構の自動検証」と「LLM応答の人間判定」に分離
+- **該当**: task_12 §1(自動受入テスト)/ CLAUDE §9.3(人間判定の自動化禁止)
+- **内容**: タスクの雛形は `simulateConversation`/`sendUserMessage` で実 Claude 応答(「太郎」「知らない」等)を assert する形だったが、これは実 API + 人間判定が本質で非決定的・自動化不可(成功基準4・8)。
+- **判断**: 自動受入テスト(`tests/acceptance/automated/`)は**決定的な機構**のみを検証する方針に変更。
+  - `memory-recall`: 長期記憶 保存→新セッション読込→統合プロンプトへ反映(paths をモックで一時ディレクトリへ隔離)。
+  - `domain-recognition`: 実 `characters/ene` をロードし、人格プロンプトに none 領域(パチンコ)+「知らないと返す」指示+AI自称防止が含まれることを検証。
+  - `os-command-execution`: `executeOsCommand` のホワイトリスト(notepad/http限定/パストラバーサル拒否)。シェルはモック。
+  - `api-security`: safeStorage モックで「保存物に平文 sk-ant- が出ない」往復・保存先が data/ 外。
+  - `performance`: `dist/*.exe` のサイズ <100MB(未ビルド環境は `it.skipIf` で skip)。
+- **LLM応答の質・AIっぽさ(成功基準8)・UI体感**は `tests/acceptance/manual-check.md` の手動プロトコル(5質問×5項目=25)に分離。**自己合格させず、ユーザーが実機判定**(メモリ [[manual-check-division]])。
+- **反映(要検討)**: 設計書/タスクの受入テスト節に「人間判定項目は自動化しない」旨を明記。実 E2E(Playwright 等)は MVP スコープ外。
+
+### N-12-2 🟢 vitest は専用 config を持たずデフォルト include で acceptance も収集
+- **該当**: task_12 受入条件「`npm run test` で受入テストが含まれて実行される」
+- **内容**: 本プロジェクトは `vitest.config.*` を持たず(`electron.vite.config.ts` は vitest 非対象)、vitest デフォルト include(`**/*.test.ts` 再帰)で `tests/acceptance/automated/*.test.ts` も自動収集される。結果 175 tests(うち受入 13)が `npm run test` で実行・合格。
+- **反映**: 追加設定不要。新しい受入テストは `tests/acceptance/automated/` に `*.test.ts` で置けば自動的に対象になる。
+
 ---
 
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)
