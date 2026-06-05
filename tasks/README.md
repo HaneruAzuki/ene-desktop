@@ -96,7 +96,10 @@ MVP(task_00〜12)完成後の新機能フェーズ。方針・ロードマップ
 | # | ファイル名 | レイヤー / 役割 | 主な依存 |
 |---|-----------|---------------|---------|
 | 13 | [task_13_animation.md](task_13_animation.md) | MVP 0.2「存在感」: アニメ基盤(状態機械・PNG差分・emotion表情・考える間・クリック音) | task_07, 08, 10 |
+| 14 | [task_14_memory_request_optimization.md](task_14_memory_request_optimization.md) | MVP 0.3「記憶リクエスト最適化」: Tier0/1/2 再構成＋プロンプトキャッシュ＋クリック起点ウォーム | task_05, 08 |
+| 15 | [task_15_memory_recall_update.md](task_15_memory_recall_update.md) | MVP 0.3「記憶の会話活用強化」: 想起エンジン(ベクトル＋語彙＋entity ハイブリッド)＋記憶更新(supersede) | task_03, 04, 05 |
 
-> MVP 0.2「存在感」のコード作業はこの task_13 に集約する(別タスク task_14 は作らない)。
-> 素材(VRoid スプライト)・JSON 精緻化は task_13 付録のチェックリスト、
-> 記憶の会話活用強化はコード作業のため 0.3 以降へ送り。
+> - MVP 0.2「存在感」のコード作業は task_13 に集約(アニメ用の別タスク task_14 は作らない)。
+> - task_14 = **MVP 0.3 のコスト最適化**(記憶リクエストの Tier 再構成＋キャッシュ)。task_15 と独立に着手可能。
+> - task_15 のデータモデルは `docs/design-revision-memory-v2.md`(§3.3/§5.2 改訂案)に定義。
+>   想起・更新の**処理**は task_15、**データの持ち方**は当該改訂文書、で分離している。

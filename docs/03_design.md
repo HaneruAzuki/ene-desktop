@@ -592,6 +592,11 @@ interface CacheEntry {
 - MVPではタグベース検索のみ
 - 会話終了時の記憶抽出と保存
 
+> 📌 **MVP 0.3 改訂あり**:中期記憶のスキーマ(`EpisodicMemory` に `entities`/`supersededBy`/`extra` 等を追加)と
+> 想起方式(ベクトル＋語彙＋entity ハイブリッド・`MemoryRetriever` 抽象)は
+> **`docs/design-revision-memory-v2.md`** に定義(全 optional・後方互換)。0.3 実装時に本節へマージする。
+> 以下の型は MVP(v1)のもの。
+
 #### 主要型定義
 
 ```typescript
@@ -2617,6 +2622,12 @@ win:
   内部実装をベクトル検索に差し替え可能
 - SQLite + sqlite-vss などへの移行を想定
 
+> 📌 **MVP 0.3 で前倒し・方式確定**:SQLite ではなく、**JSON を真実の源**とし
+> **ローカル埋め込み＋派生ベクトル索引(再生成可キャッシュ)**を採用。会話時の想起は
+> `searchEpisodic`(明示フィルタ用に存続)とは別に **`MemoryRetriever` 抽象**(ベクトル＋語彙＋entity を
+> RRF 合流)を新設する。詳細は `tasks/task_15_memory_recall_update.md` と
+> `docs/design-revision-memory-v2.md`。埋め込みモデルは別DL・要承認(§1.2 更新を伴う)。
+
 ### 11.5 感情モデル
 
 - ConversationResponseに `emotion?: string` を追加するだけで拡張可能
@@ -2627,6 +2638,11 @@ win:
 ビジョン§3 柱1「人間らしい忘却」を実現するための機構。
 MVPでは実装しないが、**スケール想定の表(§3.3)で示した通り、
 中期記憶が増えるにつれ必須となる将来拡張**である。
+
+> 📌 **MVP 0.3 との関係**:記憶データモデル v2(`docs/design-revision-memory-v2.md`)は、忘却・統合の
+> 受け皿として `RelationshipMemory`(人物gist)・関係ナラティブ(era)層・`importance` を**器として予約済み**。
+> 本機構＋能動的想起(follow-up)・パターン検出・共同想起は、task_14/15 では実装せず
+> **将来タスク(task_16 相当)**に送る。研究の裏付けは記憶ノート research-memory-taxonomy-2026 を参照。
 
 **実装する処理**:
 
