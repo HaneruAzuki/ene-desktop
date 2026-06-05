@@ -55,6 +55,13 @@
 > 使わない・MVP では不要)。将来 Fast Refresh が必要になったらユーザー承認のうえ
 > `@vitejs/plugin-react` を devDependencies に追加する。N-00-3 参照。
 
+> 📌 **MVP 0.3 追加(承認済み 2026-06)**:記憶のローカル意味検索(task_15 Phase B)用に
+> **ONNX埋め込みランタイム**を `dependencies` に追加する(候補:`onnxruntime-node` ＋ トークナイザ、
+> または `@huggingface/transformers`。**正確なパッケージ・バージョンは実装時に検証して確定し本表へ追記**)。
+> 埋め込みモデルは **`cl-nagoya/ruri-v3-310m`(Apache-2.0・768次元・8192ctx)** を採用するが、これは
+> **別ダウンロードのアセット**であり `dependencies` には含めない(コア100MB非汚染・可搬性は索引の再生成で担保)。
+> 選定根拠は記憶ノート research-embedding-model-2026 と `tasks/task_15_memory_recall_update.md`(§Phase B)。
+
 #### バージョン指定方針
 
 - バージョン指定は **`^` (キャレット)を基本**とする
