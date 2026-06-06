@@ -491,6 +491,41 @@
 
 ---
 
+## 方針転換(2026-06): 固定キャラ・人生記憶・心
+
+> ユーザー承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は
+> `docs/design-revision-character-heart.md`(staging)。実装時に 03_design §2/§3.1/§3.3/§5 へマージ。
+
+### N-16-1 🟡 単一固定キャラ(魚川トリミ)へ。アーキテクチャの JSON 外出しは維持
+- **該当**: vision §3柱2/§9、CLAUDE §5.1/§12、requirements F-CHAR-08/NF-EXT-03、philosophy §6/§7
+- **内容**: 「キャラ入れ替え可能」を製品の売りにしない。一人の固定キャラに集中。旧 Phase5(多キャラPF)破棄。
+- **判断**: 製品は固定。ただしコードは特定キャラ非依存・属性は JSON 外出しのまま(ハードコード禁止・賭けの可逆性)。
+  ENE=コードネーム、魚川トリミ=キャラ名、`characterId` は当面 `"ene"`。
+- **反映**: 上位文書反映済み。03_design §2/§3.1 のキャラ記述へ「単一固定」を注記(実装時)。
+  キャラ資産の改名(identity name / fewshot 台詞の "ENE"→"魚川トリミ")は別の**創作タスク**。
+
+### N-16-2 🟡 EpisodicMemory に provenance / valence を追加(人生記憶・心の素)
+- **該当**: 03_design §3.3 / §5.2、design-revision-memory-v2(積み増し)
+- **内容**: `provenance?: 'user'|'self'`(self=人生記憶 canon・読取専用・忘却外)、`valence?: number`
+  (-2〜+2・中立観察・想起バイアス用)。全 optional・後方互換。
+- **反映**: 03_design §3.3 の型へマージ。詳細は design-revision-character-heart §4。
+
+### N-16-3 🟡 人生記憶 canon は characters/{id}/life-memory.json(キャラ資産・配布物)
+- **該当**: 03_design §2(characters/ ツリー)/ §5、別添A
+- **内容**: キャラ自身の人生エピソードを canon として同梱。data/(ユーザー領域)へはコピーしない=不変・忘却外。
+  想起時に user episodic と統合プールにマージ。
+- **反映**: §2 の `characters/{id}/` ツリーに `life-memory.json` を追記。別添A にサンプル追加(執筆時)。
+
+### N-16-4 🟡 心=記憶から導出(永続スカラー方式は不採用)
+- **該当**: CLAUDE §5.3、philosophy §6、design-revision-character-heart §3、task_16
+- **内容**: 「-100〜+100 を保存し日次±1/週次回帰」案は**不採用**。心情は直近 episodic の `valence` を
+  recency 重み付き平均で**導出**(状態を貯めない)。減衰=直近重み。非対称(τ_neg<τ_pos)＋ `MOOD_FLOOR` で
+  暗転ロック回避。想起バイアスは RRF に `λ·clampedMood·valence` 加算＋softmax。相手別は entity 限定の同式。
+- **判断根拠**: §5.3 整合・部品最小(スカラー案より少ない)・脆弱ユーザーへの加害回避(倫理の一線)。
+- **反映**: 処理は task_16、データは design-revision-character-heart。03_design §3.3 へマージ。
+
+---
+
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)
 
 MVP の動作自体は妨げないが、完成後に改善する項目(ユーザー方針で記録)。
