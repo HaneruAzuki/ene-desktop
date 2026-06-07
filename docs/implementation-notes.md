@@ -682,6 +682,37 @@
 - **内容**: `RetrieverDeps={embedder?,mood?,familiarityStage?,rng?}`。未指定=mood0(バイアス無)・stage5(全開示)・argmax(決定論)=**task_15 の挙動と同一**。会話経路(`buildHeartDeps`)が now=`Date.now()` で mood/familiarity＋`Math.random` を注入。softmax サンプリング(`RECALL_SOFTMAX_TEMP`)で揺らぎ。λ/温度は調律可。
 - **反映**: §3.3(retriever.ts)。既存 retriever テスト群は回帰なし(251緑)。
 
+### N-17-1 🟡 音声方針の確定(2026-06-07 設計セッション・task_17)
+- **内容**: 4決定 = ①ルート=ローカルファースト(脳=Claudeストリーミング・STT/VAD/Turnはローカル・§4.2維持) ②役割=双方向の音声会話(速さは追わない) ③TTS=`TtsEngine`差し替え可能＋完全ローカル開始(§4.4) ④声=同梱・戦略A「寛容ライセンス声を採用＋味付け」(Kokoro/MeloTTS等をin-process・pitch/speedをJSON外出し)。旧「ユーザー各自VOICEVOXインストール」は任意オプションへ降格。
+- **判断根拠**: 哲学「リアルタイム性は抑える対象」ゆえクラウドS2Sの速度優位は不要。ローカルのターンテイキングはSmart Turn v3.2で解決済。同梱要望に対し寛容ライセンス声で無料配布を両立。
+- **反映**: `tasks/task_17_voice.md`。memory `voice-plan-decisions-2026`。
+
+### N-17-2 🟡 STT=VAD区切りWhisper(ストリーミングSTT不要)・SenseVoice回避
+- **内容**: turn-based cascade(mic→Silero VAD→Smart Turn v3.2終話判定→**非ストリーミングWhisperで確定発話を書き起こし**→Claude→文単位TTS)。**ストリーミングSTTモデルは使わない**=調査で未確認だった日本語ストリーミングモデル実在リスクを回避。エンジン候補=`sherpa-onnx`(Apache・Node binding・プリビルド・STT+VAD一本化)だが自前onnxruntime重複が論点。モデル=Whisper(MIT)。**SenseVoiceは商用ライセンス懸念(規約4.2)で回避**。
+- **反映**: task_17 アーキテクチャ/未決#1。
+
+### N-17-3 🟡 最大の改修=C1ストリーミング再設計・C2文単位自称検知
+- **内容**: C1=非ストリーミング`{type,message,emotion}`契約を「喋るプレーンテキストstream」と「os_command構造化出力」へ分離(キャッシュ安定プレフィックスは維持)。C2=4層防御を**文単位でTTS発話前にゲート**(喋り始めたら取り消せないため)。
+- **反映**: task_17 最大の技術改修。
+
+### N-17-4 🟢 N-15-9 解消(packaging検証)・音声の土台確認
+- **内容**: `npm run package:portable` 成功(exit 0)。`dist/ENE-Desktop-0.1.0.exe`=**72MB**(<100MB)。`app.asar.unpacked/.../win32/x64/onnxruntime_binding.node`＋`onnxruntime.dll` 同梱確認・`DirectML.dll` 除外確認(CPU限定方針どおり)。**音声がonnx依存を増やす前の土台が健全**と確認。残り=実機での起動ランタイム1回(ベクトル想起発火でnative load成功確認)。
+- **反映**: N-15-9 を packaging 面で解消。
+
+### N-17-5 🟡 同梱ライセンスの鉄則(種は寛容側から)
+- **内容**: 出力モデルの再配布可否=「エンジンlicense × 種(seed)license」両方。**採用可**=Kokoro/MeloTTS/Parler出力(Apache/MIT)・つくよみコーパス(商用/再配布OK)・JVNV(CC BY-SA)・Whisper(MIT)・sherpa-onnx(Apache)・Silero・Smart Turn(BSD)。**回避**=Fish-Speech(CC-BY-NC)・XTTS(CPML)・SenseVoice(懸念)・VOICEVOXキャラ声クローン・Style-Bert-VITS2直接同梱(AGPL→AivisSpeech経由でLGPL)。
+- **反映**: task_17 ライセンス制約。
+
+### N-17-6 🟢 §4.2例外を承認(AivisSpeechエンジン/モデルの初回DL)
+- **内容**: ユーザー明示承認(2026-06-07)。音声機能で **AivisSpeech エンジン＋音声モデル(AIVM)を初回起動時にネット取得**することを許可。**§4.2/§7.1/§12「Claude以外への外部通信」への限定的例外**。届け方=管理サイドカー(手動インストール不要で"同梱体験"・コア<100MB維持)。
+- **スコープ厳守**: 取得対象は**エンジン/モデル本体のみ**。**音声データ・会話・記憶・テレメトリは一切送信しない**。取得後は localhost:10101 サイドカーで完結。
+- **声**: クリーンな女性ボイス(つくよみ→自作AIVM)。**Anneli は無断クローン問題で不可**(N-17-5/voice-plan)。
+- **反映**: `docs/design-revision-voice.md` §4.3/§8。承認後 03_design §4.2/§7.1 に「音声エンジン取得の例外」を明記してマージ。
+
+### N-17-7 🟡 Phase A 着手: C1中核(文分割・ストリーミング応答パーサ)を実装
+- **内容**: `src/conversation/sentence-splitter.ts`(日本語の文単位分割)＋ `src/conversation/stream-parser.ts`(`[[emotion:LABEL]]`＋本文＋任意 `[[os_command:{...}]]` のインクリメンタル解釈)を新規追加。純粋ロジック=単体テスト対象(既存フロー非影響)。sentinel 書式は**暫定**(実モデルでのスパイク後に確定)。
+- **反映**: design-revision-voice §2(C1)。
+
 ---
 
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)

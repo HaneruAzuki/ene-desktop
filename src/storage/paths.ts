@@ -153,6 +153,11 @@ export function getAnimationPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'animation.json');
 }
 
+/** characters/{characterId}/voice.json(音声設定・emotion→スタイル/パラメータ・任意・task_17)。 */
+export function getVoiceConfigPath(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'voice.json');
+}
+
 /** characters/{characterId}/{file}(スプライト等・animation.json の frames が指す実ファイル)。 */
 export function getCharacterAssetPath(characterId: string, file: string): string {
   return path.join(getCharacterDir(characterId), file);
