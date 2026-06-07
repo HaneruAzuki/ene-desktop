@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import path from 'node:path';
 import { readJson } from './json-store';
+import { VAD_MODEL_FILE } from '../shared/constants';
 
 // ファイルパスの統一管理(設計書 §3.6 / §5.5)。
 //
@@ -171,6 +172,11 @@ export function getResourcesDir(): string {
 /** タスクトレイ用アイコン(resources/tray-icon.png)。 */
 export function getTrayIconPath(): string {
   return path.join(getResourcesDir(), 'tray-icon.png');
+}
+
+/** Silero VAD モデル(resources/silero_vad.onnx・配布物に同梱・task_17 Phase C)。 */
+export function getVadModelPath(): string {
+  return path.join(getResourcesDir(), VAD_MODEL_FILE);
 }
 
 // --- マシン固定データ(暗号化 API キーの保存先) ---

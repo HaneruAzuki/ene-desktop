@@ -17,6 +17,7 @@ import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
 import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse } from './voice-runtime';
+import { VadRuntime } from './vad-runtime';
 import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
 import type { CharacterContext } from '../shared/types/character';
 import type { ConversationResponse } from '../shared/types/conversation';
@@ -142,6 +143,16 @@ async function handleSendMessage(
 }
 
 export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRuntime): void {
+  // ハンズフリー VAD(task_17 Phase C)。renderer から連続フレームを受け、発話区間を
+  // 文字起こしして確定テキストを renderer へ返す(renderer はそれを send-message に流す)。
+  const vad = new VadRuntime(mainWindow);
+  ipcMain.handle('ene:vad-start', async (): Promise<boolean> => vad.start());
+  ipcMain.on('ene:vad-frame', (_event, frame: Float32Array) => {
+    void vad.pushFrame(frame instanceof Float32Array ? frame : new Float32Array(frame));
+  });
+  ipcMain.on('ene:vad-stop', () => vad.stop());
+  ipcMain.on('ene:vad-speaking', (_event, speaking: boolean) => vad.setSpeaking(speaking));
+
   ipcMain.handle('ene:send-message', async (_event, text: string): Promise<ConversationResponse> => {
     try {
       return await handleSendMessage(text, runtime, mainWindow);

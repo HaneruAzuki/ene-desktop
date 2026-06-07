@@ -722,6 +722,14 @@
 - **残(手動・人間判定)**: 実際にマイクへ発話しての end-to-end(getUserMedia→IPC→認識→送信→TTS往復)はハードウェア依存=ユーザー手動確認。固有名詞精度は Whisper 一般の限界(将来 initial_prompt/語彙バイアスで改善余地)。
 - **反映**: design-revision-voice §3(STT)。
 
+### N-17-9 🔴 落とし穴: Silero VAD v5 は onnxruntime-node で壊れる → **v4 を採用**(2026-06-08)
+- **症状**: Silero VAD **v5/v5.1**(ONNX・入力 `input/state/sr`)を onnxruntime-node(1.24.3)で回すと、**実人間音声でも発話確率が ≈0**(aepyx 実音声 max 0.003、無音 0.001、TTS 0.2)。エラーは出ない(無言の誤計算)。
+- **切り分け(実機スモークで全消し込み)**: 音声は正常(同じ PCM を Whisper が完璧に書き起こし)/ 窓512正しい(1024/1536はエラー)/ state 形状[2,1,128]正しい(再構築しても不変)/ sr dims [] [1] 不変 / グラフ最適化 disabled/basic 不変。→ **モデル側の `If`+combined-state+動的形状を onnxruntime-node が誤計算**(警告 `Expected shape {1,-1,128}` が兆候)。
+- **解決**: **Silero VAD v4.0**(入力 `input/sr/h/c`=h/c 分離・[2,1,64]・出力 `output/hn/cn`)に変更 → onnxruntime-node で**正しく動作**(実音声 max **1.000**・発話76%、無音 max **0.043**、TTS max 0.999)。しきい値 **0.5** で speech/silence をクリーン分離。配布=`resources/silero_vad.onnx`(v4・1.8MB・MIT・同梱)。
+- **副次の重要事実**: **TTS 音声も Silero で 0.999 と判定される** → barge-in で ENE 自身の声がマイクに回り込むと VAD が誤発火する。**echoCancellation 必須・ヘッドホンで確実回避**(N-17 設計の通り)。barge-in は実機で AEC 効果を要検証。
+- **教訓**: ローカル ONNX は「ロードできる/エラーが出ない」≠「正しく計算される」。**実データのスモークで数値を必ず確認**(STT/VAD とも実音声で検証して初めて分かった)。
+- **反映**: design-revision-voice §4(VAD)。`scripts/download-vad-model.mjs` は v4.0 を取得。
+
 ---
 
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)

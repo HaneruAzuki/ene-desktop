@@ -43,6 +43,22 @@ export interface EneAPI {
   // マイク音声(16kHz mono Float32)を文字起こしする(renderer → main・task_17 Phase B)
   transcribeAudio(samples: Float32Array): Promise<TranscribeResult>;
 
+  // --- ハンズフリー音声会話(VAD・task_17 Phase C) ---
+  // VAD セッション開始(戻り値 false=モデル未配置で無効)。
+  startVad(): Promise<boolean>;
+  // マイクの1フレーム(16kHz・512サンプル)を VAD へ送る(連続・一方向)。
+  sendVadFrame(frame: Float32Array): void;
+  // VAD セッション終了。
+  stopVad(): void;
+  // ENE 発話中フラグ(barge-in 検出のデバウンス切替・エコー誤割り込み抑制)。
+  setVadSpeaking(speaking: boolean): void;
+  // 聞き取り状態(main → renderer・UI 表示用)。
+  onVoiceState(callback: (state: 'listening' | 'recording' | 'transcribing') => void): void;
+  // 話し終わりの確定テキスト(main → renderer)。renderer は sendMessage に流す。
+  onVoiceTranscript(callback: (text: string) => void): void;
+  // ENE 発話中の割り込み検出(main → renderer)。renderer は再生を止める。
+  onVoiceBargeIn(callback: () => void): void;
+
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
   onError(callback: (error: string) => void): void;

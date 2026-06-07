@@ -11,7 +11,7 @@ directories:
 files:
   - 'out/**/*'
   - 'characters/**/*' # 初期キャラ(JSON + portrait)を同梱
-  - 'resources/**/*' # トレイアイコン等(実行時に nativeImage が読む・N-07-6)
+  - 'resources/**/*' # トレイアイコン等(実行時に nativeImage が読む・N-07-6)＋ Silero VAD モデル(task_17 Phase C)
   - '!node_modules/**/*'
   # 埋め込みランタイム(text 用途に必要な分のみ)
   - 'node_modules/@huggingface/transformers/**/*'
@@ -28,6 +28,7 @@ asar: true
 asarUnpack:
   - 'characters/**/*' # キャラ定義はユーザーがカスタマイズ可能なよう展開状態を維持
   - 'node_modules/onnxruntime-node/bin/**/*' # native .dll/.node は asar 外でないとロードできない
+  - 'resources/silero_vad.onnx' # VAD モデルは native onnxruntime-node が直接読む=asar 外が必須(task_17 Phase C)
 win:
   target:
     - target: portable

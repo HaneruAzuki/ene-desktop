@@ -49,6 +49,30 @@ export const STT_SAMPLE_RATE = 16000;
 /** 認識言語(日本語固定)。短い発話での言語自動判定のブレを防ぐ。 */
 export const STT_LANGUAGE = 'japanese';
 
+// --- 音声区間検出(VAD・ハンズフリー・task_17 Phase C) ---
+// Silero VAD v4(resources/silero_vad.onnx・onnxruntime-node)。
+// ★ v5 は onnxruntime-node で誤計算するため v4 を採用(N-17-9)。
+
+/** resources/ 配下の Silero VAD モデルファイル名(配布物に同梱)。 */
+export const VAD_MODEL_FILE = 'silero_vad.onnx';
+
+/** Silero が要求する 16kHz の1フレーム長(サンプル数)。マイクもこの粒度で送る。 */
+export const VAD_FRAME_SIZE = 512;
+
+/** 発話判定の上側しきい値(これ以上で「話している」)。実機検証で 0.5 が speech/silence をクリーン分離。 */
+export const VAD_SPEECH_THRESHOLD = 0.5;
+/** 発話終了側の下側しきい値(ヒステリシス・チャタリング防止)。 */
+export const VAD_SILENCE_THRESHOLD = 0.35;
+
+/** 話し終わり(ターン終了)とみなす無音継続時間(ms)。「間のあるENE」哲学に合わせ気持ち長め。 */
+export const VAD_MIN_SILENCE_MS = 700;
+/** 発話開始の確定に必要な最小発話継続(ms)。単発ノイズでの誤発火を防ぐ。 */
+export const VAD_MIN_SPEECH_MS = 160;
+/** 切り出し時に発話頭へ付ける先読みパディング(ms)。語頭の欠けを防ぐ。 */
+export const VAD_SPEECH_PAD_MS = 200;
+/** barge-in(ENE発話中の割り込み)確定に必要な発話継続(ms)。エコー残響での誤割り込みを抑えるため長め。 */
+export const VAD_BARGE_IN_MIN_SPEECH_MS = 320;
+
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 
 /** 心情導出の時定数(日)。負は速く減衰=復元力(非対称)。 */

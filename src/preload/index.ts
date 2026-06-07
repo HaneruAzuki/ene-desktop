@@ -16,6 +16,24 @@ const eneAPI: EneAPI = {
   showCharacterContextMenu: () => ipcRenderer.invoke('ene:show-character-context-menu'),
   warmCache: () => ipcRenderer.invoke('ene:warm-cache'),
   transcribeAudio: (samples) => ipcRenderer.invoke('ene:transcribe-audio', samples),
+  startVad: () => ipcRenderer.invoke('ene:vad-start'),
+  sendVadFrame: (frame) => ipcRenderer.send('ene:vad-frame', frame),
+  stopVad: () => ipcRenderer.send('ene:vad-stop'),
+  setVadSpeaking: (speaking) => ipcRenderer.send('ene:vad-speaking', speaking),
+  onVoiceState: (cb) => {
+    ipcRenderer.removeAllListeners('ene:voice-state');
+    ipcRenderer.on('ene:voice-state', (_event, state: 'listening' | 'recording' | 'transcribing') =>
+      cb(state),
+    );
+  },
+  onVoiceTranscript: (cb) => {
+    ipcRenderer.removeAllListeners('ene:voice-transcript');
+    ipcRenderer.on('ene:voice-transcript', (_event, text: string) => cb(text));
+  },
+  onVoiceBargeIn: (cb) => {
+    ipcRenderer.removeAllListeners('ene:voice-barge-in');
+    ipcRenderer.on('ene:voice-barge-in', () => cb());
+  },
   onVoiceChunk: (cb) => {
     // 二重登録防止: dev の StrictMode で effect が2回走るとリスナーが累積し、
     // 各センテンスが2回再生される。常に単一リスナーへ張り替える。

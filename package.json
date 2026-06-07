@@ -17,9 +17,11 @@
     "format": "prettier --write .",
     "download:model": "node scripts/download-model.mjs",
     "download:stt-model": "node scripts/download-stt-model.mjs",
+    "download:vad-model": "node scripts/download-vad-model.mjs",
     "seed:recall": "node scripts/seed-recall-fixtures.mjs",
     "voice:smoke": "node scripts/voice-smoke.mjs",
-    "stt:smoke": "node scripts/stt-smoke.mjs"
+    "stt:smoke": "node scripts/stt-smoke.mjs",
+    "vad:smoke": "node scripts/vad-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
