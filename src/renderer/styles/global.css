@@ -99,8 +99,16 @@ body,
   z-index: 20;
 }
 
+/* 入力欄(テキスト)＋マイクボタンの横並び */
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .input-field {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 8px 12px;
   border: none;
   border-radius: 18px;
@@ -113,4 +121,32 @@ body,
 
 .input-field::placeholder {
   color: #888;
+}
+
+/* マイク(push-to-talk)ボタン。録音中は赤く点灯。 */
+.mic-button {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1a1a1a;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mic-button--active {
+  background: #ff5d5d;
+  color: #fff;
+}
+
+.mic-button:disabled {
+  opacity: 0.7;
+  cursor: default;
 }

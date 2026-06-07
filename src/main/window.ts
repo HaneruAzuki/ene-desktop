@@ -26,6 +26,15 @@ export function createMainWindow(position?: Position): BrowserWindow {
     },
   });
 
+  // マイク権限(getUserMedia)のみ許可する(task_17 Phase B・音声入力)。
+  // 対象はローカルの自アプリのみ。録音音声はローカル STT(main)にしか使わない(§4.2/§7.1)。
+  // media 以外の権限(通知・位置情報等)は一切使わないため拒否する(最小権限)。
+  const ses = win.webContents.session;
+  ses.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(permission === 'media');
+  });
+  ses.setPermissionCheckHandler((_wc, permission) => permission === 'media');
+
   // 開発時は dev サーバ URL、本番時は out/renderer/index.html を読み込む。
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   if (rendererUrl) {

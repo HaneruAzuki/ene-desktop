@@ -1,5 +1,6 @@
 import type { ConversationResponse } from './conversation';
 import type { CharacterAnimationData } from './animation';
+import type { TranscribeResult } from './stt';
 
 // IPC 通信の契約(設計書 §4.2)。Renderer 側は window.ene.* で呼ぶ。
 
@@ -38,6 +39,9 @@ export interface EneAPI {
 
   // 音声応答のチャンク(WAV)受信(main → renderer・task_17 Phase A)
   onVoiceChunk(callback: (chunk: ArrayBuffer) => void): void;
+
+  // マイク音声(16kHz mono Float32)を文字起こしする(renderer → main・task_17 Phase B)
+  transcribeAudio(samples: Float32Array): Promise<TranscribeResult>;
 
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;

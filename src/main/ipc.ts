@@ -17,9 +17,11 @@ import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
 import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse } from './voice-runtime';
+import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
 import type { CharacterContext } from '../shared/types/character';
 import type { ConversationResponse } from '../shared/types/conversation';
 import type { CharacterInfo } from '../shared/types/ipc';
+import type { TranscribeResult } from '../shared/types/stt';
 import type { EmotionLabel } from '../shared/types/animation';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 
@@ -196,6 +198,30 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   ipcMain.handle('ene:show-character-context-menu', async (): Promise<void> => {
     showCharacterContextMenu(mainWindow, runtime);
   });
+
+  // マイク音声の文字起こし(task_17 Phase B)。renderer の push-to-talk から呼ばれる。
+  // §6.2 厳守: 認識テキスト本文はログに出さない(文字数のみ)。
+  ipcMain.handle(
+    'ene:transcribe-audio',
+    async (_event, samples: Float32Array): Promise<TranscribeResult> => {
+      try {
+        if (!(await isSttModelAvailable())) {
+          return { ok: false, message: '…ごめん、耳がまだ準備できてないみたい。' };
+        }
+        // IPC 越しに渡るのは Float32Array(構造化複製)。念のため型を正規化する。
+        const pcm = samples instanceof Float32Array ? samples : new Float32Array(samples);
+        const text = await transcribe(pcm);
+        if (!text) {
+          return { ok: false, message: '…ん? うまく聞き取れなかった。もう一回言ってみて?' };
+        }
+        log.info(`stt transcribed (${text.length} chars)`);
+        return { ok: true, text };
+      } catch (err) {
+        log.warn('transcribe failed', { name: (err as Error).name });
+        return { ok: false, message: '…耳の調子が悪いみたい。ごめんね、もう一回試して?' };
+      }
+    },
+  );
 
   // 入力欄オープン時のキャッシュウォーム(task_14 Phase 3・レイテンシ施策)。fire-and-forget。
   ipcMain.handle('ene:warm-cache', async (): Promise<void> => {

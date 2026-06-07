@@ -152,7 +152,12 @@ export function App(): React.ReactElement | null {
         onClick={openInput}
       />
       {inputVisible && (
-        <InputArea ref={inputRef} onSubmit={handleSubmit} onClose={() => setInputVisible(false)} />
+        <InputArea
+          ref={inputRef}
+          onSubmit={handleSubmit}
+          onClose={() => setInputVisible(false)}
+          onNotice={(m) => setBubble(m)}
+        />
       )}
     </div>
   );

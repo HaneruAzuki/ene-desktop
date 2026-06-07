@@ -713,6 +713,15 @@
 - **内容**: `src/conversation/sentence-splitter.ts`(日本語の文単位分割)＋ `src/conversation/stream-parser.ts`(`[[emotion:LABEL]]`＋本文＋任意 `[[os_command:{...}]]` のインクリメンタル解釈)を新規追加。純粋ロジック=単体テスト対象(既存フロー非影響)。sentinel 書式は**暫定**(実モデルでのスパイク後に確定)。
 - **反映**: design-revision-voice §2(C1)。
 
+### N-17-8 🟢 Phase B(STT・マイク入力)実装＋実機検証(2026-06-08)
+- **構成判断(重要)**: STT は **main プロセス + onnxruntime-node + ローカル事前配置モデル**で実装。`src/memory/embedder.ts` と**完全同型**(`env.allowRemoteModels=false`／`env.localModelPath=getModelsDir()`／別DLスクリプトで `data/models/` へ配置)。当初検討した「renderer + transformers.js + WebGPU」は **renderer の CSP/WASM/onnxruntime-web 統合リスク**が大きく、§7.1 の「実行時に外部からモデルを取らない」確立パターンとも乖離するため**不採用**。renderer は **getUserMedia によるマイク取得のみ**(CSP 変更ゼロ)。
+- **モデル**: `onnx-community/whisper-large-v3-turbo`(encoder=fp32／decoder=q8`_quantized`)。**精度最優先**の選択(ユーザー要求「とにかく正確に」)。turbo はデコーダ4層で large-v3 比 約8倍速。`scripts/download-stt-model.mjs`(`npm run download:stt-model`)が HF API でファイル一覧を引き、configs＋encoder＋decoder＋**external-data(`*.onnx_data`)** を取得。**落とし穴**: 大きい ONNX は重みを `encoder_model.onnx_data` に分離(ONNX external data 形式)。連れファイル未取得だとロード時に `*.onnx_data not found` で落ちる → スクリプトで `<onnx>_data` を必ず同伴取得。
+- **実機検証(`npm run stt:smoke`)**: torimi 自身の TTS 音声(voice-smoke-out)を書き起こし。**ロード3.0s／~3s音声を~3sで認識(CPUで等倍)／日本語精度=非常に良好**(2文は完全一致、固有名詞「魚川トリミ」のみ音写)。**CPU で実用域=GPU は任意**を実証(main+CPU 判断が妥当)。WebGPU は将来の速度最適化レバーとして温存。
+- **マイク権限**: `window.ts` で当該 session に `setPermissionRequestHandler`/`setPermissionCheckHandler` を設定し **`media` のみ許可**(他権限は拒否=最小権限)。録音音声は外部送信せずローカル STT にのみ使用(§4.2/§7.1)。
+- **UX**: 入力欄に 🎤 **push-to-talk**(押下中だけ録音→離すと認識→既存 `sendMessage` へ流す=テキスト入力と同経路)。`src/renderer/mic-capture.ts` は `AudioContext({sampleRate:16000})` で 16kHz mono Float32 を直接取得(手動リサンプル不要)、gain=0 ノードでハウリング回避、ScriptProcessorNode 採用(AudioWorklet 用の別バンドルを避ける)。IPC `ene:transcribe-audio` は §6.2 厳守で**本文を出さず文字数のみログ**。
+- **残(手動・人間判定)**: 実際にマイクへ発話しての end-to-end(getUserMedia→IPC→認識→送信→TTS往復)はハードウェア依存=ユーザー手動確認。固有名詞精度は Whisper 一般の限界(将来 initial_prompt/語彙バイアスで改善余地)。
+- **反映**: design-revision-voice §3(STT)。
+
 ---
 
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)

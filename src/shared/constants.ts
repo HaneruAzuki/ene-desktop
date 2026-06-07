@@ -38,6 +38,17 @@ export const EMBEDDING_DOCUMENT_PREFIX = '検索文書: ';
 /** RRF(Reciprocal Rank Fusion)の平滑化定数。一般に 60 が無難。 */
 export const RRF_K = 60;
 
+// --- 音声入力(STT・task_17 Phase B) ---
+
+/** STT モデル(whisper-large-v3-turbo・ONNX)のディレクトリ名。data/models/ 配下に別DLで配置。 */
+export const STT_MODEL_DIR = 'whisper-large-v3-turbo';
+
+/** Whisper が前提とするサンプリングレート(16kHz 固定)。マイク取得もこのレートで行う。 */
+export const STT_SAMPLE_RATE = 16000;
+
+/** 認識言語(日本語固定)。短い発話での言語自動判定のブレを防ぐ。 */
+export const STT_LANGUAGE = 'japanese';
+
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 
 /** 心情導出の時定数(日)。負は速く減衰=復元力(非対称)。 */

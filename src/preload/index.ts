@@ -15,6 +15,7 @@ const eneAPI: EneAPI = {
   setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke('ene:set-ignore-mouse-events', ignore),
   showCharacterContextMenu: () => ipcRenderer.invoke('ene:show-character-context-menu'),
   warmCache: () => ipcRenderer.invoke('ene:warm-cache'),
+  transcribeAudio: (samples) => ipcRenderer.invoke('ene:transcribe-audio', samples),
   onVoiceChunk: (cb) => {
     // 二重登録防止: dev の StrictMode で effect が2回走るとリスナーが累積し、
     // 各センテンスが2回再生される。常に単一リスナーへ張り替える。
