@@ -4,8 +4,9 @@ import type { EmotionLabel } from './animation';
 // Conversation Layer の型定義(設計書 §3.4 / task_14 / task_16)。
 
 export type ConversationResponse =
-  | { type: 'chat'; message: string; emotion?: EmotionLabel } // emotion は task_13(任意・1ターン揮発)
-  | { type: 'os_command'; message: string; command: OsCommand };
+  // message=表示(漢字かな交じり) / reading=音声読み上げ用のひらがな(任意・task_17・欠落時は message を読む)
+  | { type: 'chat'; message: string; reading?: string; emotion?: EmotionLabel } // emotion は task_13(任意・1ターン揮発)
+  | { type: 'os_command'; message: string; reading?: string; command: OsCommand };
 
 /**
  * Claude へ渡すメッセージ1件(role + 文字列 content)。

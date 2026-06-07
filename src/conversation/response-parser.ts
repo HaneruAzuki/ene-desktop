@@ -54,12 +54,20 @@ export function parseConversationResponse(raw: string): ConversationResponse | n
   try {
     const parsed: unknown = JSON.parse(text);
     if (!isValidResponse(parsed)) return null;
+    const o = parsed as Record<string, unknown>;
+    // reading(任意・音声読み上げ用のひらがな・task_17)。欠落時は呼び出し側が message を読む。
+    const reading = typeof o.reading === 'string' && o.reading.length > 0 ? o.reading : undefined;
     // chat は emotion(任意)を許可ラベルへ正規化して付与する(task_13)。
     if (parsed.type === 'chat') {
-      const emotion = normalizeEmotion((parsed as Record<string, unknown>).emotion);
-      return emotion ? { ...parsed, emotion } : { type: 'chat', message: parsed.message };
+      const emotion = normalizeEmotion(o.emotion);
+      return {
+        type: 'chat',
+        message: parsed.message,
+        ...(emotion ? { emotion } : {}),
+        ...(reading ? { reading } : {}),
+      };
     }
-    return parsed;
+    return reading ? { ...parsed, reading } : parsed;
   } catch {
     return null;
   }

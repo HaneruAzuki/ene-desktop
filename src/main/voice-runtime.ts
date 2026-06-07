@@ -37,18 +37,18 @@ export async function initVoice(characterId: string): Promise<VoiceRuntime | nul
 }
 
 /**
- * 確定応答を合成し、文ごとに renderer へ音声チャンク(WAV)を送る(再生は renderer)。
+ * 確定応答(読み=ひらがな or 表示文)を合成し、文ごとに renderer へ音声チャンク(WAV)を送る。
  * 失敗しても会話に影響させない(best-effort)。自称検知は本会話の4層防御で済んでいるため空。
  */
 export async function speakResponse(
-  message: string,
+  spokenText: string,
   emotion: EmotionLabel,
   tts: TtsEngine,
   voiceConfig: VoiceConfig,
   mainWindow: BrowserWindow,
 ): Promise<void> {
   try {
-    await speakText(message, emotion, {
+    await speakText(spokenText, emotion, {
       tts,
       voiceConfig,
       neverCallsSelf: [],

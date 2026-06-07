@@ -84,7 +84,8 @@ async function handleSendMessage(
     const { tts, voiceConfig } = runtime;
     if (tts && voiceConfig) {
       const emo: EmotionLabel = r.type === 'chat' ? (r.emotion ?? 'neutral') : 'neutral';
-      void speakResponse(r.message, emo, tts, voiceConfig, mainWindow);
+      // 読み(ひらがな)があれば TTS はそれを喋る(誤読対策・task_17)。無ければ表示文を読む。
+      void speakResponse(r.reading ?? r.message, emo, tts, voiceConfig, mainWindow);
     }
     return r;
   };
