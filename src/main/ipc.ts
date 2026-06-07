@@ -16,9 +16,12 @@ import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
 import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
 import { handleApiAuthError } from './api-key-auto-recovery';
+import { speakResponse } from './voice-runtime';
 import type { CharacterContext } from '../shared/types/character';
 import type { ConversationResponse } from '../shared/types/conversation';
 import type { CharacterInfo } from '../shared/types/ipc';
+import type { EmotionLabel } from '../shared/types/animation';
+import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 
 // IPC ハンドラ集約(設計書 §4)。
 // すべての業務ロジックは main 側。Renderer は IPC 経由でのみ呼ぶ(API キーも漏らさない)。
@@ -29,6 +32,10 @@ export interface AppRuntime {
   apiKey: string | null;
   /** 起動挨拶(Renderer が getInitialGreeting で1回取得する)。 */
   initialGreeting: string | null;
+  /** 音声合成エンジン(task_17 Phase A・未起動/未設定なら null=テキストのみ)。 */
+  tts: TtsEngine | null;
+  /** 音声設定(emotion→スタイル/パラメータ・null なら音声無効)。 */
+  voiceConfig: VoiceConfig | null;
 }
 
 const NOT_READY: ConversationResponse = {
@@ -72,6 +79,16 @@ async function handleSendMessage(
     return NOT_READY;
   }
 
+  // 確定応答を喋らせる(音声有効時のみ・best-effort)。吹き出しは即返し、音声は文ごとに後追いで届く。
+  const speak = (r: ConversationResponse): ConversationResponse => {
+    const { tts, voiceConfig } = runtime;
+    if (tts && voiceConfig) {
+      const emo: EmotionLabel = r.type === 'chat' ? (r.emotion ?? 'neutral') : 'neutral';
+      void speakResponse(r.message, emo, tts, voiceConfig, mainWindow);
+    }
+    return r;
+  };
+
   // 認証失効(401/402/429)を検知したら APIキーダイアログを再表示し、保存後は runtime を更新。
   const onAuthError = (error: unknown): void => {
     void handleApiAuthError(error, mainWindow, (key) => {
@@ -106,7 +123,7 @@ async function handleSendMessage(
   if (response.type === 'os_command') {
     const osResult = await executeOsCommand(response.command);
     if (!osResult.ok && osResult.message) {
-      return { type: 'chat', message: osResult.message };
+      return speak({ type: 'chat', message: osResult.message });
     }
   }
 
@@ -118,7 +135,7 @@ async function handleSendMessage(
     }
   }
 
-  return response;
+  return speak(response);
 }
 
 export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRuntime): void {

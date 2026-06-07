@@ -16,6 +16,7 @@ import { ensureMemoryDirectories } from './init-directories';
 import { createMainWindow } from './window';
 import { createTray } from './tray';
 import { registerIpcHandlers, type AppRuntime } from './ipc';
+import { initVoice } from './voice-runtime';
 import { generateGreeting } from './greeting';
 import {
   loadWindowPosition,
@@ -127,6 +128,12 @@ export async function runStartupSequence(
   await saveWindowPosition(position.x, position.y);
   registerIpcHandlers(mainWindow, runtime);
   createTray(mainWindow);
+
+  // Step 10.5: 音声を best-effort 初期化(エンジン未起動でも起動は続行・task_17 Phase A)。
+  // AivisSpeech が立っていれば /speakers で実 styleId を解決して喋れる状態にする。
+  const voice = await initVoice(active.characterId);
+  runtime.tts = voice?.tts ?? null;
+  runtime.voiceConfig = voice?.voiceConfig ?? null;
 
   // Step 11: 起動挨拶を用意(Renderer が getInitialGreeting で取得・pull 方式)
   runtime.initialGreeting = generateGreeting(active, charContext);

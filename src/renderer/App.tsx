@@ -3,6 +3,7 @@ import { CharacterDisplay, type CharacterDisplayHandle } from './components/Char
 import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea } from './components/InputArea';
 import { playClick } from './sound';
+import { enqueueAudio } from './audio-player';
 import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
 import type { CharacterInfo } from '../shared/types/ipc';
 import type { CharacterState } from '../shared/types/animation';
@@ -51,6 +52,11 @@ export function App(): React.ReactElement | null {
     window.ene.onResetPosition(() => {
       /* 位置リセットは main 側で実施。Renderer は特に何もしない。 */
     });
+  }, []);
+
+  // 音声応答チャンク(WAV)を受け取って逐次再生(task_17 Phase A・出力のみ)
+  useEffect(() => {
+    window.ene.onVoiceChunk((chunk) => void enqueueAudio(chunk));
   }, []);
 
   // 入力欄を開いた瞬間に Tier0 キャッシュを温める(task_14 Phase 3・初回応答の体感を速く)。

@@ -1,4 +1,4 @@
-import { Menu, app, type BrowserWindow } from 'electron';
+import { Menu, app, dialog, type BrowserWindow } from 'electron';
 import { resetToDefaultPosition } from './window-position';
 import { openApiKeyDialog } from './api-key-dialog';
 import type { AppRuntime } from './ipc';
@@ -17,6 +17,19 @@ export function showCharacterContextMenu(window: BrowserWindow, runtime: AppRunt
         // 保存成功時は実行時状態の apiKey を更新し、即座に会話可能にする。
         void openApiKeyDialog(window, (key) => {
           runtime.apiKey = key;
+        });
+      },
+    },
+    {
+      label: 'クレジット / ライセンス',
+      click: () => {
+        // つくよみコーパスの必須クレジットを表示(voice.json から・出荷要件)。
+        const credit = runtime.voiceConfig?.credit ?? 'クレジット情報はまだ読み込まれていません。';
+        void dialog.showMessageBox(window, {
+          type: 'info',
+          title: 'クレジット',
+          message: '音声合成クレジット',
+          detail: credit,
         });
       },
     },

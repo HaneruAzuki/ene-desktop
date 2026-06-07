@@ -15,6 +15,12 @@ const eneAPI: EneAPI = {
   setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke('ene:set-ignore-mouse-events', ignore),
   showCharacterContextMenu: () => ipcRenderer.invoke('ene:show-character-context-menu'),
   warmCache: () => ipcRenderer.invoke('ene:warm-cache'),
+  onVoiceChunk: (cb) => {
+    // 二重登録防止: dev の StrictMode で effect が2回走るとリスナーが累積し、
+    // 各センテンスが2回再生される。常に単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:voice-chunk');
+    ipcRenderer.on('ene:voice-chunk', (_event, chunk: ArrayBuffer) => cb(chunk));
+  },
   onAppReady: (cb) => {
     ipcRenderer.on('ene:app-ready', () => cb());
   },

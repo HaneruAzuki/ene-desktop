@@ -8,7 +8,13 @@ import type { AppRuntime } from './ipc';
 // Electron main エントリポイント(設計書 §7)。
 // 多重起動防止 → 起動シーケンス(lifecycle)→ 終了時に記憶抽出(shutdown)。
 
-const runtime: AppRuntime = { charContext: null, apiKey: null, initialGreeting: null };
+const runtime: AppRuntime = {
+  charContext: null,
+  apiKey: null,
+  initialGreeting: null,
+  tts: null,
+  voiceConfig: null,
+};
 let mainWindow: BrowserWindow | null = null;
 let shuttingDown = false;
 

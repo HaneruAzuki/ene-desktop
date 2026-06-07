@@ -36,6 +36,9 @@ export interface EneAPI {
   // 入力欄を開いた瞬間に Tier0 キャッシュを温める(task_14 Phase 3・レイテンシ施策)
   warmCache(): Promise<void>;
 
+  // 音声応答のチャンク(WAV)受信(main → renderer・task_17 Phase A)
+  onVoiceChunk(callback: (chunk: ArrayBuffer) => void): void;
+
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
   onError(callback: (error: string) => void): void;
