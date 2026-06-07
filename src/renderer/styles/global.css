@@ -36,6 +36,13 @@ body,
   object-position: bottom center;
   -webkit-user-drag: none;
   user-select: none;
+  /* 透過キャラのシルエットに沿った影＋淡い縁取り。明暗どちらの背景でも輪郭が浮く。
+     drop-shadow は alpha 形状に追従(box-shadow と違い矩形にならない)。クリック判定には影響しない。 */
+  filter:
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) /* 明るい縁(内): くっきりした輪郭線 */
+    drop-shadow(0 0 6px rgba(255, 255, 255, 0.75)) /* 明るい縁(外): 暗背景でも沈まない発光感 */
+    drop-shadow(0 0 9px rgba(0, 0, 0, 0.55)) /* 外側の濃いめ影: 明るい背景で分離 */
+    drop-shadow(0 7px 10px rgba(0, 0, 0, 0.5)); /* 接地影: 立体感 */
 }
 
 /* 呼吸の微動(idle 中のみ・CSS transform・スプライト不要・F-ANIM-03) */
