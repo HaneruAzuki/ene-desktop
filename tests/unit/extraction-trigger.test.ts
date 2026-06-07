@@ -13,6 +13,8 @@ vi.mock('../../src/storage/paths', () => ({
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getActiveCharacterId: (): string => 'ene',
 }));
 
 import { extractFromShortTerm } from '../../src/memory/extraction-trigger';

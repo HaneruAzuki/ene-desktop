@@ -43,7 +43,7 @@ const EXTRACTION_SYSTEM = [
   'あなたは中立的な観察者です。特定のキャラクターの口調や人格は一切反映しないでください。',
   '',
   '出力は次の JSON 形式のみ(前後に文章を付けない):',
-  '{"episodic": {"topic": string, "summary": string, "tags": string[], "entities": string[], "importance": number, "category": string} | null,',
+  '{"episodic": {"topic": string, "summary": string, "tags": string[], "entities": string[], "importance": number, "category": string, "valence": number} | null,',
   ' "semanticPatch": {"userName"?: string, "preferences"?: object, "longTermGoals"?: string[], "personality"?: string[], "extra"?: object} | null,',
   ' "corrections": [{"targetFile": string, "kind": "supersede"|"refine"|"reattribute", "newSummary"?: string, "newEntities"?: string[], "reason"?: string}] }',
   '',
@@ -53,6 +53,8 @@ const EXTRACTION_SYSTEM = [
   '  (例:「ユーザーは…と言った。ENEは反対した。」「田中さんから聞いた話では…」)。専用フィールドは作らない。',
   `- importance は ${IMPORTANCE_MIN}(些細)〜${IMPORTANCE_MAX}(極めて重要)の整数。`,
   '- category は health / work / hobby / relationship / general などの短い英単語。',
+  '- valence は出来事の感情的トーン(-2=とてもつらい 〜 0=中立 〜 +2=とてもうれしい)の整数。',
+  '  これは中立的な観察であり、評価や感情の押し付けではない(愚痴=話題は負でも記録は中立に付ける)。',
   '- entities: 会話に登場する人物・固有名を列挙し、代表表記(canonical)に正規化する。',
   '  同一人物の表記ゆれ(例「田中」「田中さん」「田中一郎」)は1つにまとめる。人物を優先。無ければ []。',
   '  例: ユーザーが「田中さんと喧嘩した」→ entities: ["田中"]。',
@@ -88,6 +90,13 @@ function clampImportance(v: unknown): number {
   return Math.min(IMPORTANCE_MAX, Math.max(IMPORTANCE_MIN, n));
 }
 
+/** valence を -2..+2 の整数にクランプ(不正・欠落は 0=中立)。 */
+function clampValence(v: unknown): number {
+  const n = typeof v === 'number' ? Math.round(v) : NaN;
+  if (Number.isNaN(n)) return 0;
+  return Math.min(2, Math.max(-2, n));
+}
+
 function stringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 }
@@ -104,6 +113,7 @@ function normalizeEpisodic(raw: Record<string, unknown>): EpisodicMemory {
     entities: stringArray(raw.entities),
     importance: clampImportance(raw.importance),
     category: typeof raw.category === 'string' && raw.category.length > 0 ? raw.category : 'general',
+    valence: clampValence(raw.valence),
   };
 }
 

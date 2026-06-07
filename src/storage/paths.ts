@@ -138,6 +138,16 @@ export function getCharacterDir(characterId: string): string {
   return path.join(getCharactersDir(), characterId);
 }
 
+/** characters/{characterId}/life-memory.json(人生記憶 canon・読取専用・task_16)。 */
+export function getLifeMemoryPath(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'life-memory.json');
+}
+
+/** characters/{characterId}/current-state.json(現在状態・任意・task_16)。 */
+export function getCurrentStatePath(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'current-state.json');
+}
+
 /** ビルドリソース(アイコン等)のディレクトリ。app.getAppPath() 配下の resources/。 */
 export function getResourcesDir(): string {
   return path.join(app.getAppPath(), 'resources');

@@ -2,6 +2,7 @@ import type {
   CharacterIdentity,
   CharacterBackground,
   CharacterKnowledgeDomains,
+  CurrentState,
 } from '../shared/types/character';
 
 // キャラクター人格のシステムプロンプト構築(設計書 §3.1 / §3.4)。
@@ -13,10 +14,24 @@ import type {
 // 📌 AI自称防止は neverCallsSelf を identity.json から読んで明示する。
 //    コードに NG ワードをハードコードしない(CLAUDE §5.4 / task_02 禁止事項)。
 
+/** 現在状態(task_16・決定5)を「# 今のあなた」節に整形する。不在なら空文字。 */
+function formatCurrentState(currentState: CurrentState | null | undefined): string {
+  if (!currentState) return '';
+  const lines: string[] = [];
+  if (currentState.currentHobbies && currentState.currentHobbies.length > 0) {
+    lines.push(`- 最近ハマっていること: ${currentState.currentHobbies.join('、')}`);
+  }
+  if (currentState.familySituation) lines.push(`- 最近の家族のこと: ${currentState.familySituation}`);
+  if (currentState.currentStatus) lines.push(`- 近況: ${currentState.currentStatus}`);
+  if (lines.length === 0) return '';
+  return ['', '# 今のあなた(最近の状況・自然に会話に滲ませてよい)', ...lines].join('\n');
+}
+
 export function buildSystemPrompt(
   identity: CharacterIdentity,
   background: CharacterBackground,
   knowledgeDomains: CharacterKnowledgeDomains,
+  currentState?: CurrentState | null,
 ): string {
   const { name, ageAppearance, personality, selfRecognition } = identity;
   const high = knowledgeDomains.domains.high;
@@ -25,7 +40,7 @@ export function buildSystemPrompt(
 
   const neverList = selfRecognition.neverCallsSelf.map((w) => `「${w}」`).join('');
 
-  return [
+  const parts = [
     `あなたは「${name}」という名前の、一人の存在です。見た目の年齢層は${ageAppearance}。`,
     `汎用的なアシスタントではなく、${name}という人格として一貫して振る舞ってください。`,
     '',
@@ -56,5 +71,11 @@ export function buildSystemPrompt(
     `「私は${selfRecognition.neverCallsSelf[0] ?? ''}です」「${selfRecognition.neverCallsSelf[0] ?? ''}として」のような自称は禁止です。`,
     `もし「あなたは${selfRecognition.neverCallsSelf[0] ?? ''}なの?」のように問われても、${selfRecognition.aiQuestionHandling}。`,
     'また「お役に立てます」「申し訳ございません」のような事務的・アシスタント的な言い回しも使いません。',
-  ].join('\n');
+  ];
+
+  // task_16: 現在状態(任意)を末尾に足す。不在なら何も足さない(Tier0 の不変性を保つ)。
+  const cs = formatCurrentState(currentState);
+  if (cs) parts.push(cs);
+
+  return parts.join('\n');
 }

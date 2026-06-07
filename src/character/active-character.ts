@@ -42,6 +42,29 @@ export async function markFirstLaunchCompleted(): Promise<void> {
   }
 }
 
+/**
+ * 会話の“事実”を記録する(task_16・開示ゲーティングの素)。user ターンごとに呼ぶ。
+ * 感情/好感度ではなく接触の事実(初回時刻・会話実日数・累計ターン)のみ(§5.3)。
+ */
+export async function recordConversationTurn(): Promise<void> {
+  const active = await loadOrCreateActiveCharacter();
+  const now = nowLocalIso();
+  const today = now.slice(0, 10); // ローカル YYYY-MM-DD
+  const rel = active.relationship ?? {
+    firstMetAt: now,
+    lastConversationDate: '',
+    distinctConversationDays: 0,
+    totalTurns: 0,
+  };
+  if (rel.lastConversationDate !== today) {
+    rel.distinctConversationDays += 1;
+    rel.lastConversationDate = today;
+  }
+  rel.totalTurns += 1;
+  active.relationship = rel;
+  await saveActiveCharacter(active);
+}
+
 /** ユーザーが誕生日に触れた時に呼ぶ(該当年を celebrated にする)。 */
 export async function recordBirthdayCelebrated(year: number): Promise<void> {
   const active = await loadOrCreateActiveCharacter();

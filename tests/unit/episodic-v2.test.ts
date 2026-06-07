@@ -46,6 +46,10 @@ describe('episodic v2 (design-revision-memory-v2)', () => {
     expect(m.schemaVersion).toBe(1);
     expect(m.tags).toEqual([]);
     expect(m.topic).toBe('a');
+    // 心(task_16)の既定補完
+    expect(m.provenance).toBe('user');
+    expect(m.valence).toBe(0);
+    expect(m.disclosureLevel).toBe(1);
   });
 
   it('saveEpisodic は ID を返し、新規は schemaVersion=2 を付与する', async () => {

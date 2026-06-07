@@ -579,9 +579,11 @@
 ## 方針転換(2026-06): 固定キャラ・人生記憶・心
 
 > ユーザー承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は
-> `docs/design-revision-character-heart.md`(staging)。実装時に 03_design §2/§3.1/§3.3/§5 へマージ。
+> `docs/design-revision-character-heart.md`(マージ元)。
+> **task_16 で実装完了(2026-06-07)**:N-16-1〜7 のデータ＋処理を実装し 03_design §2/§3.1/§3.3/§5 へ反映済み。
+> 実装固有の追加判断は N-16-8〜11 を参照。実機検証:valence 抽出(負イベント→-2)・関係事実記録・心/canon/キャッシュ共存を確認。
 
-### N-16-1 🟡 単一固定キャラ(魚川トリミ)へ。アーキテクチャの JSON 外出しは維持
+### N-16-1 🟢 単一固定キャラ(魚川トリミ)へ。アーキテクチャの JSON 外出しは維持
 - **該当**: vision §3柱2/§9、CLAUDE §5.1/§12、requirements F-CHAR-08/NF-EXT-03、philosophy §6/§7
 - **内容**: 「キャラ入れ替え可能」を製品の売りにしない。一人の固定キャラに集中。旧 Phase5(多キャラPF)破棄。
 - **判断**: 製品は固定。ただしコードは特定キャラ非依存・属性は JSON 外出しのまま(ハードコード禁止・賭けの可逆性)。
@@ -589,19 +591,19 @@
 - **反映**: 上位文書反映済み。03_design §2/§3.1 のキャラ記述へ「単一固定」を注記(実装時)。
   キャラ資産の改名(identity name / fewshot 台詞の "ENE"→"魚川トリミ")は別の**創作タスク**。
 
-### N-16-2 🟡 EpisodicMemory に provenance / valence を追加(人生記憶・心の素)
+### N-16-2 🟢 EpisodicMemory に provenance / valence を追加(人生記憶・心の素)
 - **該当**: 03_design §3.3 / §5.2、design-revision-memory-v2(積み増し)
 - **内容**: `provenance?: 'user'|'self'`(self=人生記憶 canon・読取専用・忘却外)、`valence?: number`
   (-2〜+2・中立観察・想起バイアス用)。全 optional・後方互換。
 - **反映**: 03_design §3.3 の型へマージ。詳細は design-revision-character-heart §6(型定義)。
 
-### N-16-3 🟡 人生記憶 canon は characters/{id}/life-memory.json(キャラ資産・配布物)
+### N-16-3 🟢 人生記憶 canon は characters/{id}/life-memory.json(キャラ資産・配布物)
 - **該当**: 03_design §2(characters/ ツリー)/ §5、別添A
 - **内容**: キャラ自身の人生エピソードを canon として同梱。data/(ユーザー領域)へはコピーしない=不変・忘却外。
   想起時に user episodic と統合プールにマージ。
 - **反映**: §2 の `characters/{id}/` ツリーに `life-memory.json` を追記。別添A にサンプル追加(執筆時)。
 
-### N-16-4 🟡 心=記憶から導出(永続スカラー方式は不採用)
+### N-16-4 🟢 心=記憶から導出(永続スカラー方式は不採用)
 - **該当**: CLAUDE §5.3、philosophy §6、design-revision-character-heart §3、task_16
 - **内容**: 「-100〜+100 を保存し日次±1/週次回帰」案は**不採用**。心情は直近 episodic の `valence` を
   recency 重み付き平均で**導出**(状態を貯めない)。減衰=直近重み。非対称(τ_neg<τ_pos)＋ `MOOD_FLOOR` で
@@ -609,24 +611,41 @@
 - **判断根拠**: §5.3 整合・部品最小(スカラー案より少ない)・脆弱ユーザーへの加害回避(倫理の一線)。
 - **反映**: 処理は task_16、データは design-revision-character-heart。03_design §3.3 へマージ。
 
-### N-16-5 🟡 開示ゲーティング(関係に応じた記憶の開示)
+### N-16-5 🟢 開示ゲーティング(関係に応じた記憶の開示)
 - **該当**: CLAUDE §5.3、design-revision-character-heart §4、task_16(Phase 4)
 - **内容**: 記憶に `disclosureLevel?`(1..5・欠落=1)を持たせ、`familiarityStage`(知り合ってからの日数・会話実日数・累計回数=**接触の事実**から導出・**単調非減少**)以下の記憶のみ想起候補にする。初対面で重い記憶(喪失・大恥・恋の核)を出さない。
 - **判断根拠**: 「親しさ」を**好感度スカラーでなく時間の事実**で表せば §5.3 に抵触しない。開示=時間の事実／想起バイアス=心、と2軸分離。単調増加なのでドゥームループ無縁。
 - **反映**: design-revision-character-heart §4。03_design §3.3/§5 へマージ。
 
-### N-16-6 🟡 現在状態レイヤー(更新可能な"今")
+### N-16-6 🟢 現在状態レイヤー(更新可能な"今")
 - **該当**: CLAUDE §5.3/§6.1/§6.4、design-revision-character-heart §5、task_16(Phase 5)
 - **内容**: 記憶を3層化。①固定canon(過去)=`life-memory.json`(不変) ②**現在の私(今)**=`current-state.json`(マイブーム/最近の家族の状況/追加趣味/現況・**事実のみ**) ③ユーザー episodic。趣味=核(固定)＋現在(可変)で「追加できる」を満たす。
 - **判断根拠**: 「永遠だが今を生きる」を支える。MVP は**開発者更新でキャラ資産配布**(自律ドリフトなし)。自己更新は post-MVP・per-user で `data/`(所有権 §6.4)。
 - **反映**: design-revision-character-heart §5。03_design §2(characters/ ツリー)/§5 へマージ。
 
-### N-16-7 🟡 人生記憶 canon の内容確定とガードレール(A/B/C)
+### N-16-7 🟢 人生記憶 canon の内容確定とガードレール(A/B/C)
 - **該当**: design-revision-character-heart §2.4、`docs/character-life-memory-canon-plan.md`、knowledge_domains.json
 - **内容**: canon の**内容計画**(前提・カテゴリ別記憶リスト約41件・valence/importance/開示Lv)を計画書に確定。固定キャラ=人間の少女(IT は**完全独学**)、自己イメージは「ネットの住人」。**加齢しない日時**=絶対年でなく相対ライフステージ。
 - **ガードレール**: A=ハッキングは才能(深い理解)のみ・実行は `refuse`・クーポンは過去の黒歴史。B=性的無知の失敗は**語ズラし**(非性的な大人語)へ・開示Lv5・性的会話に乗らない refuse 線。C=初恋は事実のみ認め**身体面は恒久はぐらかし**・深い開示は感情(ツン由来直結)。
 - **判断根拠**: 未成年キャラ×性的/違法題材の製品リスク(審査・評判・脱獄)を、芯(電脳少女・無邪気な失敗・過去の恋)を残しつつ回避。
 - **反映**: 個別記憶の執筆＋`characters/ene/life-memory.json` への JSON 変換・配置は**実装セッション**(計画書を入力)。
+- **実装(task_16)**: draft の41記憶を `characters/ene/life-memory.json` に配置済み(全 provenance:self・valence 分布 ポジ23/中立7/ネガ11・開示Lv 1〜5)。ガードレール A/B/C は canon 文面に反映済み。実行系ハッキング refuse・性的会話 refuse 線は fewshot/knowledge_domains 側(将来の創作タスクで強化)。
+
+### N-16-8 🟢 心情に中立プライアを追加(設計の正規化平均を補正)
+- **内容**: 設計 §3.2 の `Σw·v/Σw`(正規化平均)は**古い負記憶だけが残ると 0 に戻らず暗転ロック**する。分母に `MOOD_PRIOR_WEIGHT=1` を足し `Σw·v/(Σw+prior)` とした。→ 沈黙(記憶が古い/少ない)で mood が 0 へ縮約・数件では微細、を実現(設計の「沈黙で0へ」§3.2 の意図を満たす)。
+- **反映**: §3.3(mood.ts)。design-revision-character-heart §3.2 の式に prior を補う改訂。
+
+### N-16-9 🟢 familiarityStage=接触の事実3要素・連言・Lv5≈1年
+- **内容**: 経過日数 AND 会話実日数 AND ターン累計の**全部**が閾値を満たす最大段(`FAMILIARITY_THRESHOLDS`)。事実は `active-character.json` の `relationship`(firstMetAt/lastConversationDate/distinctConversationDays/totalTurns)に記録(誕生日履歴と同列の“事実”)。ユーザー決定:**Lv5≈1年**(365日/80会話日/800ターン)。`recordConversationTurn()` を user ターンで呼ぶ。
+- **反映**: §3.1/§5.4(ActiveCharacter に relationship)。§3.3(familiarity.ts)。
+
+### N-16-10 🟢 canon は recall-pool で統合(索引含む)・mood/安全網は user のみ
+- **内容**: `loadRecallPool()` = user episodic ＋ canon(ID=`self/N`)。retriever・逆引き索引・ベクトル索引はこのプールを母集団に(canon も語彙/意味で引ける)。一方 **mood 導出と「直近×高importance」安全網は provenance:'user' のみ**(canon は直近の出来事ではない・想起を埋め尽くさない)。canon は supersede/保存/忘却の対象外。
+- **反映**: §2/§3.3。
+
+### N-16-11 🟢 心/開示は retriever の deps ゲートで後方互換
+- **内容**: `RetrieverDeps={embedder?,mood?,familiarityStage?,rng?}`。未指定=mood0(バイアス無)・stage5(全開示)・argmax(決定論)=**task_15 の挙動と同一**。会話経路(`buildHeartDeps`)が now=`Date.now()` で mood/familiarity＋`Math.random` を注入。softmax サンプリング(`RECALL_SOFTMAX_TEMP`)で揺らぎ。λ/温度は調律可。
+- **反映**: §3.3(retriever.ts)。既存 retriever テスト群は回帰なし(251緑)。
 
 ---
 

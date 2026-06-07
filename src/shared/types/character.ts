@@ -79,12 +79,36 @@ export interface BirthdayHistoryEntry {
   celebratedAt?: string; // 触れられた日時(ローカルTZ込み ISO 8601)
 }
 
+/**
+ * 関係の事実(task_16・開示ゲーティング用)。
+ * 接触の“事実”のみ(感情/好感度スカラーではない・§5.3)。familiarityStage はこれから導出する。
+ */
+export interface RelationshipFacts {
+  firstMetAt: string; // 初めて会話した日時(ローカルTZ込み ISO 8601)
+  lastConversationDate: string; // 直近に会話した日付(YYYY-MM-DD・実日数カウント用)
+  distinctConversationDays: number; // 会話した実日数
+  totalTurns: number; // 累計やりとり回数
+}
+
 export interface ActiveCharacter {
   version: number; // スキーマバージョン(MVPは 1)
   characterId: string; // 現在使用中のキャラ ID
   selectedAt: string; // 切り替えた日時(ローカルTZ込み ISO 8601)
   birthdayHistory: BirthdayHistoryEntry[];
   firstLaunchCompleted: boolean; // 初回起動の操作案内表示済みフラグ(§8.7)
+  relationship?: RelationshipFacts; // ★task_16 開示ゲーティングの素(事実のみ)
+}
+
+/**
+ * 現在状態レイヤー(task_16・決定5)。更新可能な“今”(事実のみ・感情スカラーなし)。
+ * characters/{id}/current-state.json。不在でも background のみで動く(後方互換)。
+ */
+export interface CurrentState {
+  characterId: string;
+  asOf: string; // この“今”の基準時刻(ローカルTZ込み ISO 8601)
+  currentHobbies?: string[]; // マイブーム・追加趣味
+  familySituation?: string; // 最近の家族関係の近況(事実)
+  currentStatus?: string; // 現況・近況(事実)
 }
 
 /** レイヤー間で受け渡す統合コンテキスト */
@@ -96,4 +120,5 @@ export interface CharacterContext {
   portraitPath: string; // 絶対パス
   systemPrompt: string; // 構築済みのキャラクター人格プロンプト(応答形式は Conversation Layer が付与)
   birthdayHint?: 'today' | 'forgotten' | null;
+  currentState?: CurrentState | null; // ★task_16 現在状態(任意・不在可)
 }

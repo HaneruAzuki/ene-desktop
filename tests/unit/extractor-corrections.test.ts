@@ -25,6 +25,19 @@ describe('extractor v2 — entities / schemaVersion', () => {
     );
     expect(r.episodic?.entities).toEqual([]);
   });
+
+  it('valence を -2..+2 にクランプし、欠落時は 0(中立)', async () => {
+    const make = (v: unknown): (() => Promise<string>) => async () =>
+      JSON.stringify({ episodic: { topic: 't', summary: 's', importance: 3, category: 'general', valence: v } });
+    expect((await extractMemoryFromConversation(entries, [], make(5))).episodic?.valence).toBe(2);
+    expect((await extractMemoryFromConversation(entries, [], make(-9))).episodic?.valence).toBe(-2);
+    expect((await extractMemoryFromConversation(entries, [], make(-1))).episodic?.valence).toBe(-1);
+    // 欠落
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({ episodic: { topic: 't', summary: 's', importance: 3, category: 'general' } }),
+    );
+    expect(r.episodic?.valence).toBe(0);
+  });
 });
 
 describe('extractor v2 — corrections', () => {

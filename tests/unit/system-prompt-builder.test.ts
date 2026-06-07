@@ -78,4 +78,21 @@ describe('system-prompt-builder (設計書 §3.1 / §3.4)', () => {
     expect(prompt).not.toContain('os_command');
     expect(prompt).not.toContain('"type"');
   });
+
+  it('現在状態(task_16)があれば「今のあなた」節を含む', () => {
+    const prompt = buildSystemPrompt(identity, background, knowledgeDomains, {
+      characterId: 'ene',
+      asOf: '2026-06-07T12:00:00+09:00',
+      currentHobbies: ['シュタゲ再履修'],
+      currentStatus: '夜型加速中',
+    });
+    expect(prompt).toContain('今のあなた');
+    expect(prompt).toContain('シュタゲ再履修');
+    expect(prompt).toContain('夜型加速中');
+  });
+
+  it('現在状態が無ければ「今のあなた」節は出ない(Tier0 不変)', () => {
+    const prompt = buildSystemPrompt(identity, background, knowledgeDomains, null);
+    expect(prompt).not.toContain('今のあなた');
+  });
 });

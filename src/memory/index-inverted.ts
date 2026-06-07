@@ -1,6 +1,6 @@
 import { getInvertedIndexPath } from '../storage/paths';
 import { readJson, writeJson } from '../storage/json-store';
-import { loadAllEpisodicFiles } from './episodic';
+import { loadRecallPool } from './recall-pool';
 import type { EpisodicMemory } from '../shared/types/memory';
 
 // 逆引き索引(語彙・人物・design-revision-memory-v2 §1.3)。
@@ -30,10 +30,10 @@ function addRecordToIndex(index: InvertedIndex, id: string, memory: EpisodicMemo
   for (const t of memory.tags ?? []) addTo(index.keywords, t, id);
 }
 
-/** 全 episodic から索引を作り直して保存する(欠落時・索引破損時の復旧)。 */
+/** 想起プール(user+canon)から索引を作り直して保存する(欠落時・索引破損時の復旧)。 */
 export async function rebuildInvertedIndex(): Promise<InvertedIndex> {
   const index = emptyIndex();
-  for (const { id, memory } of await loadAllEpisodicFiles()) {
+  for (const { id, memory } of await loadRecallPool()) {
     addRecordToIndex(index, id, memory);
   }
   await writeJson(getInvertedIndexPath(), index);

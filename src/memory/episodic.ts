@@ -42,6 +42,10 @@ export function migrateEpisodic(raw: EpisodicMemory): EpisodicMemory {
     ...raw,
     schemaVersion: raw.schemaVersion ?? 1,
     tags: raw.tags ?? [],
+    // 心(task_16)欠落時の既定。canon は provenance:'self' を明示するので ?? で保持される。
+    provenance: raw.provenance ?? 'user',
+    valence: raw.valence ?? 0,
+    disclosureLevel: raw.disclosureLevel ?? 1,
   };
 }
 

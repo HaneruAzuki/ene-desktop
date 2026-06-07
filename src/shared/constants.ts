@@ -38,6 +38,44 @@ export const EMBEDDING_DOCUMENT_PREFIX = '検索文書: ';
 /** RRF(Reciprocal Rank Fusion)の平滑化定数。一般に 60 が無難。 */
 export const RRF_K = 60;
 
+// --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
+
+/** 心情導出の時定数(日)。負は速く減衰=復元力(非対称)。 */
+export const MOOD_TAU_POS_DAYS = 14;
+export const MOOD_TAU_NEG_DAYS = 7;
+
+/** clampedMood の下限(“デレの床”・暗転ロック回避・倫理の一線)。 */
+export const MOOD_FLOOR = -1.5;
+
+/**
+ * 中立プライアの重み。mood を 0 へ向けて縮約する仮想的な“中立の記憶”。
+ * これにより (a) 沈黙(記憶が古い)で mood が自然に 0 へ戻る(§3.2)、
+ * (b) 数件の直近記憶では mood が小さい(微細)、という性質が出る。
+ */
+export const MOOD_PRIOR_WEIGHT = 1;
+
+/** 想起バイアス係数。RRF スコアと同オーダーで「微細」(拮抗時のみ順位が動く・調律可)。 */
+export const RECALL_BIAS_LAMBDA = 0.01;
+
+/** 想起の softmax サンプリング温度(小さいほど上位が安定・調律可)。 */
+export const RECALL_SOFTMAX_TEMP = 0.01;
+
+/**
+ * 開示ゲーティングの段階閾値(接触の事実3要素・連言・Lv5≈1年)。
+ * 経過日数 AND 会話実日数 AND ターン累計の全部が満たされた最大段になる。
+ */
+export const FAMILIARITY_THRESHOLDS: ReadonlyArray<{
+  stage: number;
+  days: number;
+  talkDays: number;
+  turns: number;
+}> = [
+  { stage: 2, days: 3, talkDays: 2, turns: 10 },
+  { stage: 3, days: 30, talkDays: 12, turns: 80 },
+  { stage: 4, days: 120, talkDays: 40, turns: 350 },
+  { stage: 5, days: 365, talkDays: 80, turns: 800 },
+];
+
 // --- ウィンドウ(設計書 §8.1) ---
 /** キャラ部分のウィンドウ幅。 */
 export const WINDOW_WIDTH = 240;

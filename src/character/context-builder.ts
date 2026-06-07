@@ -21,6 +21,7 @@ export async function buildCharacterContext(): Promise<CharacterContext> {
     profile.identity,
     profile.background,
     profile.knowledgeDomains,
+    profile.currentState,
   );
 
   const birthdayHint = checkBirthday(profile.identity, active, todayLocalYmd());
@@ -33,5 +34,6 @@ export async function buildCharacterContext(): Promise<CharacterContext> {
     portraitPath: profile.portraitPath,
     systemPrompt,
     birthdayHint,
+    currentState: profile.currentState,
   };
 }

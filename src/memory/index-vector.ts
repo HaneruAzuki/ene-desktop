@@ -1,7 +1,7 @@
 import { getVectorIndexPath } from '../storage/paths';
 import { readJson, writeJson } from '../storage/json-store';
 import { EMBEDDING_DIM } from '../shared/constants';
-import { loadAllEpisodicFiles } from './episodic';
+import { loadRecallPool } from './recall-pool';
 import type { Embedder } from './embedder';
 import type { EpisodicRecord } from '../shared/types/memory';
 
@@ -77,9 +77,9 @@ export async function syncVectorIndex(
   return index;
 }
 
-/** 全 episodic から索引を作り直す(欠落時・モデル後から導入時の一括生成)。 */
+/** 想起プール(user+canon)から索引を作り直す(欠落時・モデル後から導入時の一括生成)。 */
 export async function rebuildVectorIndex(embedder: Embedder): Promise<VectorIndex> {
-  const records = await loadAllEpisodicFiles();
+  const records = await loadRecallPool();
   const summaries = records.map((r) => r.memory.summary);
   const vectors = await embedder.embed(summaries, 'document');
   const index: VectorIndex = {

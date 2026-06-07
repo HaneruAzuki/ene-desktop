@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({ acPath: '', dir: '' }));
 vi.mock('../../src/storage/paths', () => ({
   getActiveCharacterPath: (): string => h.acPath,
   getCharacterDir: (id: string): string => `${process.cwd()}/characters/${id}`,
+  getCurrentStatePath: (id: string): string => `${process.cwd()}/characters/${id}/current-state.json`,
   setActiveCharacterId: vi.fn(),
 }));
 

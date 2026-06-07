@@ -1,11 +1,12 @@
 import { join } from 'node:path';
-import { getCharacterDir } from '../storage/paths';
+import { getCharacterDir, getCurrentStatePath } from '../storage/paths';
 import { readJson } from '../storage/json-store';
 import type {
   CharacterIdentity,
   CharacterBackground,
   CharacterKnowledgeDomains,
   CharacterFewshot,
+  CurrentState,
 } from '../shared/types/character';
 
 // キャラクタープロファイル(4ファイル)のロード(設計書 §3.1)。
@@ -18,6 +19,7 @@ export interface LoadedCharacterProfile {
   knowledgeDomains: CharacterKnowledgeDomains;
   fewshot: CharacterFewshot;
   portraitPath: string; // 絶対パス(存在チェックはしない)
+  currentState: CurrentState | null; // task_16・任意(不在可)
 }
 
 interface HasCharacterId {
@@ -63,11 +65,15 @@ export async function loadCharacterProfile(
     }
   }
 
+  // 現在状態(task_16)は任意。不在でも background のみで動く(後方互換・致命的でない)。
+  const currentState = await readJson<CurrentState>(getCurrentStatePath(characterId));
+
   return {
     identity,
     background,
     knowledgeDomains,
     fewshot,
     portraitPath: join(dir, 'portrait.png'),
+    currentState: currentState ?? null,
   };
 }

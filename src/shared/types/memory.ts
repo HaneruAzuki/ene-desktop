@@ -27,6 +27,10 @@ export interface EpisodicMemory {
   category: string; // health, work, hobby など(表示・年次忘却用)
   supersededBy?: string; // 置換した新記録の ID(相対パス)。存在＝この記録は古い(非破壊更新)。
   extra?: Record<string, ExtraValue>; // 拡張領域(emotion/isFirst 等は当面ここに溜める)
+  // --- 心(task_16・全 optional・後方互換・design-revision-character-heart §6) ---
+  provenance?: 'user' | 'self'; // 欠落=user。self=キャラ自身の人生記憶(canon・読取専用・忘却外)
+  valence?: number; // -2..+2。欠落=0(中立)。出来事の感情的トーン(想起バイアス用・感情管理ではない)
+  disclosureLevel?: number; // 1..5。欠落=1(初対面から)。親しさ段階で開示制御(開示ゲーティング)
 }
 
 /** episodic 記録とその ID(= episodic ルートからの相対パス)の対。 */

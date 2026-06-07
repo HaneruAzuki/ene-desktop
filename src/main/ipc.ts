@@ -4,13 +4,13 @@ import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
 import { log } from '../shared/logger';
 import { WINDOW_WIDTH, WINDOW_HEIGHT } from '../shared/constants';
 import { appendShortTerm } from '../memory/short-term';
-import { buildMemoryContext } from '../memory/context-builder';
+import { buildMemoryContext, buildHeartDeps } from '../memory/context-builder';
 import { extractFromShortTerm } from '../memory/extraction-trigger';
 import { classifyTopic } from '../router/router';
 import { chat, makeLlmComplete, warmPromptCache } from '../conversation/client';
 import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
-import { recordBirthdayCelebrated } from '../character/active-character';
+import { recordBirthdayCelebrated, recordConversationTurn } from '../character/active-character';
 import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
 import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
@@ -81,14 +81,16 @@ async function handleSendMessage(
   // 短期記憶 overflow 時の抽出(Claude 呼び出しを注入)。Memory 層は Claude を直接知らない。
   const onOverflow = (): Promise<void> => extractFromShortTerm('overflow', makeLlmComplete(apiKey));
 
-  // 1. user を短期記憶へ
+  // 1. user を短期記憶へ ＋ 関係の事実を記録(開示ゲーティングの素・task_16)
   await appendShortTerm({ role: 'user', text, timestamp: nowLocalIso(), extracted: false }, onOverflow);
+  await recordConversationTurn();
 
   // 2. トピック判定(失敗しても fallback で続行)
   const routerResult = await classifyTopic(text, charContext.knowledgeDomains, apiKey);
 
-  // 3. 記憶コンテキスト(ユーザー発言を引き金に全件横断で想起・Router 非依存・task_15)
-  const memoryContext = await buildMemoryContext({ text, limit: 5 });
+  // 3. 記憶コンテキスト(全件横断想起・Router 非依存・心/開示バイアスを注入・task_15/16)
+  const heartDeps = await buildHeartDeps();
+  const memoryContext = await buildMemoryContext({ text, limit: 5 }, heartDeps);
 
   // 4. 本会話(4層防御込み)。認証失効時はダイアログ再表示。
   const response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError });

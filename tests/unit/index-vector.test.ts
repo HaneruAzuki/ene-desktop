@@ -7,6 +7,8 @@ import { promises as fs } from 'node:fs';
 const h = vi.hoisted(() => ({ memDir: '' }));
 vi.mock('../../src/storage/paths', () => ({
   getMemoryDir: (): string => h.memDir,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getActiveCharacterId: (): string => 'ene',
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
