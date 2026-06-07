@@ -10,6 +10,9 @@ vi.mock('../../src/storage/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
+  getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
+  getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
+  getModelsDir: (): string => `${h.memDir}/models`,
 }));
 
 import { extractFromShortTerm } from '../../src/memory/extraction-trigger';
@@ -56,7 +59,7 @@ describe('extraction-trigger (設計書 §3.3)', () => {
     expect(complete).toHaveBeenCalledOnce();
     const eps = await loadAllEpisodicFiles();
     expect(eps.length).toBe(1);
-    expect(eps[0]?.topic).toBe('睡眠');
+    expect(eps[0]?.memory.topic).toBe('睡眠');
     const sem = await getSemantic();
     expect(sem.preferences?.sleep).toBe('改善したい');
     const st = await getShortTerm();

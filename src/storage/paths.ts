@@ -58,6 +58,15 @@ function getConfigDir(): string {
   return path.join(getPortableDataDir(), 'config');
 }
 
+/**
+ * 埋め込みモデルの置き場(data/models/)。アプリ共通(キャラ非依存)。
+ * コア exe を汚さないため別ダウンロードで配置する(§4.3・design-revision-memory-v2 §1.3)。
+ * data/ は .gitignore 済み＝リポジトリには含めない。
+ */
+export function getModelsDir(): string {
+  return path.join(getPortableDataDir(), 'models');
+}
+
 /** data/config/active-character.json(active キャラに依存しない固定パス)。 */
 export function getActiveCharacterPath(): string {
   return path.join(getConfigDir(), 'active-character.json');
@@ -93,6 +102,28 @@ export function getSemanticPath(): string {
 /** data/memory/{activeCharacterId}/short-term.json */
 export function getShortTermPath(): string {
   return path.join(getMemoryDir(), 'short-term.json');
+}
+
+// --- 派生キャッシュ(真実の源ではない・JSON から再生成可能・design-revision-memory-v2 §1.3) ---
+
+/** data/memory/{activeCharacterId}/index/(逆引き・ベクトル索引の置き場)。 */
+export function getMemoryIndexDir(): string {
+  return path.join(getMemoryDir(), 'index');
+}
+
+/** data/memory/{activeCharacterId}/index/inverted.json(entity/keyword 逆引き)。 */
+export function getInvertedIndexPath(): string {
+  return path.join(getMemoryIndexDir(), 'inverted.json');
+}
+
+/** data/memory/{activeCharacterId}/index/vectors.json(意味検索ベクトル・Phase B)。 */
+export function getVectorIndexPath(): string {
+  return path.join(getMemoryIndexDir(), 'vectors.json');
+}
+
+/** data/memory/{activeCharacterId}/relationships/(人物 gist・予約)。 */
+export function getRelationshipsDir(): string {
+  return path.join(getMemoryDir(), 'relationships');
 }
 
 // --- 同梱キャラ定義(読み取り専用・配布物に含まれる) ---

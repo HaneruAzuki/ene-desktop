@@ -15,6 +15,9 @@ vi.mock('../../../src/storage/paths', () => ({
   getMemoryDir: (): string => h.base,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.base}/episodic/${year}/${category}`,
+  getInvertedIndexPath: (): string => `${h.base}/index/inverted.json`,
+  getVectorIndexPath: (): string => `${h.base}/index/vectors.json`,
+  getModelsDir: (): string => `${h.base}/models`,
 }));
 
 import { updateSemantic } from '../../../src/memory/semantic';
@@ -35,7 +38,7 @@ describe('受入: セッションを跨いだ記憶(成功基準5 の機構)', (
     await updateSemantic({ userName: '太郎' });
 
     // セッション2(新規プロセス相当):記憶を読み直す
-    const mc = await buildMemoryContext({ limit: 5 });
+    const mc = await buildMemoryContext({ text: '私の名前覚えてる?', limit: 5 });
     expect(mc.semantic.userName).toBe('太郎');
 
     // 統合プロンプトの長期記憶セクションに名前が載る(= ENE が参照できる)
@@ -45,7 +48,7 @@ describe('受入: セッションを跨いだ記憶(成功基準5 の機構)', (
 
   it('好み(preferences)も長期記憶に蓄積され、プロンプトへ反映される', async () => {
     await updateSemantic({ userName: '太郎', preferences: { 好きな食べ物: 'ラーメン' } });
-    const mc = await buildMemoryContext({ limit: 5 });
+    const mc = await buildMemoryContext({ text: 'なんか食べたい', limit: 5 });
     const prompt = buildPrompt(makeCharContext(), mc, makeRouterResult(), 'なんか食べたい');
     expect(prompt.system).toContain('ラーメン');
   });

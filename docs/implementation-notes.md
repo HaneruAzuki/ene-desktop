@@ -491,6 +491,58 @@
 
 ---
 
+## task_15(記憶想起エンジン・非破壊更新)
+
+> MVP 0.3「記憶の会話活用強化」。Phase A(語彙＋entity)＋Phase B(ベクトルRRF)を実装・テスト・
+> 実モデル/実API でエンドツーエンド検証済み(2026-06-07)。設計書 §1.2/§2/§3.3/§5.2/§5.5 へ反映済み。
+
+### N-15-1 🟢 EpisodicMemory v2(全 optional・後方互換)
+- **内容**: `schemaVersion?`/`entities?`/`supersededBy?`/`extra?` を追加、`tags?` を任意化。読取時 `migrateEpisodic` で欠落補完(ファイルは書き換えない)。
+- **反映**: §3.3 型定義・§5.2 例を v2 へ更新。
+
+### N-15-2 🟢 記憶ID = episodic ルートからの相対パス(設計書記述の訂正)
+- **該当**: design-revision-memory-v2 §1.1「ファイル名(`{date}.json`)が一意IDを兼ねる」
+- **内容**: ファイル名単独は year/category 跨ぎで衝突しうるため、ID は `"{year}/{category}/{file}.json"` の相対パスに**訂正**。`saveEpisodic` は ID を返し、`loadAllEpisodicFiles` は `EpisodicRecord[]`(ID付き)。`loadEpisodicById`/`updateEpisodicById` を追加。
+- **反映**: §3.3 関数シグネチャ更新。
+
+### N-15-3 🟢 想起を Router 非依存に(MemoryRetriever)
+- **内容**: 会話時の想起を `matchedTopic` タグ検索から `buildMemoryContext({ text })`→`MemoryRetriever.retrieve` に切替。Router は知識ドメイン判定のみ。`searchEpisodic`(明示フィルタ)は存続。
+- **反映**: §3.3・N-07-3 改訂。
+
+### N-15-4 ⚪ Phase A 語彙層は形態素解析器を入れない
+- **内容**: 日本語形態素解析器は新規依存になるため見送り。逆引きは entity/tag の部分一致(双方向 includes)で実装。意味の橋渡しは Phase B(ベクトル)が担当。
+
+### N-15-5 🟢 非破壊更新(supersede/refine/reattribute)
+- **内容**: `applyCorrections` で旧記録に `supersededBy` 付与(物理削除なし)/summary・entities の refine/その1件のみ reattribute。確信が低い更新は抽出器が出さない＋ライブ層で ENE が口頭確認(**保存される確認ステートを持たない**=§5.3)。
+- **反映**: §3.3 に方針記載。
+
+### N-15-6 🟢 抽出の2層フロー＋抽出器シグネチャ変更
+- **内容**: (live)retriever が旧記憶をプロンプトに載せる/(persist)抽出時に retriever を1回回し `relevantMemories` を渡す→`corrections` を非破壊適用。`extractMemoryFromConversation(unextracted, relevantMemories, complete)` に変更し `corrections?` を出力。
+- **反映**: §3.3 シグネチャ更新。
+
+### N-15-7 🟢 派生キャッシュ＋ベクトル増分は retriever 経路に集約
+- **内容**: `index/inverted.json`・`index/vectors.json` は真実の源でなく再生成可(削除で自己修復)。**埋め込みは retriever 経路でのみ実行**(抽出/更新フローはモデルに触れない=モデル未配置でも書き込みが動く)。新記録のベクトル化は次回想起時に `syncVectorIndex` で増分。
+- **反映**: §2/§5.5 に index/・relationships/ 追記。
+
+### N-15-8 🟢 Phase B 埋め込み = @huggingface/transformers + ruri int8(ローカル限定)
+- **内容**: `@huggingface/transformers ^4.x`(onnxruntime-node 推移同梱)。モデルは `cl-nagoya/ruri-v3-310m` int8(別DL `data/models/`)。実行時の外部DL禁止(`env.allowRemoteModels=false`)。未配置時は `isEmbeddingModelAvailable()` で判定し**語彙のみフォールバック**。入力プレフィックス必須(`検索クエリ:`/`検索文書:`)。dtype `q8`→`model_quantized.onnx`。
+- **検証**: 実モデルで読込664ms・768次元・「赤点」が study 0.85 > food/person 0.80(意味の橋渡し成立)。
+- **反映**: §1.2 へ確定追記。
+
+### N-15-9 🟢 配布は native・win-x64・CPU限定
+- **内容**: `onnxruntime-node` は全OS native で 211MB のため、配布は win-x64 の CPU コア(`onnxruntime.dll`＋`*_binding.node` 約24MB)のみ同梱。GPU用 DirectML(約38MB)・他OS・`onnxruntime-web`(約130MB)は除外。`electron.vite.config.ts` で external 化、`electron-builder.yml` の files/asarUnpack を設定。コア exe は約100MB境界。
+- **要フォロー**: 実機 `npm run package:portable` での起動確認(DirectML除外で binding がロードできるか)は未了。
+
+### N-15-10 🟢 手動テスト資材と実機エンドツーエンド検証
+- **内容**: `scripts/seed-recall-fixtures.mjs`(仮記憶)/`scripts/download-model.mjs`(モデル取得)/`tests/acceptance/memory-recall-manual.md`(S1〜S5)。
+- **検証(実API/実モデル)**: S3 意味想起(赤点→勉強)、S4 supersede(鈴木・非破壊で旧に supersededBy)、S5 reattribute(田中→田中一郎で3件束ね)をエンドツーエンドで確認。単体テストは全パターン網羅(API/モデル不要・埋め込みはモック注入)。
+
+### N-15-11 ⚪ 既知の軽微事項(対応不要)
+- 抽出は1バッチ=1 episodic のため、1会話で複数話題が出ると1記録に統合されることがある(横断想起では問題になりにくい)。
+- Router 毎ターン fallback は **N-09-9(既知のブラッシュアップ項目)**。想起は Router 非依存にしたため品質に影響しない。
+
+---
+
 ## 方針転換(2026-06): 固定キャラ・人生記憶・心
 
 > ユーザー承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は

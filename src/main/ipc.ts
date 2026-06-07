@@ -86,11 +86,8 @@ async function handleSendMessage(
   // 2. トピック判定(失敗しても fallback で続行)
   const routerResult = await classifyTopic(text, charContext.knowledgeDomains, apiKey);
 
-  // 3. 記憶コンテキスト(matchedTopic をタグに使った簡易検索・MVP)
-  const memoryContext = await buildMemoryContext({
-    tags: routerResult.matchedTopic ? [routerResult.matchedTopic] : undefined,
-    limit: 5,
-  });
+  // 3. 記憶コンテキスト(ユーザー発言を引き金に全件横断で想起・Router 非依存・task_15)
+  const memoryContext = await buildMemoryContext({ text, limit: 5 });
 
   // 4. 本会話(4層防御込み)。認証失効時はダイアログ再表示。
   const response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError });

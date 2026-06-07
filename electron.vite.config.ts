@@ -10,6 +10,10 @@ export default defineConfig({
       outDir: 'out/main',
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.ts') },
+        // 埋め込みランタイムは ESM＋ネイティブ依存(onnxruntime-node の .node)を含むため
+        // バンドルせず外部化する。実行時に node_modules から解決し、native は asarUnpack で同梱する
+        // (electron-builder.yml)。Phase B(task_15)。
+        external: ['@huggingface/transformers', 'onnxruntime-node'],
       },
     },
     resolve: {

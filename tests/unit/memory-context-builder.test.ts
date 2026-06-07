@@ -10,6 +10,9 @@ vi.mock('../../src/storage/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
+  getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
+  getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
+  getModelsDir: (): string => `${h.memDir}/models`,
 }));
 
 import { buildMemoryContext } from '../../src/memory/context-builder';
@@ -42,7 +45,7 @@ describe('memory context-builder (設計書 §3.3)', () => {
       category: 'general',
     });
 
-    const ctx = await buildMemoryContext({ tags: ['k'] });
+    const ctx = await buildMemoryContext({ text: 'k のこと覚えてる?' });
     expect(ctx.semantic.userName).toBe('太郎');
     expect(ctx.shortTerm.length).toBe(1);
     expect(ctx.relevantEpisodic.length).toBe(1);

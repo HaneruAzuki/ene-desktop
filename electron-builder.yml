@@ -3,16 +3,31 @@ productName: ENE Desktop
 directories:
   output: dist
   buildResources: resources
-# 配布物に含めるファイル。main/preload/renderer は out/ に自己完結バンドル済みなので
-# node_modules は同梱しない(electron ランタイムは electron-builder が別途同梱する)。
+# 配布物に含めるファイル。main/preload/renderer は out/ に自己完結バンドル済み。
+# 例外: 埋め込みランタイム(@huggingface/transformers + onnxruntime-node)は ESM＋ネイティブ依存のため
+# バンドルせず external 化(electron.vite.config.ts)し、ここで node_modules から必要分だけ同梱する。
+# ※ Phase B(task_15)。配布サイズ §4.3 を守るため CPU 限定(GPU用DLL除外)・win-x64 のみ・onnxruntime-web 除外。
+# ※ この同梱範囲は実機 `npm run package:portable` での起動確認が未了(手動テスト後に検証)。
 files:
   - 'out/**/*'
   - 'characters/**/*' # 初期キャラ(JSON + portrait)を同梱
   - 'resources/**/*' # トレイアイコン等(実行時に nativeImage が読む・N-07-6)
   - '!node_modules/**/*'
+  # 埋め込みランタイム(text 用途に必要な分のみ)
+  - 'node_modules/@huggingface/transformers/**/*'
+  - 'node_modules/@huggingface/jinja/**/*'
+  - 'node_modules/@huggingface/tokenizers/**/*'
+  - 'node_modules/onnxruntime-common/**/*'
+  - 'node_modules/onnxruntime-node/package.json'
+  - 'node_modules/onnxruntime-node/lib/**/*'
+  - 'node_modules/onnxruntime-node/dist/**/*'
+  # native は win-x64 の CPU 推論コアのみ(GPU用 DirectML/他OS は載せない)
+  - 'node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll'
+  - 'node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node'
 asar: true
 asarUnpack:
   - 'characters/**/*' # キャラ定義はユーザーがカスタマイズ可能なよう展開状態を維持
+  - 'node_modules/onnxruntime-node/bin/**/*' # native .dll/.node は asar 外でないとロードできない
 win:
   target:
     - target: portable

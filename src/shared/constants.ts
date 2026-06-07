@@ -17,6 +17,27 @@ export const IMPORTANCE_MAX = 5;
 /** importance が不正値だった場合の既定値。 */
 export const IMPORTANCE_DEFAULT = 3;
 
+/** Episodic スキーマの現行バージョン(新規保存時に付与)。design-revision-memory-v2 §1.1。 */
+export const EPISODIC_SCHEMA_VERSION = 2;
+
+/** 想起(MemoryRetriever)のデフォルト取得件数。 */
+export const DEFAULT_RETRIEVAL_LIMIT = 5;
+
+// --- 埋め込み・ベクトル想起(Phase B・task_15 / design-revision-memory-v2 §1.3) ---
+
+/** 埋め込みモデル(ruri-v3-310m)のディレクトリ名。data/models/ 配下に別ダウンロードで配置。 */
+export const EMBEDDING_MODEL_DIR = 'ruri-v3-310m';
+
+/** ruri の埋め込み次元(768)。 */
+export const EMBEDDING_DIM = 768;
+
+/** ruri は入力にプレフィックス必須(付け忘れ＝精度劣化)。クエリ用・文書用。 */
+export const EMBEDDING_QUERY_PREFIX = '検索クエリ: ';
+export const EMBEDDING_DOCUMENT_PREFIX = '検索文書: ';
+
+/** RRF(Reciprocal Rank Fusion)の平滑化定数。一般に 60 が無難。 */
+export const RRF_K = 60;
+
 // --- ウィンドウ(設計書 §8.1) ---
 /** キャラ部分のウィンドウ幅。 */
 export const WINDOW_WIDTH = 240;
