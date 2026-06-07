@@ -21,6 +21,7 @@ export interface VoiceConfig {
   engine: string; // 'aivisspeech' 等(将来 VOICEVOX 等へ差し替え)
   baseUrl: string; // ローカル API(例 http://127.0.0.1:10101)
   model?: string; // 採用音声モデル識別(任意・記録用)
+  credit?: string; // 必須ライセンス文言(about/クレジット画面に常時表示・つくよみコーパス規約)
   styles: Partial<Record<EmotionLabel, VoiceStyleParams>>; // neutral は必須(フォールバック先)
 }
 

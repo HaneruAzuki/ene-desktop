@@ -1,4 +1,5 @@
 import { createVoiceStreamParser } from './stream-parser';
+import { splitSentences } from './sentence-splitter';
 import { detectAiSelfReference } from './ai-self-check';
 import { resolveStyle } from '../character/voice-loader';
 import type { EmotionLabel } from '../shared/types/animation';
@@ -83,4 +84,43 @@ export async function runVoiceChat(
   }
 
   return { spokenText: spoken.join(''), emotion, command: final.command, blockedBySelfCheck: blocked };
+}
+
+export interface SpeakTextDeps {
+  tts: TtsEngine;
+  voiceConfig: VoiceConfig;
+  neverCallsSelf: string[];
+  onAudio: (wav: ArrayBuffer) => void;
+}
+
+export interface SpeakTextResult {
+  spokenText: string;
+  blockedBySelfCheck: boolean;
+}
+
+/**
+ * 既に確定したメッセージ(非ストリーミング応答)を文単位で合成・再生する。
+ * 最初の「声が出る」用途=ストリーミング C1 を待たずに音声化できる最小経路(Phase A)。
+ * 自称を検知した文は発話せず打ち切る(C2 と同方針)。
+ */
+export async function speakText(
+  text: string,
+  emotion: EmotionLabel,
+  deps: SpeakTextDeps,
+): Promise<SpeakTextResult> {
+  const opts = resolveStyle(deps.voiceConfig, emotion);
+  const { complete, remainder } = splitSentences(text);
+  const tail = remainder.trim();
+  const sentences = tail ? [...complete, tail] : complete;
+
+  const spoken: string[] = [];
+  for (const s of sentences) {
+    if (detectAiSelfReference(s, deps.neverCallsSelf).detected) {
+      return { spokenText: spoken.join(''), blockedBySelfCheck: true };
+    }
+    const wav = await deps.tts.speak(s, opts);
+    deps.onAudio(wav);
+    spoken.push(s);
+  }
+  return { spokenText: spoken.join(''), blockedBySelfCheck: false };
 }

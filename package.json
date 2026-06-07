@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "download:model": "node scripts/download-model.mjs",
-    "seed:recall": "node scripts/seed-recall-fixtures.mjs"
+    "seed:recall": "node scripts/seed-recall-fixtures.mjs",
+    "voice:smoke": "node scripts/voice-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

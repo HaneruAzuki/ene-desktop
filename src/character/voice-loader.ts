@@ -42,6 +42,7 @@ export function validateVoiceConfig(raw: unknown): VoiceConfig | null {
     engine: o.engine,
     baseUrl: o.baseUrl,
     model: typeof o.model === 'string' ? o.model : undefined,
+    credit: typeof o.credit === 'string' ? o.credit : undefined,
     styles,
   };
 }

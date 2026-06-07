@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runVoiceChat, type ModelStream } from '../../src/conversation/voice-chat';
+import { runVoiceChat, speakText, type ModelStream } from '../../src/conversation/voice-chat';
 import type { TtsEngine, TtsOptions, VoiceConfig } from '../../src/shared/types/voice';
 
 // task_17:音声会話のストリーミング統合(C1/C2・design-revision-voice §2,§3)。
@@ -92,5 +92,47 @@ describe('runVoiceChat', () => {
     );
     expect(result.spokenText).toBe('開くね。');
     expect(result.command).toEqual({ action: 'open_notepad' });
+  });
+});
+
+describe('speakText', () => {
+  it('確定メッセージを文単位で合成・再生する', async () => {
+    const { tts, calls } = recordingTts();
+    const onAudio = vi.fn();
+    const r = await speakText('こんにちは。元気？', 'neutral', {
+      tts,
+      voiceConfig: config,
+      neverCallsSelf: [],
+      onAudio,
+    });
+    expect(r.spokenText).toBe('こんにちは。元気？');
+    expect(r.blockedBySelfCheck).toBe(false);
+    expect(calls.map((c) => c.text)).toEqual(['こんにちは。', '元気？']);
+    expect(onAudio).toHaveBeenCalledTimes(2);
+  });
+
+  it('emotion のスタイルで合成する', async () => {
+    const { tts, calls } = recordingTts();
+    await speakText('やった。', 'joy', { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} });
+    expect(calls[0].opts.styleId).toBe(1);
+  });
+
+  it('自称検知で発話せず打ち切る(C2)', async () => {
+    const { tts, calls } = recordingTts();
+    const r = await speakText('私はAIです。よろしく。', 'neutral', {
+      tts,
+      voiceConfig: config,
+      neverCallsSelf: ['AI'],
+      onAudio: () => {},
+    });
+    expect(r.blockedBySelfCheck).toBe(true);
+    expect(r.spokenText).toBe('');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('句点なしの末尾も1文として発話する', async () => {
+    const { tts, calls } = recordingTts();
+    await speakText('最後', 'neutral', { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} });
+    expect(calls.map((c) => c.text)).toEqual(['最後']);
   });
 });

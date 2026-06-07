@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   provisionVoice,
   buildVoiceConfig,
+  reconcileVoiceConfig,
   type ProvisionEnv,
 } from '../../src/conversation/voice-provisioner';
 import type { TtsStyle } from '../../src/shared/types/voice';
@@ -87,5 +88,26 @@ describe('buildVoiceConfig', () => {
   it('スタイルが空でも neutral=0 で成立する', () => {
     const config = buildVoiceConfig([], 'http://x');
     expect(config.styles.neutral).toEqual({ styleId: 0 });
+  });
+});
+
+describe('reconcileVoiceConfig', () => {
+  const bundled = {
+    engine: 'aivisspeech',
+    baseUrl: 'http://127.0.0.1:10101',
+    model: 'torimi',
+    styles: { neutral: { styleId: 0, speedScale: 1.0, intonationScale: 1.0 } },
+  };
+
+  it('固定パラメータを保持しつつ styleId を実値へ差し替える(HANDOFF 注意1)', () => {
+    const styles: TtsStyle[] = [{ name: '魚川トリミ/ノーマル', styleId: 3 }];
+    const c = reconcileVoiceConfig(bundled, styles);
+    // speedScale/intonationScale は同梱を保持・styleId だけ 3 へ
+    expect(c.styles.neutral).toEqual({ styleId: 3, speedScale: 1.0, intonationScale: 1.0 });
+  });
+
+  it('一致するスタイルが無ければ先頭 styleId にフォールバック', () => {
+    const c = reconcileVoiceConfig(bundled, [{ name: '別キャラ/うた', styleId: 7 }]);
+    expect(c.styles.neutral?.styleId).toBe(7);
   });
 });

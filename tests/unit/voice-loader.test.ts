@@ -48,6 +48,11 @@ describe('validateVoiceConfig', () => {
     expect(validateVoiceConfig(null)).toBeNull();
     expect(validateVoiceConfig('x')).toBeNull();
   });
+
+  it('credit(クレジット文言)を保持する', () => {
+    const c = validateVoiceConfig({ ...valid, credit: 'つくよみクレジット' });
+    expect(c?.credit).toBe('つくよみクレジット');
+  });
 });
 
 describe('resolveStyle', () => {

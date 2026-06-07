@@ -3,6 +3,9 @@ node_modules/
 dist/
 out/
 
+# 音声スモークの出力 WAV(task_17・手動検証用・生成物)
+voice-smoke-out/
+
 # ユーザーデータ(実行時生成・ポータブル)
 data/
 

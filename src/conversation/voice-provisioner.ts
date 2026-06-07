@@ -1,5 +1,5 @@
 import { EMOTION_LABELS, type EmotionLabel } from '../shared/types/animation';
-import type { TtsStyle, VoiceConfig } from '../shared/types/voice';
+import type { TtsStyle, VoiceConfig, VoiceStyleParams } from '../shared/types/voice';
 
 // 音声の自動プロビジョニング(task_17 / design-revision-voice §4.3)。
 //
@@ -98,4 +98,28 @@ export function buildVoiceConfig(styles: TtsStyle[], baseUrl: string, model?: st
     byEmotion.neutral = { styleId: styles[0]?.styleId ?? 0 };
   }
   return { engine: 'aivisspeech', baseUrl, model, styles: byEmotion };
+}
+
+/**
+ * 同梱 voice.json(固定パラメータ＋暫定 styleId)に、起動後 `/speakers` で得た**実 styleId** をマージする。
+ *
+ * `buildVoiceConfig` は emotion ごとに `{styleId}` しか書かず、同梱 voice.json の
+ * speedScale/intonationScale 等の固定パラメータを失う(HANDOFF 注意1)。
+ * → **パラメータ値は同梱を保持し、styleId だけ実値へ差し替える**(注意2:styleId はグローバルで起動時確定)。
+ */
+export function reconcileVoiceConfig(bundled: VoiceConfig, styles: TtsStyle[]): VoiceConfig {
+  const resolveId = (emotion: EmotionLabel, fallback: number): number => {
+    const match = styles.find((s) => STYLE_HINTS[emotion].some((h) => s.name.includes(h)));
+    return match?.styleId ?? fallback;
+  };
+  // neutral の解決を全 emotion のフォールバックに使う(単一スタイルモデルでは全部これになる)。
+  const neutralId = resolveId('neutral', styles[0]?.styleId ?? bundled.styles.neutral?.styleId ?? 0);
+
+  const out: Partial<Record<EmotionLabel, VoiceStyleParams>> = {};
+  for (const key of Object.keys(bundled.styles) as EmotionLabel[]) {
+    const params = bundled.styles[key];
+    if (!params) continue;
+    out[key] = { ...params, styleId: resolveId(key, neutralId) };
+  }
+  return { ...bundled, styles: out };
 }

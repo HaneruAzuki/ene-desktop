@@ -1,0 +1,15 @@
+{
+  "engine": "aivisspeech",
+  "baseUrl": "http://127.0.0.1:10101",
+  "model": "torimi",
+  "credit": "本ソフトウェアの音声合成には、フリー素材キャラクター「つくよみちゃん」（© Rei Yumesaki）が無料公開している音声データを使用しています。■つくよみちゃんコーパス（CV.夢前黎）https://tyc.rei-yumesaki.net/material/corpus/",
+  "styles": {
+    "neutral": {
+      "styleId": 1736267264,
+      "speedScale": 1.0,
+      "intonationScale": 1.0,
+      "tempoDynamicsScale": 1.0,
+      "volumeScale": 1.0
+    }
+  }
+}
