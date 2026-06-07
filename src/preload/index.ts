@@ -34,6 +34,13 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:voice-barge-in');
     ipcRenderer.on('ene:voice-barge-in', () => cb());
   },
+  getVoiceInputMode: () => ipcRenderer.invoke('ene:get-voice-input-mode'),
+  onVoiceInputModeChanged: (cb) => {
+    ipcRenderer.removeAllListeners('ene:voice-input-mode-changed');
+    ipcRenderer.on('ene:voice-input-mode-changed', (_event, mode: 'push-to-talk' | 'hands-free') =>
+      cb(mode),
+    );
+  },
   onVoiceChunk: (cb) => {
     // 二重登録防止: dev の StrictMode で effect が2回走るとリスナーが累積し、
     // 各センテンスが2回再生される。常に単一リスナーへ張り替える。

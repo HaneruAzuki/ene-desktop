@@ -78,6 +78,11 @@ export function getWindowPositionPath(): string {
   return path.join(getConfigDir(), 'window-position.json');
 }
 
+/** data/config/app-settings.json(マイク入力方式などのユーザー設定・task_17 Phase C)。 */
+export function getAppSettingsPath(): string {
+  return path.join(getConfigDir(), 'app-settings.json');
+}
+
 /** data/logs/(アプリ動作ログ・個人情報を含めない)。 */
 export function getLogsDir(): string {
   return path.join(getPortableDataDir(), 'logs');

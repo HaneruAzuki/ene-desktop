@@ -4,6 +4,7 @@ import { log, initLogger } from '../shared/logger';
 import { getPortableDataDir, getLogsDir } from '../storage/paths';
 import { isCloudSyncFolder } from '../storage/cloud-warning';
 import { loadAndDecryptApiKey } from '../storage/encryption';
+import { loadAppSettings } from '../storage/app-settings';
 import { todayLocalYmd } from '../shared/datetime';
 import { loadOrCreateActiveCharacter, markFirstLaunchCompleted } from '../character/active-character';
 import { buildCharacterContext } from '../character/context-builder';
@@ -128,6 +129,9 @@ export async function runStartupSequence(
   await saveWindowPosition(position.x, position.y);
   registerIpcHandlers(mainWindow, runtime);
   createTray(mainWindow);
+
+  // マイク入力方式(設定)を読み込む(task_17 Phase C・既定 push-to-talk)。
+  runtime.voiceInputMode = (await loadAppSettings()).voiceInputMode;
 
   // Step 10.5: 音声を best-effort 初期化(エンジン未起動でも起動は続行・task_17 Phase A)。
   // AivisSpeech が立っていれば /speakers で実 styleId を解決して喋れる状態にする。

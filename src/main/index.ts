@@ -14,6 +14,7 @@ const runtime: AppRuntime = {
   initialGreeting: null,
   tts: null,
   voiceConfig: null,
+  voiceInputMode: 'push-to-talk', // 起動時に lifecycle で設定ファイルから上書きする
 };
 let mainWindow: BrowserWindow | null = null;
 let shuttingDown = false;

@@ -730,6 +730,12 @@
 - **教訓**: ローカル ONNX は「ロードできる/エラーが出ない」≠「正しく計算される」。**実データのスモークで数値を必ず確認**(STT/VAD とも実音声で検証して初めて分かった)。
 - **反映**: design-revision-voice §4(VAD)。`scripts/download-vad-model.mjs` は v4.0 を取得。
 
+### N-17-10 🟢 マイクUI統合＋入力方式の設定化(2026-06-08・ユーザー要望)
+- **統合**: 旧「入力欄内の🎤(PTT)＋右下🎧(ハンズフリー)」の2ボタンを廃止し、**入力欄の下・中央の単一マイクボタン(大きめ48px)** に統合。ON(リッスン中=ハンズフリー起動中 or PTT 押下中)で緑に点灯・OFF は白。**状態テキスト(聞いてるよ/考え中)は廃止**=ボタンの ON/OFF だけで「聞いている/いない」を示す。聞き取り中はキャラ neutral、考え中は従来どおり吹き出し「…」(transcribing 状態 ＋ respond の thinking で表示)。
+- **設定**: 右クリックメニューに「マイク入力方式」サブメニュー(radio: Push-to-Talk / ハンズフリー)。`data/config/app-settings.json`(平文JSON・新規・§6.1)に永続化。main 起動時に読み込み runtime へ。変更は menu→main 保存＋`ene:voice-input-mode-changed` で renderer へ通知。IPC `ene:get-voice-input-mode`。
+- **新規/変更**: `shared/types/settings.ts`(VoiceInputMode/AppSettings)・`storage/app-settings.ts`・`getAppSettingsPath`(paths)。`character-context-menu.ts` にサブメニュー。`InputArea` はテキストのみへ戻し、PTT 録音ロジックは `App` の統合ボタンへ集約(PTT=push-to-talk hold、ハンズフリー=click トグル)。方式切替時は旧方式を停止。
+- **設計書差分**: `data/config/app-settings.json` は §2 ディレクトリ表に未記載の新規設定ファイル(config 配下・ユーザー設定の自然な追加)。要・設計書 §2 追記(MVP後の整合)。
+
 ---
 
 ## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)

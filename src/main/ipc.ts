@@ -25,6 +25,7 @@ import type { CharacterInfo } from '../shared/types/ipc';
 import type { TranscribeResult } from '../shared/types/stt';
 import type { EmotionLabel } from '../shared/types/animation';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
+import type { VoiceInputMode } from '../shared/types/settings';
 
 // IPC ハンドラ集約(設計書 §4)。
 // すべての業務ロジックは main 側。Renderer は IPC 経由でのみ呼ぶ(API キーも漏らさない)。
@@ -39,6 +40,8 @@ export interface AppRuntime {
   tts: TtsEngine | null;
   /** 音声設定(emotion→スタイル/パラメータ・null なら音声無効)。 */
   voiceConfig: VoiceConfig | null;
+  /** マイク入力方式(push-to-talk / hands-free・設定で切替・task_17 Phase C)。 */
+  voiceInputMode: VoiceInputMode;
 }
 
 const NOT_READY: ConversationResponse = {
@@ -152,6 +155,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
   ipcMain.on('ene:vad-stop', () => vad.stop());
   ipcMain.on('ene:vad-speaking', (_event, speaking: boolean) => vad.setSpeaking(speaking));
+
+  // マイク入力方式の取得(設定・task_17 Phase C)。変更は右クリックメニューから(main が保存＋通知)。
+  ipcMain.handle('ene:get-voice-input-mode', async (): Promise<VoiceInputMode> => runtime.voiceInputMode);
 
   ipcMain.handle('ene:send-message', async (_event, text: string): Promise<ConversationResponse> => {
     try {

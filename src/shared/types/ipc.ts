@@ -1,6 +1,7 @@
 import type { ConversationResponse } from './conversation';
 import type { CharacterAnimationData } from './animation';
 import type { TranscribeResult } from './stt';
+import type { VoiceInputMode } from './settings';
 
 // IPC 通信の契約(設計書 §4.2)。Renderer 側は window.ene.* で呼ぶ。
 
@@ -58,6 +59,10 @@ export interface EneAPI {
   onVoiceTranscript(callback: (text: string) => void): void;
   // ENE 発話中の割り込み検出(main → renderer)。renderer は再生を止める。
   onVoiceBargeIn(callback: () => void): void;
+
+  // マイク入力方式(設定)。取得 ＋ 右クリックメニューでの変更通知(task_17 Phase C)。
+  getVoiceInputMode(): Promise<VoiceInputMode>;
+  onVoiceInputModeChanged(callback: (mode: VoiceInputMode) => void): void;
 
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
