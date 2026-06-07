@@ -508,7 +508,7 @@
 - **該当**: 03_design §3.3 / §5.2、design-revision-memory-v2(積み増し)
 - **内容**: `provenance?: 'user'|'self'`(self=人生記憶 canon・読取専用・忘却外)、`valence?: number`
   (-2〜+2・中立観察・想起バイアス用)。全 optional・後方互換。
-- **反映**: 03_design §3.3 の型へマージ。詳細は design-revision-character-heart §4。
+- **反映**: 03_design §3.3 の型へマージ。詳細は design-revision-character-heart §6(型定義)。
 
 ### N-16-3 🟡 人生記憶 canon は characters/{id}/life-memory.json(キャラ資産・配布物)
 - **該当**: 03_design §2(characters/ ツリー)/ §5、別添A
@@ -523,6 +523,25 @@
   暗転ロック回避。想起バイアスは RRF に `λ·clampedMood·valence` 加算＋softmax。相手別は entity 限定の同式。
 - **判断根拠**: §5.3 整合・部品最小(スカラー案より少ない)・脆弱ユーザーへの加害回避(倫理の一線)。
 - **反映**: 処理は task_16、データは design-revision-character-heart。03_design §3.3 へマージ。
+
+### N-16-5 🟡 開示ゲーティング(関係に応じた記憶の開示)
+- **該当**: CLAUDE §5.3、design-revision-character-heart §4、task_16(Phase 4)
+- **内容**: 記憶に `disclosureLevel?`(1..5・欠落=1)を持たせ、`familiarityStage`(知り合ってからの日数・会話実日数・累計回数=**接触の事実**から導出・**単調非減少**)以下の記憶のみ想起候補にする。初対面で重い記憶(喪失・大恥・恋の核)を出さない。
+- **判断根拠**: 「親しさ」を**好感度スカラーでなく時間の事実**で表せば §5.3 に抵触しない。開示=時間の事実／想起バイアス=心、と2軸分離。単調増加なのでドゥームループ無縁。
+- **反映**: design-revision-character-heart §4。03_design §3.3/§5 へマージ。
+
+### N-16-6 🟡 現在状態レイヤー(更新可能な"今")
+- **該当**: CLAUDE §5.3/§6.1/§6.4、design-revision-character-heart §5、task_16(Phase 5)
+- **内容**: 記憶を3層化。①固定canon(過去)=`life-memory.json`(不変) ②**現在の私(今)**=`current-state.json`(マイブーム/最近の家族の状況/追加趣味/現況・**事実のみ**) ③ユーザー episodic。趣味=核(固定)＋現在(可変)で「追加できる」を満たす。
+- **判断根拠**: 「永遠だが今を生きる」を支える。MVP は**開発者更新でキャラ資産配布**(自律ドリフトなし)。自己更新は post-MVP・per-user で `data/`(所有権 §6.4)。
+- **反映**: design-revision-character-heart §5。03_design §2(characters/ ツリー)/§5 へマージ。
+
+### N-16-7 🟡 人生記憶 canon の内容確定とガードレール(A/B/C)
+- **該当**: design-revision-character-heart §2.4、`docs/character-life-memory-canon-plan.md`、knowledge_domains.json
+- **内容**: canon の**内容計画**(前提・カテゴリ別記憶リスト約41件・valence/importance/開示Lv)を計画書に確定。固定キャラ=人間の少女(IT は**完全独学**)、自己イメージは「ネットの住人」。**加齢しない日時**=絶対年でなく相対ライフステージ。
+- **ガードレール**: A=ハッキングは才能(深い理解)のみ・実行は `refuse`・クーポンは過去の黒歴史。B=性的無知の失敗は**語ズラし**(非性的な大人語)へ・開示Lv5・性的会話に乗らない refuse 線。C=初恋は事実のみ認め**身体面は恒久はぐらかし**・深い開示は感情(ツン由来直結)。
+- **判断根拠**: 未成年キャラ×性的/違法題材の製品リスク(審査・評判・脱獄)を、芯(電脳少女・無邪気な失敗・過去の恋)を残しつつ回避。
+- **反映**: 個別記憶の執筆＋`characters/ene/life-memory.json` への JSON 変換・配置は**実装セッション**(計画書を入力)。
 
 ---
 
