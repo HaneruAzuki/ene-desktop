@@ -148,6 +148,16 @@ export function getCurrentStatePath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'current-state.json');
 }
 
+/** characters/{characterId}/animation.json(アニメ定義・任意・task_13)。 */
+export function getAnimationPath(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'animation.json');
+}
+
+/** characters/{characterId}/{file}(スプライト等・animation.json の frames が指す実ファイル)。 */
+export function getCharacterAssetPath(characterId: string, file: string): string {
+  return path.join(getCharacterDir(characterId), file);
+}
+
 /** ビルドリソース(アイコン等)のディレクトリ。app.getAppPath() 配下の resources/。 */
 export function getResourcesDir(): string {
   return path.join(app.getAppPath(), 'resources');

@@ -11,6 +11,7 @@ import { chat, makeLlmComplete, warmPromptCache } from '../conversation/client';
 import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
 import { recordBirthdayCelebrated, recordConversationTurn } from '../character/active-character';
+import { loadAnimationData } from '../character/animation-loader';
 import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
 import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
@@ -133,9 +134,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   ipcMain.handle('ene:get-character-info', async (): Promise<CharacterInfo> => {
     if (runtime.charContext) {
+      // アニメ定義(任意)。無ければ単一 portrait 表示にフォールバック(F-ANIM-11)。
+      const animation =
+        (await loadAnimationData(runtime.charContext.identity.characterId)) ?? undefined;
       return {
         name: runtime.charContext.identity.name,
         portraitUrl: await readPortraitDataUrl(runtime.charContext.portraitPath),
+        animation,
       };
     }
     return { name: 'ENE', portraitUrl: '' };

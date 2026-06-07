@@ -1,0 +1,33 @@
+{
+  "characterId": "ene",
+  "frameSize": { "width": 832, "height": 1281 },
+  "frames": {
+    "neutral": "portrait.png",
+    "neutral_open": "portrait-talk.png",
+    "joy": "portrait-happy.png",
+    "joy_open": "portrait-happy-talk.png",
+    "anger": "portrait-tsun.png",
+    "anger_open": "portrait-tsun-talk.png",
+    "sorrow": "portrait-sad.png",
+    "sorrow_open": "portrait-sad-talk.png",
+    "embarrassed": "portrait-dere.png",
+    "embarrassed_open": "portrait-dere-talk.png"
+  },
+  "map": {
+    "base": {
+      "neutral": "neutral",
+      "joy": "joy",
+      "anger": "anger",
+      "sorrow": "sorrow",
+      "embarrassed": "embarrassed"
+    },
+    "baseOpen": {
+      "neutral": "neutral_open",
+      "joy": "joy_open",
+      "anger": "anger_open",
+      "sorrow": "sorrow_open",
+      "embarrassed": "embarrassed_open"
+    }
+  },
+  "timing": { "mouthFlapMs": 150, "idleSwayMs": 4000, "sofaAfterIdleMs": 60000 }
+}

@@ -56,4 +56,27 @@ describe('parseConversationResponse (設計書 §3.4)', () => {
   it('type が不正なら null', () => {
     expect(parseConversationResponse('{"type":"foo","message":"x"}')).toBeNull();
   });
+
+  // --- emotion(task_13・F-ANIM-06) ---
+
+  it('有効な emotion を取り出す', () => {
+    expect(parseConversationResponse('{"type":"chat","message":"うれしい","emotion":"joy"}')).toEqual({
+      type: 'chat',
+      message: 'うれしい',
+      emotion: 'joy',
+    });
+  });
+
+  it('許可外の emotion は落とす(neutral は表示側で補完)', () => {
+    expect(parseConversationResponse('{"type":"chat","message":"x","emotion":"furious"}')).toEqual({
+      type: 'chat',
+      message: 'x',
+    });
+  });
+
+  it('emotion 欠落は付与しない(emotion キーなし)', () => {
+    const r = parseConversationResponse('{"type":"chat","message":"x"}');
+    expect(r).toEqual({ type: 'chat', message: 'x' });
+    expect(r && 'emotion' in r).toBe(false);
+  });
 });

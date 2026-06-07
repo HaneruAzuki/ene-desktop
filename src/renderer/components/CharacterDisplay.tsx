@@ -1,15 +1,21 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { exceedsDragThreshold, classifyGesture, computeWindowTopLeft } from '../mouse-gesture';
+import { resolveFrame } from '../resolve-frame';
+import { MOUTH_FLAP_MS } from '../constants';
+import type { CharacterAnimationData, CharacterState } from '../../shared/types/animation';
 
-// キャラ表示 + マウス操作判別 + 透明ピクセル判定の提供(設計書 §8.2 / §8.6)。
+// キャラ表示 + マウス操作判別 + 透明ピクセル判定(設計書 §8.2 / §8.6 / task_13)。
+// アニメ定義があれば状態機械でフレームを切り替え、無ければ単一 portrait 表示(F-ANIM-11)。
 
 export interface CharacterDisplayHandle {
-  /** 表示座標(clientX/Y)がキャラの不透明ピクセル上かを返す。 */
+  /** 表示座標(clientX/Y)がキャラの不透明ピクセル上かを返す(現フレームの alpha・F-ANIM-08)。 */
   isOpaqueAt(clientX: number, clientY: number): boolean;
 }
 
 interface Props {
-  portraitUrl: string;
+  portraitUrl: string; // フォールバック(アニメ無し時)
+  animation?: CharacterAnimationData;
+  state: CharacterState;
   onClick: () => void;
 }
 
@@ -23,32 +29,50 @@ interface PressState {
 }
 
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
-  function CharacterDisplay({ portraitUrl, onClick }, ref) {
+  function CharacterDisplay({ portraitUrl, animation, state, onClick }, ref) {
     const imgRef = useRef<HTMLImageElement>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const onClickRef = useRef(onClick);
     const rafRef = useRef<number | null>(null);
     const pendingPosRef = useRef<{ x: number; y: number } | null>(null);
 
+    // 口パク(talking 中のみ開閉トグル)。
+    const [flapOpen, setFlapOpen] = useState(false);
+
     useEffect(() => {
       onClickRef.current = onClick;
     }, [onClick]);
 
-    // 画像を canvas に描画(alpha 読取用)
+    useEffect(() => {
+      if (state.activity !== 'talking') {
+        setFlapOpen(false);
+        return;
+      }
+      const ms = animation?.timing?.mouthFlapMs ?? MOUTH_FLAP_MS;
+      const id = setInterval(() => setFlapOpen((o) => !o), ms);
+      return () => clearInterval(id);
+    }, [state.activity, animation]);
+
+    // 現フレームの dataURL を解決(アニメ無し or フレーム欠落は portrait へ)。
+    const frameKey = animation ? resolveFrame(animation, state, flapOpen) : null;
+    const displaySrc = (frameKey && animation?.frames[frameKey]) || portraitUrl;
+
+    // 表示中フレームを canvas へ描画(alpha 読取用)。src が変わるたび再描画(F-ANIM-08)。
     function drawToCanvas(): void {
       const img = imgRef.current;
       if (!img || !img.complete || img.naturalWidth === 0) return;
-      const canvas = document.createElement('canvas');
+      const canvas = canvasRef.current ?? document.createElement('canvas');
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
       canvasRef.current = canvas;
     }
     useEffect(() => {
       drawToCanvas();
-    }, [portraitUrl]);
+    }, [displaySrc]);
 
     useImperativeHandle(
       ref,
@@ -61,8 +85,17 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
           if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) {
             return false;
           }
-          const sx = Math.floor(((clientX - rect.left) / rect.width) * canvas.width);
-          const sy = Math.floor(((clientY - rect.top) / rect.height) * canvas.height);
+          // object-fit: contain のため、表示矩形内の letterbox を考慮して画像実領域へ写像する。
+          const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+          const drawnW = canvas.width * scale;
+          const drawnH = canvas.height * scale;
+          const offX = (rect.width - drawnW) / 2;
+          const offY = (rect.height - drawnH) / 2;
+          const localX = clientX - rect.left - offX;
+          const localY = clientY - rect.top - offY;
+          if (localX < 0 || localX >= drawnW || localY < 0 || localY >= drawnH) return false; // letterbox 余白
+          const sx = Math.floor(localX / scale);
+          const sy = Math.floor(localY / scale);
           try {
             const alpha = canvas.getContext('2d')?.getImageData(sx, sy, 1, 1).data[3] ?? 255;
             return alpha > 0;
@@ -127,11 +160,14 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
       void window.ene.showCharacterContextMenu();
     }
 
+    // 呼吸の微動は idle 中のみ(CSS keyframes・スプライト不要・F-ANIM-03)。
+    const className = state.activity === 'idle' ? 'character character--breathe' : 'character';
+
     return (
       <img
         ref={imgRef}
-        className="character"
-        src={portraitUrl}
+        className={className}
+        src={displaySrc}
         alt="ENE"
         draggable={false}
         onMouseDown={onMouseDown}

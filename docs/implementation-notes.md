@@ -491,6 +491,41 @@
 
 ---
 
+## task_13(アニメ基盤・MVP 0.2「存在感」)
+
+> 状態機械(idle/thinking/talking＋emotion＋pose)でスプライト表示を駆動。配置済み2D全身立ち絵10枚で実装・
+> 実機(dev＋スクショ)検証済み(2026-06-07)。新規 npm ライブラリ無し(React+canvas+Web Audio)。表示層限定(挙動不変)。
+
+### N-13-1 🟢 スプライトは characters/{id}/ 直下のまま(sprites/ へ移設しない)
+- **該当**: task_13 §3 / §2 ツリー(sprites/ 想定)
+- **内容**: 立ち絵は `characters/ene/` 直下(portrait*.png 10枚)を `animation.json` の `frames` が実ファイル名で参照。loader は characterDir から解決。`portrait.png` がフォールバック兼 neutral-base のため移設すると二重管理 or 複製(~5MB)になる。
+- **判断**: sprites/ サブdirは作らない(意図的逸脱)。§2 ツリーは characters/{id}/ 直下に立ち絵＋animation.json を記す。
+
+### N-13-2 🟢 全身立ち絵に合わせ寸法を再設計(縦長窓・中央帯)
+- **内容**: 全身比≈0.65。ウィンドウを 260×400→**260×520**。`.character` は `width:100%; height:calc(100% - 152px); top:100px; object-fit:contain; object-position:bottom center`。上100px=吹き出し、下52px=入力欄の余白を確保し本体に重ねない。
+- **重要バグと修正**: img(置換要素)に width/height を与えず top/bottom/left/right だけで指定すると**実寸(832×1281)のままはみ出して見えなくなる**。明示寸法で解消(F-ANIM の前提)。動的リサイズはしない。
+
+### N-13-3 🟢 emotion = 応答型 ChatResponse の任意フィールド(コード固定6ラベル)
+- **内容**: `ConversationResponse(chat)` に `emotion?: EmotionLabel`。`EMOTION_LABELS=[neutral,joy,anger,sorrow,surprise,embarrassed]` はコード固定(層間の契約)。prompt-builder の出力形式(Tier0)に許可ラベルを追記、response-parser が許可外/欠落→ undefined(表示側 neutral)。4層防御は不変。
+- **反映**: §3.4(emotion)。
+
+### N-13-4 🟢 未制作フレームは neutral フォールバック＋「考える間」は「…」
+- **内容**: `thinking`/`sofa`/`surprise` は素材未制作。`resolveFrame` が neutral へフォールバック(F-ANIM-06/11)。考える間(F-ANIM-04)は thinking 中に「…」吹き出しで演出(専用スプライト不要)。sofa は状態遷移のみ(視覚は neutral・後日素材追加で有効化)。
+
+### N-13-5 🟢 口パクはメッセージ長に比例(永遠に動かさない)
+- **内容**: talking 中のみ口開閉(`MOUTH_FLAP_MS=150` トグル・現フレーム base⇄baseOpen で**表情は保持**)。talking の継続は `clamp(len×MOUTH_FLAP_MS, 400, 6000)ms`(≈一文字1口パク)で、話し終えたら idle へ戻し口を閉じる(吹き出しは表示継続)。当初 talking が吹き出し表示(最大30s)の間続く不具合を修正。
+
+### N-13-6 🟢 スプライトは base64 dataURL で IPC 配布・クリック音は Web Audio 合成
+- **内容**: `getCharacterInfo` を拡張し `CharacterInfo.animation`(frames=dataURL群・~7MB一度きり)を返す(CSP/sandbox・N-08-1 同方針)。`isOpaqueAt` は現フレームの canvas alpha＋contain の letterbox 補正(F-ANIM-08)。クリック音は AudioContext 合成(外部音源なし・F-ANIM-10)。
+
+### N-13-7 ⚪ ルート変更の含意(2D路線)
+- 素材が VRoid でなく2D立ち絵のため、将来の本格モーションは three-vrm でなく **Live2D 路線**が自然(`research-image-pipeline` 結論)。philosophy 1.0(Live2D/VRM)の選択に反映を検討。
+
+### N-13-8 🟡 未制作の追加素材(後日・コードでない)
+- `thinking`/`sofa`/`surprise` の2D立ち絵を追加し `animation.json` の `map.thinking`/`map.sofa`/`frames` を足すだけで有効化(コード変更不要)。emotion few-shot(B-2)・JSON 精緻化(C)も随時。
+
+---
+
 ## task_15(記憶想起エンジン・非破壊更新)
 
 > MVP 0.3「記憶の会話活用強化」。Phase A(語彙＋entity)＋Phase B(ベクトルRRF)を実装・テスト・

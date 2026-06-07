@@ -1,4 +1,5 @@
 import type { ConversationResponse } from './conversation';
+import type { CharacterAnimationData } from './animation';
 
 // IPC 通信の契約(設計書 §4.2)。Renderer 側は window.ene.* で呼ぶ。
 
@@ -6,6 +7,8 @@ export interface CharacterInfo {
   name: string;
   // portrait は CSP/サンドボックス制約のため data URL で渡す(main 側で PNG を base64 化)。
   portraitUrl: string;
+  // アニメ(task_13・任意)。frames は dataURL 群。無ければ単一 portrait 表示にフォールバック。
+  animation?: CharacterAnimationData;
 }
 
 export interface EneAPI {

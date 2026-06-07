@@ -267,8 +267,11 @@ ene-desktop/
 │       ├── fewshot.json
 │       ├── life-memory.json       ← 人生記憶 canon(task_16・provenance:self・読取専用・忘却外)
 │       ├── current-state.json     ← 現在状態“今”(task_16・任意・事実のみ・不在可)
-│       └── portrait.png
+│       ├── animation.json         ← アニメ定義(task_13・状態→フレーム・任意・無ければ portrait)
+│       ├── portrait.png           ← neutral(口閉じ)兼フォールバック
+│       └── portrait-{happy,dere,tsun,sad}[-talk].png ← 表情×口開閉の立ち絵(task_13・全身2D・直下配置 N-13-1)
 │
+
 ├── tests/
 │   ├── unit/                      ← 単体テスト(フラット構成・*.test.ts + fixtures.ts)
 │   │   └── *.test.ts              ← loader/router/memory/os/conversation/storage 等の純粋ロジック
@@ -951,6 +954,7 @@ export type ResponseType = "chat" | "os_command";
 export interface ChatResponse {
   type: "chat";
   message: string;
+  emotion?: EmotionLabel;   // task_13: 表情アニメ用(任意・1ターン揮発)。許可外/欠落は neutral。
 }
 
 export interface OsCommandResponse {
@@ -1757,6 +1761,8 @@ export interface EneAPI {
   getCharacterInfo(): Promise<{
     name: string;
     portraitUrl: string;   // data URL(data:image/png;base64,...)
+    // task_13: アニメ(任意)。frames は dataURL 群。無ければ単一 portrait 表示にフォールバック。
+    animation?: { frameSize; frames: Record<string, string>; map; timing? };
   }>;
 
   // N-10-3: 起動挨拶は pull 方式。Renderer がマウント時に1回取得(取得後 main 側でクリア)。

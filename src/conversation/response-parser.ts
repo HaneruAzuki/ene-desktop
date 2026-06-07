@@ -1,10 +1,18 @@
 import type { ConversationResponse } from '../shared/types/conversation';
 import type { OsAction } from '../shared/types/os';
+import { EMOTION_LABELS, type EmotionLabel } from '../shared/types/animation';
 
 // JSON 応答パースの三段構え(設計書 §3.4「パース成功率の三段構え」)。
 // zod 等は使わず手書きの型ガードで検証する。
 
 const VALID_ACTIONS: readonly OsAction[] = ['open_notepad', 'open_browser', 'open_folder'];
+
+/** emotion を許可ラベルに正規化(許可外・欠落は undefined → 表示側で neutral・F-ANIM-06)。 */
+function normalizeEmotion(v: unknown): EmotionLabel | undefined {
+  return typeof v === 'string' && (EMOTION_LABELS as readonly string[]).includes(v)
+    ? (v as EmotionLabel)
+    : undefined;
+}
 
 function isValidResponse(obj: unknown): obj is ConversationResponse {
   if (typeof obj !== 'object' || obj === null) return false;
@@ -45,8 +53,13 @@ export function parseConversationResponse(raw: string): ConversationResponse | n
   // 3. パース + 型ガード検証
   try {
     const parsed: unknown = JSON.parse(text);
-    if (isValidResponse(parsed)) return parsed;
-    return null;
+    if (!isValidResponse(parsed)) return null;
+    // chat は emotion(任意)を許可ラベルへ正規化して付与する(task_13)。
+    if (parsed.type === 'chat') {
+      const emotion = normalizeEmotion((parsed as Record<string, unknown>).emotion);
+      return emotion ? { ...parsed, emotion } : { type: 'chat', message: parsed.message };
+    }
+    return parsed;
   } catch {
     return null;
   }

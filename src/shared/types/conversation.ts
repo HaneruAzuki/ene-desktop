@@ -1,9 +1,10 @@
 import type { OsCommand } from './os';
+import type { EmotionLabel } from './animation';
 
-// Conversation Layer の型定義(設計書 §3.4 / task_14)。
+// Conversation Layer の型定義(設計書 §3.4 / task_14 / task_16)。
 
 export type ConversationResponse =
-  | { type: 'chat'; message: string }
+  | { type: 'chat'; message: string; emotion?: EmotionLabel } // emotion は task_13(任意・1ターン揮発)
   | { type: 'os_command'; message: string; command: OsCommand };
 
 /**

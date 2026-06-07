@@ -77,9 +77,11 @@ export const FAMILIARITY_THRESHOLDS: ReadonlyArray<{
 ];
 
 // --- ウィンドウ(設計書 §8.1) ---
+// task_13: 全身立ち絵(比≈0.65)を中央帯に置き、上=吹き出し余白/下=入力欄余白を確保する縦長窓。
+// キャラ表示帯 ≈ 368px(幅 260 で contain → 約 239×368)＋上余白100＋下余白52 = 520。
 /** キャラ部分のウィンドウ幅。 */
-export const WINDOW_WIDTH = 240;
+export const WINDOW_WIDTH = 260;
 /** キャラ部分のウィンドウ高さ。 */
-export const WINDOW_HEIGHT = 320;
+export const WINDOW_HEIGHT = 520;
 /** 画面端からの既定マージン(初回配置・右下)。 */
 export const WINDOW_EDGE_MARGIN = 20;

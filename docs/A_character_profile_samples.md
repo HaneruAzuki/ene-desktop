@@ -301,8 +301,41 @@ ENE の知識範囲を5段階で定義する。
 ├── background.json            ← A.2
 ├── knowledge_domains.json     ← A.3
 ├── fewshot.json               ← A.4
-└── portrait.png               ← A.5
+├── portrait.png               ← A.5
+└── animation.json             ← A.6(任意・task_13)
 ```
 
 これらのファイルは MVP に同梱され、初回起動時に
 `active-character.json` の `characterId: "ene"` を介して読み込まれる。
+
+---
+
+## A.6 animation.json(任意・task_13 アニメ基盤)
+
+状態(emotion/口開閉/考え中/寝そべり)→ スプライトの対応を定義する。`frames` は
+`characters/{id}/` 直下の立ち絵ファイル名(N-13-1: sprites/ サブdirは作らない)。
+無い/不正なら単一 portrait 表示にフォールバック(F-ANIM-11)。
+
+```jsonc
+{
+  "characterId": "ene",
+  "frameSize": { "width": 832, "height": 1281 },   // 立ち絵の実寸(表示は object-fit:contain)
+  "frames": {
+    "neutral": "portrait.png",          "neutral_open": "portrait-talk.png",
+    "joy": "portrait-happy.png",         "joy_open": "portrait-happy-talk.png",
+    "anger": "portrait-tsun.png",        "anger_open": "portrait-tsun-talk.png",
+    "sorrow": "portrait-sad.png",        "sorrow_open": "portrait-sad-talk.png",
+    "embarrassed": "portrait-dere.png",  "embarrassed_open": "portrait-dere-talk.png"
+  },
+  "map": {
+    "base":     { "neutral": "neutral", "joy": "joy", "anger": "anger", "sorrow": "sorrow", "embarrassed": "embarrassed" },
+    "baseOpen": { "neutral": "neutral_open", "joy": "joy_open", "anger": "anger_open", "sorrow": "sorrow_open", "embarrassed": "embarrassed_open" }
+    // thinking / sofa / surprise は素材未制作 → resolveFrame が neutral へフォールバック
+  },
+  "timing": { "mouthFlapMs": 150, "idleSwayMs": 4000, "sofaAfterIdleMs": 60000 }
+}
+```
+
+- emotion 6ラベル(neutral/joy/anger/sorrow/surprise/embarrassed)は全キャラ共通でコード固定(`EMOTION_LABELS`)。
+  見た目だけ animation.json、口調は fewshot.json に置く。
+- VRoid 等の別素材へ差し替える場合も `frames` の参照先と立ち絵を入れ替えるだけ(コード変更不要・データ駆動)。
