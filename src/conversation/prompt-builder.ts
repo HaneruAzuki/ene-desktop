@@ -1,12 +1,16 @@
 import type { CharacterContext } from '../shared/types/character';
 import type { MemoryContext, SemanticMemory, EpisodicMemory } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';
-import type { BuiltPrompt, PromptMessage } from '../shared/types/conversation';
+import type { BuiltPrompt, PromptMessage, SystemBlock } from '../shared/types/conversation';
 
-// 統合プロンプト構築(設計書 §3.4)。
-// charContext.systemPrompt(キャラ人格・AI自称防止)に、記憶・振る舞い・出力形式を足す。
-
-const FEWSHOT_MAX = 3; // 該当ドメインから最大3例(増やしすぎない・設計書 §3.4)
+// 統合プロンプト構築(設計書 §3.4 / task_14 Tier 再構成)。
+//
+// Tier 構造(プロンプトキャッシュ最適化・task_14):
+//  - Tier0(不変・cacheable):人格(systemPrompt)＋出力形式＋自称制約。キャラ単位で毎ターン同一。
+//  - semantic(準不変):長期記憶。抽出時のみ変化。
+//  - few-shot(固定):全ドメインの例を毎回同一順で提示(声の安定＋履歴キャッシュの前提)。
+//  - 揮発(episodic/behavior/誕生日):現在のユーザーターン本文に同梱(system を汚さない)。
+// 可変物を後ろへ送ることで、前段(Tier0・few-shot・履歴)のキャッシュを壊さない。
 
 const OUTPUT_FORMAT_SPEC = [
   '# 出力形式(厳守)',
@@ -43,7 +47,8 @@ function formatSemantic(semantic: SemanticMemory): string {
       lines.push(`- ${k}: ${Array.isArray(v) ? v.join('、') : String(v)}`);
     }
   }
-  return lines.length > 0 ? lines.join('\n') : '- (まだ相手についてあまり覚えていない)';
+  const body = lines.length > 0 ? lines.join('\n') : '- (まだ相手についてあまり覚えていない)';
+  return `# あなたの長期的な記憶\n${body}`;
 }
 
 function formatEpisodic(episodic: EpisodicMemory[]): string {
@@ -71,11 +76,67 @@ function normalizeAlternation(messages: PromptMessage[]): PromptMessage[] {
 /**
  * assistant ターンを出力形式(JSON)で提示する。
  * few-shot / 短期記憶の assistant 応答をプレーン文のまま渡すと、モデルが履歴のスタイルを
- * 真似てプレーン文で返し JSON が崩れる(パース失敗 → フォールバック)。
- * 履歴の assistant も JSON 形式に揃えることで、出力形式を一貫させる。
+ * 真似てプレーン文で返し JSON が崩れる。履歴の assistant も JSON 形式に揃え、出力形式を一貫させる。
  */
 function assistantTurn(message: string): string {
   return JSON.stringify({ type: 'chat', message });
+}
+
+/**
+ * Tier0(不変・cacheable):人格＋出力形式＋自称制約。キャラ単位で毎ターン同一バイト列。
+ * クリック起点ウォーム(task_14 Phase 3)が本会話と**同一の Tier0** を温めるため export する。
+ */
+export function buildTier0(charContext: CharacterContext): SystemBlock {
+  const neverList = charContext.identity.selfRecognition.neverCallsSelf
+    .map((w) => `「${w}」`)
+    .join('');
+  const text = [
+    charContext.systemPrompt,
+    '',
+    OUTPUT_FORMAT_SPEC,
+    '',
+    '# 重要(自称の制約)',
+    `あなたは絶対に ${neverList} と自称しません。`,
+  ].join('\n');
+  return { type: 'text', text, cacheable: true };
+}
+
+/** 全ドメインの few-shot を毎回同一順で返す(固定プレフィックス・task_14 Phase 2(A))。 */
+function buildFixedFewshot(charContext: CharacterContext): PromptMessage[] {
+  const out: PromptMessage[] = [];
+  const examples = charContext.fewshot.examples;
+  for (const key of Object.keys(examples).sort()) {
+    for (const ex of examples[key] ?? []) {
+      out.push({ role: 'user', content: ex.user });
+      out.push({ role: 'assistant', content: assistantTurn(ex.assistant) });
+    }
+  }
+  return out;
+}
+
+/** 揮発コンテキスト(episodic/behavior/誕生日)を現ターン本文の前置きに組む。 */
+function buildVolatileContext(
+  charContext: CharacterContext,
+  memoryContext: MemoryContext,
+  routerResult: RouterResult,
+): string {
+  const parts: string[] = [
+    '# 関連する過去の出来事',
+    formatEpisodic(memoryContext.relevantEpisodic),
+    '',
+    '# このトピックに対する振る舞い',
+    routerResult.behavior,
+  ];
+
+  if (charContext.birthdayHint === 'today') {
+    parts.push('', '# 今日の特別な情報', '今日はあなたの誕生日です。もし祝われたら、あなたの性格に合った反応をしてください。');
+    const celebrated = charContext.fewshot.birthdayReactions?.celebrated?.[0];
+    if (celebrated) parts.push(`(例:「${celebrated.user}」と言われたら → 「${celebrated.assistant}」のように)`);
+  } else if (charContext.birthdayHint === 'forgotten') {
+    const forgotten = charContext.fewshot.birthdayReactions?.forgotten?.[0];
+    if (forgotten) parts.push('', '# 今日の特別な情報', `(もし「${forgotten.user}」のような流れなら → 「${forgotten.assistant}」のように拗ねてよい)`);
+  }
+  return parts.join('\n');
 }
 
 export function buildPrompt(
@@ -84,51 +145,15 @@ export function buildPrompt(
   routerResult: RouterResult,
   userText: string,
 ): BuiltPrompt {
-  const neverList = charContext.identity.selfRecognition.neverCallsSelf
-    .map((w) => `「${w}」`)
-    .join('');
-
-  const systemParts: string[] = [
-    charContext.systemPrompt,
-    '',
-    '# あなたの長期的な記憶',
-    formatSemantic(memoryContext.semantic),
-    '',
-    '# 関連する過去の出来事',
-    formatEpisodic(memoryContext.relevantEpisodic),
+  // --- system: Tier0(cacheable) + semantic(準不変) ---
+  const system: SystemBlock[] = [
+    buildTier0(charContext),
+    { type: 'text', text: formatSemantic(memoryContext.semantic) },
   ];
 
-  if (charContext.birthdayHint === 'today') {
-    systemParts.push('', '# 今日の特別な情報', '今日はあなたの誕生日です。もし祝われたら、あなたの性格に合った反応をしてください。');
-  }
+  // --- messages: 固定 few-shot → 履歴 → 現ターン(揮発コンテキスト同梱) ---
+  const raw: PromptMessage[] = [...buildFixedFewshot(charContext)];
 
-  systemParts.push('', '# このトピックに対する振る舞い', routerResult.behavior);
-  systemParts.push('', OUTPUT_FORMAT_SPEC);
-  systemParts.push('', '# 重要(自称の制約)', `あなたは絶対に ${neverList} と自称しません。`);
-
-  const system = systemParts.join('\n');
-
-  // --- messages ---
-  const raw: PromptMessage[] = [];
-
-  // Few-shot(該当ドメインから最大3例)
-  const examples = charContext.fewshot.examples[routerResult.fewshotKey] ?? [];
-  for (const ex of examples.slice(0, FEWSHOT_MAX)) {
-    raw.push({ role: 'user', content: ex.user });
-    raw.push({ role: 'assistant', content: assistantTurn(ex.assistant) });
-  }
-
-  // 誕生日の特別反応 few-shot
-  const reactions = charContext.fewshot.birthdayReactions;
-  if (charContext.birthdayHint === 'today' && reactions?.celebrated?.[0]) {
-    raw.push({ role: 'user', content: reactions.celebrated[0].user });
-    raw.push({ role: 'assistant', content: assistantTurn(reactions.celebrated[0].assistant) });
-  } else if (charContext.birthdayHint === 'forgotten' && reactions?.forgotten?.[0]) {
-    raw.push({ role: 'user', content: reactions.forgotten[0].user });
-    raw.push({ role: 'assistant', content: assistantTurn(reactions.forgotten[0].assistant) });
-  }
-
-  // 直近の短期記憶(実際の会話履歴)。assistant ターンは JSON 形式で提示する。
   for (const entry of memoryContext.shortTerm) {
     raw.push({
       role: entry.role,
@@ -136,12 +161,19 @@ export function buildPrompt(
     });
   }
 
-  // 現在の入力
-  raw.push({ role: 'user', content: userText });
+  // 揮発物は現在のユーザーターン本文へ合流(system/前段キャッシュを汚さない)。
+  const volatile = buildVolatileContext(charContext, memoryContext, routerResult);
+  raw.push({ role: 'user', content: `${volatile}\n\n---\n${userText}` });
 
-  // 交互列に正規化する。末尾は必ず user メッセージ。
-  // (Prefill = 末尾 assistant "{" は現行モデルが非対応のため使わない。N-09-7 参照)
+  // 交互列に正規化(末尾は必ず user)。
   const messages = normalizeAlternation(raw);
+
+  // 履歴キャッシュ境界(task_14 Phase 2(6)):現ターン(末尾)の直前=安定プレフィックスの末尾を cacheable に。
+  // few-shot は常に存在するため len>=2。現ターンより前までを増分キャッシュする。
+  if (messages.length >= 2) {
+    const boundary = messages[messages.length - 2];
+    if (boundary) boundary.cacheable = true;
+  }
 
   return { system, messages };
 }

@@ -7,7 +7,7 @@ import { enhancePromptForRegeneration } from './prompt-enhancer';
 import { fallbackResponse } from './fallback';
 import { countAndCheck, type TokenCheck } from './token-counter';
 import type { CharacterContext } from '../shared/types/character';
-import type { MemoryContext } from '../shared/types/memory';
+import type { MemoryContext, SemanticMemory } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';
 import type { BuiltPrompt, ConversationResponse } from '../shared/types/conversation';
 import type { LlmComplete } from '../memory/extractor';
@@ -37,17 +37,43 @@ function isAuthLikeError(error: unknown): boolean {
   return status === 401 || status === 402 || status === 429;
 }
 
+const EPHEMERAL = { type: 'ephemeral' as const };
+
+/** SystemBlock[] を SDK の system パラメータへ(cacheable ブロックに cache_control を付与・task_14)。 */
+function toSystemParam(system: BuiltPrompt['system']): Anthropic.Beta.PromptCaching.PromptCachingBetaTextBlockParam[] {
+  return system.map((b) =>
+    b.cacheable
+      ? { type: 'text', text: b.text, cache_control: EPHEMERAL }
+      : { type: 'text', text: b.text },
+  );
+}
+
+/** PromptMessage[] を SDK の messages へ(cacheable メッセージは content をブロック化し境界に・task_14)。 */
+function toMessagesParam(messages: BuiltPrompt['messages']): Anthropic.Beta.PromptCaching.PromptCachingBetaMessageParam[] {
+  return messages.map((m) =>
+    m.cacheable
+      ? { role: m.role, content: [{ type: 'text', text: m.content, cache_control: EPHEMERAL }] }
+      : { role: m.role, content: m.content },
+  );
+}
+
 function makeDefaultDeps(apiKey: string): ChatDeps {
   const client = new Anthropic({ apiKey });
   return {
     callModel: async ({ system, messages }) => {
-      const resp = await client.messages.create({
+      // 0.30.1 のプロンプトキャッシュはベータ名前空間(N-14)。Tier0 を固定プレフィックスとして使い回す。
+      const resp = await client.beta.promptCaching.messages.create({
         model: CONVERSATION_MODEL,
         max_tokens: MAX_TOKENS,
         temperature: TEMPERATURE,
-        system,
-        messages,
+        system: toSystemParam(system),
+        messages: toMessagesParam(messages),
       });
+      // キャッシュ命中状況をログ(トークン数のみ・会話内容や PII は載せない・CLAUDE §6.2)。
+      const u = resp.usage;
+      log.info(
+        `cache usage: write=${u.cache_creation_input_tokens ?? 0} read=${u.cache_read_input_tokens ?? 0} input=${u.input_tokens}`,
+      );
       // Prefill は使わないので、応答テキストをそのまま返す(パーサが JSON を抽出する)。
       return resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
     },
@@ -71,6 +97,41 @@ export function makeLlmComplete(apiKey: string): LlmComplete {
     });
     return resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
   };
+}
+
+// ウォーム用のダミー router 結果(揮発コンテキストはキャッシュ境界より後ろ＝中身は不問)。
+const WARM_ROUTER: RouterResult = {
+  domain: 'medium',
+  behavior: '',
+  fewshotKey: '',
+  isFromCache: false,
+  isFromFallback: false,
+};
+
+/**
+ * クリック起点ウォーム(task_14 Phase 3)。入力欄を開いた瞬間に、本会話と**同一の安定プレフィックス**
+ * (Tier0 ＋ semantic ＋ 固定 few-shot)を `max_tokens:1` で送ってキャッシュを書き込む。
+ * 揮発物(episodic/behavior)はキャッシュ境界より後ろなのでダミーでよい＝本送信が確実にキャッシュを読む。
+ * 位置づけは**レイテンシ施策**(コストは微増)。best-effort で失敗しても会話に影響させない。
+ */
+export async function warmPromptCache(
+  charContext: CharacterContext,
+  semantic: SemanticMemory,
+  apiKey: string,
+): Promise<void> {
+  try {
+    const client = new Anthropic({ apiKey });
+    // 本会話と同じ buildPrompt を使い、キャッシュ可能プレフィックスをバイト同一で再現する。
+    const prompt = buildPrompt(charContext, { semantic, shortTerm: [], relevantEpisodic: [] }, WARM_ROUTER, 'warm');
+    await client.beta.promptCaching.messages.create({
+      model: CONVERSATION_MODEL,
+      max_tokens: 1,
+      system: toSystemParam(prompt.system),
+      messages: toMessagesParam(prompt.messages),
+    });
+  } catch (e) {
+    log.warn(`prompt cache warm failed: ${(e as Error).name}`);
+  }
 }
 
 const skipTokenCheck: TokenChecker = async () => ({ ok: true, tokens: 0 });

@@ -1065,7 +1065,7 @@ export function buildPrompt(
   memoryContext: MemoryContext,
   routerResult: RouterResult,
   userText: string
-): BuiltPrompt;  // { system, messages }
+): BuiltPrompt;  // { system: SystemBlock[], messages }  ※ task_14 で system をブロック配列化
 ```
 
 - **N-05-4**:few-shot + 短期記憶 + 現在入力を素朴に並べると連続同 role が生じうるため、
@@ -1073,25 +1073,20 @@ export function buildPrompt(
 - **N-05-5**:出力形式(JSON 仕様)は buildSystemPrompt(キャラ層)ではなく **prompt-builder が system へ付与**する(疎結合・N-02-2)。
 - **N-05-6**:`birthdayHint === 'forgotten'` の場合も forgotten 用 few-shot を1例注入する(today は祝福 few-shot + system 注記)。
 - **N-07-3(task_15 で改訂)**:会話時の Episodic 想起は Router の `matchedTopic` 依存をやめ、`buildMemoryContext({ text: userText, limit: 5 })` で **`MemoryRetriever` による全件横断想起**(語彙＋entity＋ベクトルRRF)に切替。Router は知識ドメイン判定のみに限定(想起の引き金に流用しない)。旧:`{ tags: matchedTopic }` の簡易タグ一致。
+- **N-14(task_14 Tier 再構成＋プロンプトキャッシュ)**:`BuiltPrompt.system` を文字列→`SystemBlock[]` に。安定度で並べ、`@anthropic-ai/sdk` の **`client.beta.promptCaching.messages.create`** で `cache_control:{type:'ephemeral'}` を付与しキャッシュする(SDK 0.30.1 ではベータ名前空間)。実測で入力の約8割をキャッシュ読込に転換。詳細は implementation-notes N-14-1〜6。
 
-System Promptの構造:
+System Prompt / メッセージの Tier 構造(task_14):
 ```
-{charContext.systemPrompt}
+system(ブロック配列):
+  [Tier0 / cacheable]  {charContext.systemPrompt} + 出力形式 + 自称制約   ← 毎ターン不変・cache_control
+  [semantic / 準不変]  # あなたの長期的な記憶 {semantic}                 ← 抽出時のみ変化
 
-# あなたの長期的な記憶
-{memoryContext.semantic を要約}
+messages:
+  [固定 few-shot(全ドメイン・同一順)] … [短期履歴] …
+  ↑ 現ターン直前に2つ目の cache_control(履歴キャッシュ境界)
+  [現在の user ターン] = 揮発コンテキスト(関連過去 episodic / 振る舞い behavior / 誕生日)＋ userText
 
-# 関連する過去の出来事
-{memoryContext.relevantEpisodic を箇条書き}
-
-# 今日の特別な情報
-{charContext.birthdayHint があれば}
-
-# このトピックに対する振る舞い
-{routerResult.behavior}
-
-# 出力形式(厳守)
-以下のJSON形式のいずれかで応答してください。
+# 出力形式(厳守)は Tier0 に含める。以下のJSON形式のいずれかで応答する。
 
 通常の会話:
 {"type": "chat", "message": "..."}

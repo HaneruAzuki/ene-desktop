@@ -1,12 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { buildPrompt } from '../../src/conversation/prompt-builder';
-import { makeCharContext, makeMemoryContext, makeRouterResult } from './fixtures';
+import { buildPrompt, buildTier0 } from '../../src/conversation/prompt-builder';
+import { makeCharContext, makeMemoryContext, makeRouterResult, systemText, lastUserText } from './fixtures';
 
-describe('buildPrompt (設計書 §3.4)', () => {
-  it('system に neverCallsSelf の語を含む', () => {
+// task_14: system は Tier ブロック配列。Tier0(人格/出力形式/自称制約)は system、
+// 揮発物(episodic/behavior/誕生日)は現在の user ターン本文へ移動した。
+
+describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
+  it('system(Tier0)に neverCallsSelf の語を含む', () => {
     const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'こんにちは');
-    expect(p.system).toContain('AI');
-    expect(p.system).toContain('アシスタント');
+    expect(systemText(p)).toContain('AI');
+    expect(systemText(p)).toContain('アシスタント');
+  });
+
+  it('system 先頭ブロックは cacheable(Tier0)', () => {
+    const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
+    expect(p.system[0]?.cacheable).toBe(true);
+    // semantic ブロックは準不変=非キャッシュ
+    expect(p.system[1]?.cacheable).toBeFalsy();
   });
 
   it('messages の最後は現在の user 入力(Prefill は使わない=現行モデル非対応)', () => {
@@ -22,7 +32,7 @@ describe('buildPrompt (設計書 §3.4)', () => {
     expect(p.messages.some((m) => m.role === 'user' && m.content.includes('いまの質問'))).toBe(true);
   });
 
-  it('few-shot/短期記憶の assistant ターンは JSON 形式で提示される(履歴と出力形式の一致)', () => {
+  it('few-shot/短期記憶の assistant ターンは JSON 形式で提示される', () => {
     const mc = makeMemoryContext({
       shortTerm: [
         { role: 'user', text: '過去の質問', timestamp: 't1', extracted: true },
@@ -30,28 +40,36 @@ describe('buildPrompt (設計書 §3.4)', () => {
       ],
     });
     const p = buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x');
-    // few-shot の assistant が JSON 化されている
     const fewshotAssistant = p.messages.find((m) => m.content.includes('ふん、教えてあげるわよ'));
     expect(fewshotAssistant?.content).toContain('"type":"chat"');
-    // 短期記憶の assistant も JSON 化されている
     const stAssistant = p.messages.find((m) => m.content.includes('過去の返答'));
     expect(stAssistant?.content).toContain('"type":"chat"');
-    // user ターンはプレーンのまま
     const stUser = p.messages.find((m) => m.role === 'user' && m.content.includes('過去の質問'));
     expect(stUser?.content).not.toContain('"type":"chat"');
   });
 
-  it('出力形式(os_command 仕様)が system に含まれる', () => {
+  it('出力形式(os_command 仕様)が system(Tier0)に含まれる', () => {
     const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
-    expect(p.system).toContain('os_command');
-    expect(p.system).toContain('open_notepad');
-    expect(p.system).toContain('open_browser');
-    expect(p.system).toContain('open_folder');
+    expect(systemText(p)).toContain('os_command');
+    expect(systemText(p)).toContain('open_notepad');
+    expect(systemText(p)).toContain('open_browser');
+    expect(systemText(p)).toContain('open_folder');
   });
 
-  it('routerResult.behavior が system に含まれる', () => {
+  it('routerResult.behavior は揮発物として現 user ターンに同梱(system には出さない)', () => {
     const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult({ behavior: '特別な振る舞い' }), 'x');
-    expect(p.system).toContain('特別な振る舞い');
+    expect(lastUserText(p)).toContain('特別な振る舞い');
+    expect(systemText(p)).not.toContain('特別な振る舞い');
+  });
+
+  it('episodic も現 user ターンに同梱される', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        { date: '2026-05-10T00:00:00+09:00', topic: 't', summary: '過去にラーメンの話をした', importance: 3, category: 'general' },
+      ],
+    });
+    const p = buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x');
+    expect(lastUserText(p)).toContain('過去にラーメンの話をした');
   });
 
   it('連続する同一 role を作らない(交互列を保つ)', () => {
@@ -62,18 +80,39 @@ describe('buildPrompt (設計書 §3.4)', () => {
     for (let i = 1; i < p.messages.length; i++) {
       expect(p.messages[i]?.role).not.toBe(p.messages[i - 1]?.role);
     }
-    // 先頭は user
     expect(p.messages[0]?.role).toBe('user');
   });
 
-  it('誕生日(today)なら祝福 few-shot を含む', () => {
+  it('現ターンの直前メッセージが履歴キャッシュ境界(cacheable)になる', () => {
+    const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
+    const boundary = p.messages[p.messages.length - 2];
+    expect(boundary?.cacheable).toBe(true);
+    // 現ターン(末尾)自身は揮発=非キャッシュ
+    expect(p.messages[p.messages.length - 1]?.cacheable).toBeFalsy();
+  });
+
+  it('誕生日(today)なら誕生日情報と祝福例が現 user ターンに含まれる', () => {
     const p = buildPrompt(
       makeCharContext({ birthdayHint: 'today' }),
       makeMemoryContext(),
       makeRouterResult(),
       'x',
     );
-    expect(p.system).toContain('誕生日');
-    expect(p.messages.some((m) => m.content.includes('べ、別に嬉しくない'))).toBe(true);
+    expect(lastUserText(p)).toContain('誕生日');
+    expect(lastUserText(p)).toContain('べ、別に嬉しくない');
+  });
+
+  it('ウォーム用 buildTier0 は本会話の system[0](Tier0)とバイト同一', () => {
+    // Phase 3 のクリック起点ウォームが本会話と同じキャッシュを温めるための不変条件。
+    const cc = makeCharContext();
+    const p = buildPrompt(cc, makeMemoryContext(), makeRouterResult(), 'x');
+    expect(buildTier0(cc)).toEqual(p.system[0]);
+  });
+
+  it('同一入力で Tier0 はバイト同一(キャッシュ前提の不変性)', () => {
+    const a = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult({ behavior: 'X' }), '質問1');
+    const b = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult({ behavior: 'Y' }), '質問2');
+    // behavior も入力も違うが Tier0(先頭ブロック)は変わらない
+    expect(a.system[0]?.text).toBe(b.system[0]?.text);
   });
 });

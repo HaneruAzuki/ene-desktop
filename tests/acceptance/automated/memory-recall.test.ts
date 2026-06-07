@@ -23,7 +23,7 @@ vi.mock('../../../src/storage/paths', () => ({
 import { updateSemantic } from '../../../src/memory/semantic';
 import { buildMemoryContext } from '../../../src/memory/context-builder';
 import { buildPrompt } from '../../../src/conversation/prompt-builder';
-import { makeCharContext, makeRouterResult } from '../../unit/fixtures';
+import { makeCharContext, makeRouterResult, systemText } from '../../unit/fixtures';
 
 beforeEach(async () => {
   h.base = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-acc-mem-'));
@@ -43,13 +43,13 @@ describe('受入: セッションを跨いだ記憶(成功基準5 の機構)', (
 
     // 統合プロンプトの長期記憶セクションに名前が載る(= ENE が参照できる)
     const prompt = buildPrompt(makeCharContext(), mc, makeRouterResult(), '私の名前覚えてる?');
-    expect(prompt.system).toContain('相手の名前: 太郎');
+    expect(systemText(prompt)).toContain('相手の名前: 太郎');
   });
 
   it('好み(preferences)も長期記憶に蓄積され、プロンプトへ反映される', async () => {
     await updateSemantic({ userName: '太郎', preferences: { 好きな食べ物: 'ラーメン' } });
     const mc = await buildMemoryContext({ text: 'なんか食べたい', limit: 5 });
     const prompt = buildPrompt(makeCharContext(), mc, makeRouterResult(), 'なんか食べたい');
-    expect(prompt.system).toContain('ラーメン');
+    expect(systemText(prompt)).toContain('ラーメン');
   });
 });

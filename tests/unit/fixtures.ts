@@ -2,6 +2,17 @@
 import type { CharacterContext } from '../../src/shared/types/character';
 import type { MemoryContext } from '../../src/shared/types/memory';
 import type { RouterResult } from '../../src/shared/types/router';
+import type { BuiltPrompt } from '../../src/shared/types/conversation';
+
+/** task_14: system はブロック配列になったため、検証用に全ブロックを連結する。 */
+export function systemText(prompt: BuiltPrompt): string {
+  return prompt.system.map((b) => b.text).join('\n');
+}
+
+/** 末尾(現在の user ターン)の本文を返す検証ヘルパ。 */
+export function lastUserText(prompt: BuiltPrompt): string {
+  return prompt.messages[prompt.messages.length - 1]?.content ?? '';
+}
 
 export function makeCharContext(over: Partial<CharacterContext> = {}): CharacterContext {
   return {

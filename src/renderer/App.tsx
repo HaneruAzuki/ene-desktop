@@ -43,6 +43,11 @@ export function App(): React.ReactElement | null {
     });
   }, []);
 
+  // 入力欄を開いた瞬間に Tier0 キャッシュを温める(task_14 Phase 3・初回応答の体感を速く)。
+  useEffect(() => {
+    if (inputVisible) void window.ene.warmCache();
+  }, [inputVisible]);
+
   // ESC で入力欄・吹き出しを閉じる
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {

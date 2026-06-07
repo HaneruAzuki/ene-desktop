@@ -7,7 +7,8 @@ import { appendShortTerm } from '../memory/short-term';
 import { buildMemoryContext } from '../memory/context-builder';
 import { extractFromShortTerm } from '../memory/extraction-trigger';
 import { classifyTopic } from '../router/router';
-import { chat, makeLlmComplete } from '../conversation/client';
+import { chat, makeLlmComplete, warmPromptCache } from '../conversation/client';
+import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
 import { recordBirthdayCelebrated } from '../character/active-character';
 import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
@@ -169,5 +170,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   ipcMain.handle('ene:show-character-context-menu', async (): Promise<void> => {
     showCharacterContextMenu(mainWindow, runtime);
+  });
+
+  // 入力欄オープン時のキャッシュウォーム(task_14 Phase 3・レイテンシ施策)。fire-and-forget。
+  ipcMain.handle('ene:warm-cache', async (): Promise<void> => {
+    const { charContext, apiKey } = runtime;
+    if (charContext && apiKey) {
+      const semantic = await getSemantic();
+      void warmPromptCache(charContext, semantic, apiKey);
+    }
   });
 }

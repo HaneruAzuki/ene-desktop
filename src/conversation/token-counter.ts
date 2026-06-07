@@ -27,9 +27,12 @@ export function estimateTokens(charCount: number): number {
   return Math.ceil(charCount / CHARS_PER_TOKEN);
 }
 
-/** プロンプト全体(system + 全メッセージ)の推定入力トークン数。 */
+/** プロンプト全体(system 全ブロック + 全メッセージ)の推定入力トークン数。 */
 export function estimatePromptTokens(prompt: BuiltPrompt): number {
-  let chars = prompt.system.length;
+  let chars = 0;
+  for (const b of prompt.system) {
+    chars += b.text.length;
+  }
   for (const m of prompt.messages) {
     chars += m.content.length;
   }

@@ -14,6 +14,7 @@ const eneAPI: EneAPI = {
   resetWindowPosition: () => ipcRenderer.invoke('ene:reset-window-position'),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke('ene:set-ignore-mouse-events', ignore),
   showCharacterContextMenu: () => ipcRenderer.invoke('ene:show-character-context-menu'),
+  warmCache: () => ipcRenderer.invoke('ene:warm-cache'),
   onAppReady: (cb) => {
     ipcRenderer.on('ene:app-ready', () => cb());
   },

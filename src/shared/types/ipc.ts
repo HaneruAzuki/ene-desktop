@@ -30,6 +30,9 @@ export interface EneAPI {
   // キャラ右クリックメニュー(main 側でネイティブメニュー表示)
   showCharacterContextMenu(): Promise<void>;
 
+  // 入力欄を開いた瞬間に Tier0 キャッシュを温める(task_14 Phase 3・レイテンシ施策)
+  warmCache(): Promise<void>;
+
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
   onError(callback: (error: string) => void): void;

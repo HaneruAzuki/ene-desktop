@@ -543,6 +543,39 @@
 
 ---
 
+## task_14(記憶リクエスト最適化・プロンプトキャッシュ)
+
+> MVP 0.3「コスト＆軸の安定」。Phase 1+2+3 を実装・実機検証済み(2026-06-07)。
+> 実測:1ターン目から `cache_read≈2457`(ウォーム由来)、毎ターン入力の約8割をキャッシュ読込に転換。挙動不変。
+
+### N-14-1 🟢 BuiltPrompt.system を文字列→SystemBlock[] 化
+- **内容**: `SystemBlock = { type:'text'; text; cacheable? }`。先頭=Tier0(不変・cacheable)、以降に準不変。`PromptMessage` に `cacheable?` を追加(履歴キャッシュ境界)。
+- **波及**: prompt-builder / client(callModel 2経路)/ token-counter(ブロック合算)/ prompt-enhancer(SystemBlock[]→SystemBlock[]・強化文は非キャッシュ追加ブロック)。
+- **反映**: §3.4・§3.3型(BuiltPrompt)。
+
+### N-14-2 🟢 Tier 並べ替え(揮発を現ターンへ)
+- **内容**: Tier0=人格+出力形式+自称制約(system先頭)。semantic=準不変(system 2番目)。**episodic/behavior/誕生日は現在の user ターン本文へ同梱**(system から除去)=安定プレフィックス化。
+- **反映**: §3.4 の Tier 構造図。
+
+### N-14-3 🟢 プロンプトキャッシュ(ベータ名前空間)
+- **内容**: SDK 0.30.1 ではキャッシュは `client.beta.promptCaching.messages.create`。Tier0 ブロックと「現ターン直前メッセージ」に `cache_control:{type:'ephemeral'}` を付与(2境界)。`usage.cache_creation_input_tokens`/`cache_read_input_tokens` を **トークン数のみ**ログ(PII禁止)。SDK更新不要=§2.4 承認不要。
+- **反映**: §3.4・§1.2 注記。
+
+### N-14-4 🟢 few-shot を固定プレフィックス化(Phase 2 (A) を採用)
+- **内容**: 全ドメインの few-shot(計13例)を毎回同一順で messages 先頭に。`fewshotKey` による動的選択は廃止。理由:例が少なく Router も実質フォールバック多発のため、声の安定＋履歴キャッシュ有効化の利得が上回る。
+- **判断**: (A)固定 を採用((B)動的のまま は不採用)。Tier0 単体は1024トークン未満の可能性があるが、2つ目の境界(system+few-shot)が確実に1024超でキャッシュ有効。
+- **反映**: §3.4。N-05-6(誕生日 few-shot)は、誕生日情報を現ターンの揮発コンテキストにテキストで同梱する方式へ変更。
+
+### N-14-5 🟢 クリック起点ウォーム(Phase 3・レイテンシ施策)
+- **内容**: 入力欄オープン時に IPC `ene:warm-cache` → `warmPromptCache` が**本会話と同一の buildPrompt** を `max_tokens:1` で送信し、安定プレフィックスを先に書き込む。揮発物はキャッシュ境界より後ろなのでダミーで可。
+- **検証**: 実機で1ターン目 `write=0 read=2457`=ウォーム命中を確認。位置づけはレイテンシ施策(コスト微増・コスト削減策としては正当化しない)。
+- **反映**: §3.4。preload/ipc/types/App に warmCache 配線。
+
+### N-14-6 ⚪ スコープ外(本タスクで触らない)
+- `temperature`(0.7)調整、抽出の Haiku 化(§3.3 が Sonnet 指定=要承認)、想起の中身(task_15)は対象外。本タスクは「送り方」のみ変更し会話内容・人格出力は不変。
+
+---
+
 ## 方針転換(2026-06): 固定キャラ・人生記憶・心
 
 > ユーザー承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は
