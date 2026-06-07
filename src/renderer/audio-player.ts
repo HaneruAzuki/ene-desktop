@@ -1,11 +1,21 @@
 // 音声チャンク(WAV)の逐次再生(task_17 Phase A / design-revision-voice §1)。
 // main から届く WAV を AudioContext で順番に再生する。
 // barge-in(task_17 Phase C)では stopPlayback() で再生を即停止する。
+// 「ENE が実際に喋っている区間」を main に伝えるため、再生開始/終了を通知する
+// (barge-in 検出の有効期間=発話中フラグに使う。長さ推定タイマーだと実音声とズレるため)。
 
 let ctx: AudioContext | null = null;
 const queue: AudioBuffer[] = [];
 let playing = false;
 let currentSource: AudioBufferSourceNode | null = null;
+let onPlayStart: (() => void) | null = null;
+let onPlayEnd: (() => void) | null = null;
+
+/** 再生の開始/終了の通知先を登録する(task_17 Phase C・barge-in の発話中判定)。 */
+export function setPlaybackHandlers(start: () => void, end: () => void): void {
+  onPlayStart = start;
+  onPlayEnd = end;
+}
 
 function getCtx(): AudioContext {
   ctx ??= new AudioContext();
@@ -15,11 +25,14 @@ function getCtx(): AudioContext {
 function playNext(): void {
   const buf = queue.shift();
   if (!buf) {
-    playing = false;
-    currentSource = null;
+    // キューが尽きた=再生終了。
+    if (playing) {
+      playing = false;
+      currentSource = null;
+      onPlayEnd?.();
+    }
     return;
   }
-  playing = true;
   const src = getCtx().createBufferSource();
   src.buffer = buf;
   src.connect(getCtx().destination);
@@ -39,7 +52,12 @@ export async function enqueueAudio(wav: ArrayBuffer): Promise<void> {
   // decodeAudioData は渡した ArrayBuffer を detach するため、コピーを渡す。
   const buf = await c.decodeAudioData(wav.slice(0));
   queue.push(buf);
-  if (!playing) playNext();
+  if (!playing) {
+    // 新しい再生セッションの開始。
+    playing = true;
+    onPlayStart?.();
+    playNext();
+  }
 }
 
 /**
@@ -57,5 +75,8 @@ export function stopPlayback(): void {
     }
     currentSource = null;
   }
-  playing = false;
+  if (playing) {
+    playing = false;
+    onPlayEnd?.();
+  }
 }

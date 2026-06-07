@@ -3,7 +3,7 @@ import { CharacterDisplay, type CharacterDisplayHandle } from './components/Char
 import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea } from './components/InputArea';
 import { playClick } from './sound';
-import { enqueueAudio, stopPlayback } from './audio-player';
+import { enqueueAudio, stopPlayback, setPlaybackHandlers } from './audio-player';
 import { VoiceMic } from './voice-conversation';
 import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
 import type { CharacterInfo } from '../shared/types/ipc';
@@ -68,10 +68,23 @@ export function App(): React.ReactElement | null {
     window.ene.onVoiceChunk((chunk) => void enqueueAudio(chunk));
   }, []);
 
+  // 実際の再生開始/終了に「ENE 発話中」フラグを連動(task_17 Phase C・barge-in)。
+  // 長さ推定タイマーだと実音声より早くフラグが切れ、barge-in が発火せず話し終わりを待ってしまう。
+  useEffect(() => {
+    setPlaybackHandlers(
+      () => {
+        if (voiceModeRef.current) window.ene.setVadSpeaking(true);
+      },
+      () => {
+        if (voiceModeRef.current) window.ene.setVadSpeaking(false);
+      },
+    );
+  }, []);
+
   // ハンズフリー音声会話(task_17 Phase C)。main からの状態/確定テキスト/割り込みを束ねる。
   useEffect(() => {
     window.ene.onVoiceState((state) => setVoiceStatus(state));
-    window.ene.onVoiceTranscript((text) => void respond(text, true));
+    window.ene.onVoiceTranscript((text) => void respond(text));
     window.ene.onVoiceBargeIn(() => handleBargeIn());
   }, []);
 
@@ -132,10 +145,10 @@ export function App(): React.ReactElement | null {
 
   /**
    * ユーザー発話(テキスト or 音声認識)に応答する共通フロー。
-   * viaVoice=true(ハンズフリー)のときは、ENE 発話中フラグを main へ伝え、
-   * barge-in 検出のデバウンスを厳しめに切替える(エコー誤割り込みの抑制)。
+   * 「ENE 発話中」フラグ(barge-in 用)は実際の音声再生に連動させるため、ここでは扱わない
+   * (setPlaybackHandlers 参照)。
    */
-  async function respond(text: string, viaVoice: boolean): Promise<void> {
+  async function respond(text: string): Promise<void> {
     setBubble(null);
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' }));
@@ -143,7 +156,6 @@ export function App(): React.ReactElement | null {
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
     setBubble(response.message);
-    if (viaVoice && voiceModeRef.current) window.ene.setVadSpeaking(true);
 
     // 口パクはメッセージ長に比例した時間だけ。話し終えたら idle へ戻し口を閉じる。
     const talkMs = Math.min(
@@ -152,14 +164,13 @@ export function App(): React.ReactElement | null {
     );
     talkingTimerRef.current = setTimeout(() => {
       setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle' } : s));
-      if (viaVoice && voiceModeRef.current) window.ene.setVadSpeaking(false); // 聞き取りに戻る
     }, talkMs);
   }
 
   async function handleSubmit(text: string): Promise<void> {
     playClick();
     setInputVisible(false);
-    await respond(text, false);
+    await respond(text);
   }
 
   /** barge-in: ENE 発話中にユーザーが話しかけたら、ENE の声を即停止して聞く体勢へ。 */
