@@ -1,6 +1,10 @@
 # 設計改訂(ステージング):双方向ローカル音声(task_17 / MVP 0.3「声と耳」)
 
-> 本書は **Phase 0 の設計** をステージングするもの。承認後に `03_design.md`(§1.2/§2/§3.4/§4/§11.1)へマージする。
+> 本書は **Phase 0 の設計** をステージングしたもの。**2026-06-08 に `03_design.md`(§1.2/§2/§3.4/§4.2/§11.1)・
+> `02_requirements.md`(§2.14 F-VOICE)へ反映済み**(N-17-11)。以降は**経緯/根拠ドキュメント**として残置する。
+> ⚠️ **実装は本書の Phase 0 案から一部乖離**(確定は正本・N-17-8/9/10/11 が優先):STT は sherpa-onnx ではなく
+> **onnxruntime-node 再利用＋whisper-large-v3-turbo**、VAD は renderer ではなく **main・Silero v4**、
+> C1 ストリーミング(§2)は**純粋ロジック実装のみでライブ未配線**(非ストリーミング `speakText` で出荷)。
 > 上位の確定方針は `tasks/task_17_voice.md` / memory `voice-plan-decisions-2026`。
 
 ---

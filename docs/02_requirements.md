@@ -354,6 +354,25 @@ MVPでは Episodic Memory に `importance` を必須化することで、
 | F-LIFE-08 | 終了時に短期記憶から記憶抽出を行う |
 | F-LIFE-09 | 異常終了からの復旧時、可能な範囲で記憶を引き継ぐ |
 
+### 2.14 音声入出力(双方向ローカル音声・MVP 0.3「声と耳」・task_17)
+
+処理はすべてローカル。脳(Claude)へ送るのは**テキストのみ**(音声は端末外に出さない・§3.4 プライバシー / ビジョン§4.2 維持)。
+詳細設計は `docs/design-revision-voice.md`、実装判断は `docs/implementation-notes.md` N-17-x を参照。
+
+| ID | 要件 |
+|----|------|
+| F-VOICE-01 | 音声合成(TTS)は `TtsEngine` インターフェースで差し替え可能とする(§4.4 疎結合)。MVP 0.3 実装は AivisSpeech(VOICEVOX互換のローカル HTTP API・既定 `127.0.0.1:10101`)。音声を外部クラウドへ送らない(ローカル合成) |
+| F-VOICE-02 | emotion ラベル→スタイルID/合成パラメータの対応は `characters/{id}/voice.json` に外出しする(コードにハードコードしない・§4.5)。`neutral` を必須フォールバックとする。`pitchScale` は音質劣化のため使わない(声質はモデル選択＋スタイルで決める) |
+| F-VOICE-03 | 応答は読み上げ用ひらがな `reading`(任意)を持てる。TTS は `reading` があればそれを、無ければ表示文 `message` を読む(漢字の誤読対策) |
+| F-VOICE-04 | 確定応答を文単位で合成し、文ごとに音声チャンク(WAV)を renderer へ送って逐次再生する(吹き出しは即時表示・音声は後追いで届く) |
+| F-VOICE-05 | 音声認識(STT)は完全ローカル(main プロセス・`onnxruntime-node`・`whisper-large-v3-turbo`)。録音音声は外部送信せず STT 入力にのみ使う。脳(Claude)へ送るのは確定テキストのみ |
+| F-VOICE-06 | マイク取得は renderer の `getUserMedia`(16kHz mono)。STT モデルは別ダウンロードで `data/models/` 配下へ配置する(コア配布物 <100MB を維持・実行時に外部からモデルを取らない) |
+| F-VOICE-07 | ハンズフリー会話では Silero VAD(**v4**・main・`onnxruntime-node`・同梱)で発話区間を検出し、無音継続(既定 700ms)でターン終了とみなして STT→既存 `sendMessage` 経路へ流す |
+| F-VOICE-08 | barge-in:ENE 発話中(実音声の再生中)にユーザー発話を検知したら TTS 再生を即停止する。エコー回り込みでの誤発火対策に `echoCancellation` を有効化する |
+| F-VOICE-09 | マイク入力方式(push-to-talk / hands-free)を設定可能とし、`data/config/app-settings.json`(平文JSON)に永続化する。キャラ右クリックメニューから切替できる |
+| F-VOICE-10 | 同梱・配布する音声モデルは寛容ライセンス(声優の無断クローン等を含まないもの)に限定する。クレジット必須の声は、クレジット文言を about/クレジット画面に常時表示する |
+| F-VOICE-11 | 音声機能は best-effort:エンジン未起動・モデル未配置・合成失敗時でもテキスト会話は成立する(音声無効でフォールバックし、会話をブロックしない) |
+
 ---
 
 ## 3. 非機能要件

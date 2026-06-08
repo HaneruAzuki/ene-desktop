@@ -67,6 +67,23 @@
 > - 配布サイズ:native は win-x64 CPU コアのみ同梱(`onnxruntime.dll`＋`*_binding.node`)、GPU用DLL(約38MB)・`onnxruntime-web`(約130MB)・他OSは除外。`electron-builder.yml` の files/asarUnpack 参照。
 > 選定根拠は記憶ノート research-embedding-model-2026 と `tasks/task_15_memory_recall_update.md`(§Phase B)。
 
+> 📌 **MVP 0.3 確定(実装・検証済み 2026-06・task_17「声と耳」)**:双方向ローカル音声を追加したが、
+> **新規 npm ライブラリは増やしていない**(本表に追加なし)。内訳:
+> - **STT(音声認識)**:`@huggingface/transformers ^4.x`(上表既出)を再利用。モデルは
+>   **`onnx-community/whisper-large-v3-turbo`**(encoder fp32 / decoder q8)を**別ダウンロード**で
+>   `data/models/whisper-large-v3-turbo/` に配置(`scripts/download-stt-model.mjs`)。実行時に外部DLしない(§7.1)。
+> - **VAD(音声区間検出)**:`onnxruntime-node` を**直接**使用(`@huggingface/transformers` の推移的依存として
+>   既に同梱・externalize 済=新規 npm なし)。モデルは **Silero VAD v4**(`silero_vad.onnx`・約1.8MB・MIT)を
+>   **`resources/` に同梱**(小容量のため別DLでなく配布物同梱)。**⚠️ v5/v5.1 は `onnxruntime-node` が
+>   動的形状を誤計算し実音声でも発話確率≈0 になるため不可→ v4 採用**(N-17-9)。
+>   ※ Phase 0 案の `sherpa-onnx` は**不採用**(自前 onnxruntime を持ち既存と重複するため、既存 `onnxruntime-node`
+>   再利用に統一)。
+> - **TTS(音声合成)**:**AivisSpeech**(VOICEVOX互換のローカル HTTP エンジン・別プロセス=サイドカー)。
+>   npm 依存ではなく**外部エンジン**で、自前 HTTP クライアント(`AivisSpeechTtsEngine`)から叩く。
+>   エンジン/声モデルはユーザー領域に配置(同梱しない=コア<100MB維持)。声は寛容ライセンス(つくよみコーパス基盤の自作AIVM)。
+> - 配布サイズ:同梱増分は Silero v4(約1.8MB)のみ。Whisper・AivisSpeech は配布物に含めない。
+> 詳細は `docs/design-revision-voice.md` と `tasks/task_17_voice.md`、実装判断は N-17-8/9/10。
+
 #### バージョン指定方針
 
 - バージョン指定は **`^` (キャレット)を基本**とする
@@ -150,8 +167,13 @@ ene-desktop/
 ├── tasks/                         ← 実装タスク
 │   └── task_NN_*.md
 │
-├── scripts/                        ← 開発/セットアップ用(配布物に含めない・task_15)
+├── scripts/                        ← 開発/セットアップ用(配布物に含めない・task_15/17)
 │   ├── download-model.mjs         ← 埋め込みモデル(ruri)をローカル取得
+│   ├── download-stt-model.mjs     ← STT(whisper-large-v3-turbo)をローカル取得(task_17)
+│   ├── download-vad-model.mjs     ← VAD(silero v4)取得(task_17・通常は resources 同梱で不要)
+│   ├── voice-smoke.mjs            ← TTS スモーク(task_17・手動検証)
+│   ├── stt-smoke.mjs              ← STT スモーク(task_17・手動検証)
+│   ├── vad-smoke.mjs              ← VAD スモーク(task_17・手動検証)
 │   └── seed-recall-fixtures.mjs   ← 手動テスト用の仮記憶投入
 │
 ├── src/
@@ -169,7 +191,9 @@ ene-desktop/
 │   │   ├── api-key-dialog.ts      ← APIキーダイアログ表示 + 専用IPC統合(N-09-1)
 │   │   ├── api-key-tester.ts      ← APIキー疎通テスト(SDK使用)
 │   │   ├── api-key-error-messages.ts ← エラー種別→ユーザー表示文言
-│   │   └── api-key-auto-recovery.ts  ← 失効時の自動再表示配線
+│   │   ├── api-key-auto-recovery.ts  ← 失効時の自動再表示配線
+│   │   ├── voice-runtime.ts        ← 音声出力ランタイム(TTS初期化・確定応答を文単位合成→renderer・task_17)
+│   │   └── vad-runtime.ts          ← ハンズフリーVADランタイム(フレーム受信→区間検出→STT→確定テキスト・task_17)
 │   │
 │   ├── preload/                   ← Preload script
 │   │   ├── index.ts               ← メインUI向けAPI公開
@@ -199,7 +223,8 @@ ene-desktop/
 │   │   ├── context-builder.ts     ← CharacterContext 構築
 │   │   ├── system-prompt-builder.ts ← 人格システムプロンプト構築(N-02-2)
 │   │   ├── birthday-checker.ts    ← 誕生日判定
-│   │   └── active-character.ts    ← active-character.json の読書(最小状態)
+│   │   ├── active-character.ts    ← active-character.json の読書(最小状態)
+│   │   └── voice-loader.ts        ← voice.json ロード・emotion→スタイル解決(task_17)
 │   │
 │   ├── router/                    ← Knowledge Router
 │   │   ├── router.ts              ← classifyTopic(Haiku呼出・タイムアウト)
@@ -233,7 +258,15 @@ ene-desktop/
 │   │   ├── prompt-enhancer.ts     ← 再生成時の強化プロンプト(4層防御 第3層)
 │   │   ├── ai-self-check.ts       ← AI自称検知(第2層)
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
-│   │   └── token-counter.ts       ← 入力トークンのローカル見積もり(N-05-3)
+│   │   ├── token-counter.ts       ← 入力トークンのローカル見積もり(N-05-3)
+│   │   ├── aivisspeech-tts.ts     ← AivisSpeech HTTPクライアント(TtsEngine 実装・task_17)
+│   │   ├── voice-provisioner.ts   ← 声設定の整合(/speakers で実 styleId 解決・task_17)
+│   │   ├── voice-chat.ts          ← 文単位の合成・C2ゲート(speakText=非ストリーミング / runVoiceChat=将来のストリーミングC1・task_17)
+│   │   ├── stream-parser.ts       ← ストリーミング応答パーサ(将来のC1用・純粋ロジック・task_17)
+│   │   ├── sentence-splitter.ts   ← 日本語の文単位分割(純粋ロジック・task_17)
+│   │   ├── stt-transcriber.ts     ← Whisper STT(transformers.js・ローカル・task_17)
+│   │   ├── silero-vad.ts          ← Silero VAD v4 ランナー(onnxruntime-node・task_17)
+│   │   └── vad-segmenter.ts       ← 発話区間セグメンタ(無音でターン終了・barge-in判定・task_17)
 │   │
 │   ├── os/                        ← OS Integration Layer
 │   │   ├── executor.ts            ← コマンド実行(shell API)
@@ -254,7 +287,11 @@ ene-desktop/
 │       │   ├── conversation.ts
 │       │   ├── router.ts
 │       │   ├── os.ts
-│       │   └── api-key.ts
+│       │   ├── api-key.ts
+│       │   ├── animation.ts        ← アニメ状態/emotion ラベル型(task_13)
+│       │   ├── voice.ts            ← TtsEngine/VoiceConfig/スタイル型(task_17)
+│       │   ├── stt.ts              ← 文字起こし結果型(task_17)
+│       │   └── settings.ts         ← AppSettings/VoiceInputMode(task_17)
 │       ├── constants.ts
 │       ├── datetime.ts            ← ローカルTZ込み ISO ユーティリティ(§5.6)
 │       └── logger.ts              ← electron-logラッパー
@@ -268,6 +305,7 @@ ene-desktop/
 │       ├── life-memory.json       ← 人生記憶 canon(task_16・provenance:self・読取専用・忘却外)
 │       ├── current-state.json     ← 現在状態“今”(task_16・任意・事実のみ・不在可)
 │       ├── animation.json         ← アニメ定義(task_13・状態→フレーム・任意・無ければ portrait)
+│       ├── voice.json             ← 声設定(task_17・engine/baseUrl/emotion→styleId/credit・任意・無ければ音声無効)
 │       ├── portrait.png           ← neutral(口閉じ)兼フォールバック
 │       └── portrait-{happy,dere,tsun,sad}[-talk].png ← 表情×口開閉の立ち絵(task_13・全身2D・直下配置 N-13-1)
 │
@@ -283,7 +321,8 @@ ene-desktop/
 ├── resources/                     ← ビルドリソース
 │   ├── icon.ico                   ← アプリアイコン
 │   ├── tray-icon.png              ← タスクトレイアイコン(小さめ・16〜32px推奨)
-│   └── installer-icon.ico
+│   ├── installer-icon.ico
+│   └── silero_vad.onnx            ← VAD モデル(task_17・Silero v4・約1.8MB・MIT・配布物に同梱)
 │
 ├── (実行時に生成 / exeと同じディレクトリ) ─── ポータブルデータ(平文JSON)
 │   └── data/                     ← ユーザーデータ(可搬性あり)
@@ -297,12 +336,14 @@ ene-desktop/
 │       │       └── index/          ← 派生キャッシュ(真実の源でない・再生成可・task_15)
 │       │           ├── inverted.json   ← entity/keyword 逆引き
 │       │           └── vectors.json    ← 意味検索ベクトル(モデル配置時)
-│       ├── models/                ← 埋め込みモデル(別DL・コア非汚染・task_15 Phase B)
-│       │   └── ruri-v3-310m/      ← ONNX int8(約316MB)・scripts/download-model.mjs で取得
+│       ├── models/                ← ローカルモデル(別DL・コア非汚染・task_15/17)
+│       │   ├── ruri-v3-310m/      ← 埋め込み ONNX int8(約316MB)・scripts/download-model.mjs(task_15)
+│       │   └── whisper-large-v3-turbo/ ← STT ONNX・scripts/download-stt-model.mjs(task_17)
 │       ├── logs/                  ← アプリ動作ログ(個人情報を含まないメタ情報のみ)
 │       ├── config/
 │       │   ├── window-position.json
-│       │   └── active-character.json  ← 現在使用中キャラと最小状態
+│       │   ├── active-character.json  ← 現在使用中キャラと最小状態
+│       │   └── app-settings.json      ← アプリ設定(マイク入力方式 等・平文JSON・task_17)
 │       └── characters-custom/    ← (旧)ユーザー追加キャラ用。固定キャラ方針で未使用(2026-06)
 │
 └── (実行時に生成 / OSユーザー領域) ─────── マシン固定データ(暗号化)
@@ -954,12 +995,14 @@ export type ResponseType = "chat" | "os_command";
 export interface ChatResponse {
   type: "chat";
   message: string;
+  reading?: string;         // task_17: 音声読み上げ用ひらがな(任意・欠落時は message を読む=漢字誤読対策)
   emotion?: EmotionLabel;   // task_13: 表情アニメ用(任意・1ターン揮発)。許可外/欠落は neutral。
 }
 
 export interface OsCommandResponse {
   type: "os_command";
   message: string;            // キャラとしての応答も付随
+  reading?: string;           // task_17: 音声読み上げ用ひらがな(任意)
   command: OsCommand;         // src/shared/types/os.ts で定義(action は固定リテラル型)
 }
 
@@ -969,6 +1012,18 @@ export type ConversationResponse = ChatResponse | OsCommandResponse;
 > 📌 `OsCommand` の action は `"open_notepad" | "open_browser" | "open_folder"` の
 > リテラル型に固定されている(§3.5 参照)。これにより、Claude APIが想定外の
 > action 文字列を返しても、応答パース時の型ガードで即座に検出・拒否できる。
+
+> 📌 **応答の音声化(task_17・現状=非ストリーミング)**:音声有効時は、`chat()` が返した
+> **確定応答**を文単位で合成し、文ごとに WAV を renderer へ送って逐次再生する
+> (`voice-runtime.speakResponse` → `voice-chat.speakText`)。吹き出しは即時表示、音声は後追い。
+> 自称検知は完成メッセージに対する既存の4層防御(§3.4 末尾)で担保済みのため、音声経路の
+> 文単位ゲートは現状ノーオペで通す。
+> - **`reading` がある場合は `reading` を合成**し、無ければ `message` を合成する(誤読対策)。
+> - **C1 ストリーミング再設計は未実施**:設計改訂(`docs/design-revision-voice.md` §2)で構想した
+>   「制御ヘッダ＋本文stream＋コマンドトレーラ」方式のパーサ(`stream-parser.ts`)と文単位ゲート付き
+>   ストリーミング(`voice-chat.runVoiceChat`)は**純粋ロジック＋単体テストとして実装済みだが、
+>   ライブ会話フローには未配線**(将来のレイテンシ最適化レバーとして温存)。現行 `ConversationResponse` の
+>   完成JSONパースは変更していない。
 
 #### Claude APIの使用方針
 
@@ -1787,6 +1842,26 @@ export interface EneAPI {
   // タスクトレイ/コンテキストメニューからのイベント受信(main → renderer)
   onOpenInputArea(callback: () => void): void;       // 「ENEと話す」「話す」選択時
   onResetPosition(callback: () => void): void;       // 「位置をリセット」選択時
+
+  // キャッシュウォーム(task_14・入力欄オープン時に Tier0 を温める)
+  warmCache(): Promise<void>;
+
+  // 音声(task_17)─────────────────────────────────────────────
+  // STT(push-to-talk):録音 PCM(16kHz Float32)を渡して確定テキストを得る
+  transcribeAudio(samples: Float32Array): Promise<TranscribeResult>;
+  // ハンズフリー VAD:renderer がマイクフレームを送り、main が区間検出→STT→確定テキストを返す
+  startVad(): Promise<boolean>;
+  sendVadFrame(frame: Float32Array): void;           // renderer → main(send)
+  stopVad(): void;                                   // renderer → main(send)
+  setVadSpeaking(speaking: boolean): void;           // 再生中フラグ(barge-in判定の有効期間・send)
+  // マイク入力方式(push-to-talk / hands-free)
+  getVoiceInputMode(): Promise<VoiceInputMode>;
+  onVoiceInputModeChanged(cb: (mode: VoiceInputMode) => void): void;  // 右クリックメニューで変更時
+  // main → renderer の音声イベント
+  onVoiceState(cb: (state: "listening" | "recording" | "transcribing") => void): void;
+  onVoiceTranscript(cb: (text: string) => void): void;  // 確定文字起こし(renderer が send-message へ流す)
+  onVoiceBargeIn(cb: () => void): void;                 // 割り込み検知(再生停止のトリガ)
+  onVoiceChunk(cb: (chunk: ArrayBuffer) => void): void; // 合成音声チャンク(WAV・逐次再生)
 }
 
 // Renderer側で window.ene.sendMessage(...) のように使う
@@ -2730,6 +2805,14 @@ win:
 
 - UI側に音声入力ボタンを追加する余地を確保
 - Conversation Layer は文字列受取なので、音声→テキスト変換を別レイヤーで挟むだけで済む
+
+> 📌 **MVP 0.3 で実装済み(task_17「声と耳」)**:本拡張ポイントは双方向ローカル音声として実装した。
+> 想定どおり **Conversation Layer は文字列受取のまま**(STT で確定テキスト化してから既存 `sendMessage` 経路へ)。
+> 機能要件は **§2.14 F-VOICE**、型・音声化フローは **§3.4**、IPC 契約は **§4.2(音声ブロック)**、
+> ライブラリ判断は **§1.2 の MVP 0.3 task_17 注記**を参照。詳細設計・実装判断は
+> `docs/design-revision-voice.md` / `docs/implementation-notes.md` N-17-x。
+> 残:C1 ストリーミング再設計(レイテンシ最適化・パーサは実装済みだが未配線)、振幅ドリブンのリップシンク
+> (現状は時間ベース近似=F-ANIM-05)、声/レイテンシの人間判定(task_17 Phase D)。
 
 ### 11.2 Live2D対応
 

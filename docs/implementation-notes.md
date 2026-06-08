@@ -734,7 +734,16 @@
 - **統合**: 旧「入力欄内の🎤(PTT)＋右下🎧(ハンズフリー)」の2ボタンを廃止し、**入力欄の下・中央の単一マイクボタン(大きめ48px)** に統合。ON(リッスン中=ハンズフリー起動中 or PTT 押下中)で緑に点灯・OFF は白。**状態テキスト(聞いてるよ/考え中)は廃止**=ボタンの ON/OFF だけで「聞いている/いない」を示す。聞き取り中はキャラ neutral、考え中は従来どおり吹き出し「…」(transcribing 状態 ＋ respond の thinking で表示)。
 - **設定**: 右クリックメニューに「マイク入力方式」サブメニュー(radio: Push-to-Talk / ハンズフリー)。`data/config/app-settings.json`(平文JSON・新規・§6.1)に永続化。main 起動時に読み込み runtime へ。変更は menu→main 保存＋`ene:voice-input-mode-changed` で renderer へ通知。IPC `ene:get-voice-input-mode`。
 - **新規/変更**: `shared/types/settings.ts`(VoiceInputMode/AppSettings)・`storage/app-settings.ts`・`getAppSettingsPath`(paths)。`character-context-menu.ts` にサブメニュー。`InputArea` はテキストのみへ戻し、PTT 録音ロジックは `App` の統合ボタンへ集約(PTT=push-to-talk hold、ハンズフリー=click トグル)。方式切替時は旧方式を停止。
-- **設計書差分**: `data/config/app-settings.json` は §2 ディレクトリ表に未記載の新規設定ファイル(config 配下・ユーザー設定の自然な追加)。要・設計書 §2 追記(MVP後の整合)。
+- **設計書差分**: `data/config/app-settings.json` は §2 ディレクトリ表に未記載の新規設定ファイル(config 配下・ユーザー設定の自然な追加)。→ **N-17-11 で §2 へ反映済み**。
+
+### N-17-11 🟢 task_17 を正本へ反映(2026-06-08・ドキュメント整合)
+- **内容**: Phase A〜C で確定した実装実態を SSOT へ反映。
+  - `02_requirements.md`:**§2.14 音声入出力(F-VOICE-01〜11)** を新設。
+  - `03_design.md`:**§1.2**(音声ライブラリ=新規npmなし・STT=transformers.js/whisper-large-v3-turbo・VAD=onnxruntime-node直/Silero v4同梱・TTS=AivisSpeechサイドカー・sherpa不採用)、**§2**(scripts/src 各層の音声ファイル・`resources/silero_vad.onnx`・`data/models/whisper-large-v3-turbo/`・`data/config/app-settings.json`・`characters/{id}/voice.json`・新規型)、**§3.4**(`reading?` 追加＋音声化フロー=非ストリーミング)、**§4.2**(音声IPC契約＋`warmCache`)、**§11.1**(実装済みマーク)。
+- **反映上の重要判断(虚偽を書かない)**: **C1 ストリーミング再設計はライブ未配線**。`stream-parser.ts`/`sentence-splitter.ts`/`voice-chat.runVoiceChat` は純粋ロジック＋単体テストとして存在するが、実会話は従来どおり**完成JSONをパース → `speakText` で文単位合成**(非ストリーミング)。正本にはこの実態で記載し、ストリーミングは「将来レバー」と明記。
+- **staging との乖離も明記**: `docs/design-revision-voice.md` は Phase 0 案(sherpa-onnx・renderer VAD 等)を含むが、実装は onnxruntime-node 再利用・main VAD・Silero v4 に確定。正本は実装側を採用し、design-revision-voice は経緯ドキュメントとして残置。
+- **未反映(意図的)**: F-ANIM-05 の「0.3 で音声振幅ドリブンに差し替える」は**未実施**(現状は時間ベース近似のまま)。§11.1 に残課題として記録。task_17 Phase D(声/レイテンシの人間判定)も未完。
+- **反映**: 02_requirements §2.14 / 03_design §1.2・§2・§3.4・§4.2・§11.1。
 
 ---
 
