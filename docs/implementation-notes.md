@@ -13,7 +13,12 @@
 > デバウンス保存・クリックスルー集約・pull 挨拶・N-07-5/N-08-2/3/4/5/N-10-3/5)、§10(受入テスト方針・N-08-7/N-12-1/2)、§11.7(Prefill 注記)。
 > ⚪ 項目は「設計書変更不要」のため対象外。各項目の 🟡 マークは履歴として残置(上記のとおり反映済み)。
 > なお task ファイル側の表記ゆれ(N-00-2/N-00-5 等)は歴史的資料として未編集。
-> **MVP後ブラッシュアップ予定**(N-09-9/10・N-11-1/4・N-12-4)は本ファイル末尾の専用節を参照。
+> **MVP後ブラッシュアップ予定**(N-09-9/10・N-11-1/4・N-12-4 等)は `docs/optimization-backlog.md` へ移動した(2026-06 整理)。
+>
+> 📂 **2026-06 ドキュメント整理**:マージ済みの改訂文書(`design-revision-memory-v2` /
+> `-character-heart` / `-voice`)と canon ドラフトは `docs/archive/` へ移動した。
+> 以下の N-xx に出てくる `design-revision-*` への言及は経緯記録であり、現行の所在は
+> `docs/archive/README.md` の対応表を参照(現行 SSOT は `03_design.md`)。
 
 > **このファイルの位置づけ**
 > 実装(task_00〜)の過程で生じた **設計判断** と、判明した **設計書(01/02/03/別添A)の
@@ -614,7 +619,7 @@
 ## 方針転換(2026-06): 固定キャラ・人生記憶・心
 
 > ユーザー承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は
-> `docs/design-revision-character-heart.md`(マージ元)。
+> `docs/archive/design-revision-character-heart.md`(マージ元)。
 > **task_16 で実装完了(2026-06-07)**:N-16-1〜7 のデータ＋処理を実装し 03_design §2/§3.1/§3.3/§5 へ反映済み。
 > 実装固有の追加判断は N-16-8〜11 を参照。実機検証:valence 抽出(負イベント→-2)・関係事実記録・心/canon/キャッシュ共存を確認。
 
@@ -707,7 +712,7 @@
 - **内容**: ユーザー明示承認(2026-06-07)。音声機能で **AivisSpeech エンジン＋音声モデル(AIVM)を初回起動時にネット取得**することを許可。**§4.2/§7.1/§12「Claude以外への外部通信」への限定的例外**。届け方=管理サイドカー(手動インストール不要で"同梱体験"・コア<100MB維持)。
 - **スコープ厳守**: 取得対象は**エンジン/モデル本体のみ**。**音声データ・会話・記憶・テレメトリは一切送信しない**。取得後は localhost:10101 サイドカーで完結。
 - **声**: クリーンな女性ボイス(つくよみ→自作AIVM)。**Anneli は無断クローン問題で不可**(N-17-5/voice-plan)。
-- **反映**: `docs/design-revision-voice.md` §4.3/§8。承認後 03_design §4.2/§7.1 に「音声エンジン取得の例外」を明記してマージ。
+- **反映**: `docs/archive/design-revision-voice.md` §4.3/§8。承認後 03_design §4.2/§7.1 に「音声エンジン取得の例外」を明記してマージ。
 
 ### N-17-7 🟡 Phase A 着手: C1中核(文分割・ストリーミング応答パーサ)を実装
 - **内容**: `src/conversation/sentence-splitter.ts`(日本語の文単位分割)＋ `src/conversation/stream-parser.ts`(`[[emotion:LABEL]]`＋本文＋任意 `[[os_command:{...}]]` のインクリメンタル解釈)を新規追加。純粋ロジック=単体テスト対象(既存フロー非影響)。sentinel 書式は**暫定**(実モデルでのスパイク後に確定)。
@@ -741,25 +746,15 @@
   - `02_requirements.md`:**§2.14 音声入出力(F-VOICE-01〜11)** を新設。
   - `03_design.md`:**§1.2**(音声ライブラリ=新規npmなし・STT=transformers.js/whisper-large-v3-turbo・VAD=onnxruntime-node直/Silero v4同梱・TTS=AivisSpeechサイドカー・sherpa不採用)、**§2**(scripts/src 各層の音声ファイル・`resources/silero_vad.onnx`・`data/models/whisper-large-v3-turbo/`・`data/config/app-settings.json`・`characters/{id}/voice.json`・新規型)、**§3.4**(`reading?` 追加＋音声化フロー=非ストリーミング)、**§4.2**(音声IPC契約＋`warmCache`)、**§11.1**(実装済みマーク)。
 - **反映上の重要判断(虚偽を書かない)**: **C1 ストリーミング再設計はライブ未配線**。`stream-parser.ts`/`sentence-splitter.ts`/`voice-chat.runVoiceChat` は純粋ロジック＋単体テストとして存在するが、実会話は従来どおり**完成JSONをパース → `speakText` で文単位合成**(非ストリーミング)。正本にはこの実態で記載し、ストリーミングは「将来レバー」と明記。
-- **staging との乖離も明記**: `docs/design-revision-voice.md` は Phase 0 案(sherpa-onnx・renderer VAD 等)を含むが、実装は onnxruntime-node 再利用・main VAD・Silero v4 に確定。正本は実装側を採用し、design-revision-voice は経緯ドキュメントとして残置。
+- **staging との乖離も明記**: `docs/archive/design-revision-voice.md` は Phase 0 案(sherpa-onnx・renderer VAD 等)を含むが、実装は onnxruntime-node 再利用・main VAD・Silero v4 に確定。正本は実装側を採用し、design-revision-voice は経緯ドキュメントとして残置。
 - **未反映(意図的)**: F-ANIM-05 の「0.3 で音声振幅ドリブンに差し替える」は**未実施**(現状は時間ベース近似のまま)。§11.1 に残課題として記録。task_17 Phase D(声/レイテンシの人間判定)も未完。
 - **反映**: 02_requirements §2.14 / 03_design §1.2・§2・§3.4・§4.2・§11.1。
 
 ---
 
-## 🔧 MVP 完成後のブラッシュアップ予定(機能・品質改善)
+## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
 
-MVP の動作自体は妨げないが、完成後に改善する項目(ユーザー方針で記録)。
-
-- **[N-09-9] Router タイムアウト**: 800ms が実 Haiku レイテンシを下回り毎回 fallback。並列化 or タイムアウト調整を検討。
-- **[N-09-10] 記憶抽出の頻度**: 短期20件超過後は毎メッセージ抽出 → 追加 API 呼び出し。一定件数たまった時のみ/バッチ化/バックグラウンド化を検討。
-  - **[2026-06-08 実測ログ報告(task_17 音声テスト中に顕在化)]**: ハンズフリー音声会話で「話し終わり→返答」のレイテンシが**会話が進むほど増加**する事象を確認。dev ログで原因特定:
-    短期記憶が上限(20件)を超えた瞬間(`memory extraction triggered: reason=overflow, entries=21`)から、**毎ターン抽出(中期/長期へまとめる Claude 呼び出し)が `appendShortTerm` の await として応答の前段に挟まる**(`short-term.ts` L34-38 → `handleSendMessage` step1 がブロック)。
-    実測: 満杯前=応答 **約3〜4秒** / 満杯後=**約13〜16秒**(抽出だけで +約9秒・例 05:52:33 transcript→33.452 extraction→42.279 router=抽出に8.8s)。
-    **音声のバグではなく既知の記憶層課題**(テキスト入力でも同様・音声は会話テンポが速く早期に顕在化)。VAD/Whisper(CPU 数秒)は増加要因ではない。
-    **修正案(後回し・ユーザー承認で実施)**: 抽出を**応答クリティカルパスから外す(バックグラウンド化＋直列化ロックで多重実行防止)**。記憶づくりは維持したまま応答は満杯前の体感に戻る。閉じた記憶層変更。
-- **[N-11-1] winCodeSign 回避**: ビルドに手動キャッシュ配置が必要。開発者モード/CI 整備で恒久化。
-- **[N-11-4] パッケージ時のログ保存先**: %APPDATA% ではなく data/logs に出すよう electron-log 設定を見直す。
-- **[N-12-4] 抽出が episodic を作りにくい**: 抽出 LLM は嗜好を semantic へ寄せ、雑談的発話を「長期的に意味のある出来事ではない」と判断して episodic=null にしがち(実機の5質問では semantic のみ更新・episodic 0件)。記憶自体は semantic で機能するが、ユーザーから見ると「中期記憶が残らない」体感になる。抽出プロンプトの基準緩和 or episodic/semantic の振り分け方針を再検討(1抽出=最大1 episodic の制約も含む)。動作上は正常のため MVP 後に調整。
-- **[立ち絵/表示・task_13関連] 全身立ち絵アセット投入と表示サイズ不整合**: 魚川トリミの立ち絵を作成(Fooocus原案→Nano Banana 2で表情差分→rembg/BiRefNet透過→Photopea手仕上げ)し `characters/ene/` に配置。`portrait.png`=通常(neutral)、加えて `portrait-{happy,dere,tsun,sad}.png` と各 `-talk`(口開き)版=**計10枚・各832×1281透過**。旧プレースホルダは `portrait.placeholder.png` に退避。**課題**: (1) `CharacterDisplay` の `.character` は `width:240px; height:320px`・object-fit 未指定(=fill)。全身絵(縦横比≈0.65)を 240×320(0.75)枠へ入れると**横に歪む** → `object-fit: contain` 化＋ウィンドウ/表示寸法の見直しが必要。(2) 別添A.5 の `portrait.png` 推奨 240×320 は**半身プレースホルダ前提**で全身絵には小さすぎ・縦横比も不一致 → 表示寸法の再設計を要す。(3) 表情切替(`emotion`→差分PNG)と口パク(閉/`-talk`)の**読込は未実装**(task_13)。命名規約 `portrait-{emotion}[-talk].png` は task_13 実装時に確定。アセットは配置済み・表示側は task_13(アニメ/表示)で対応。配布サイズ +約5MB(10枚)。
-- (随時追記)
+MVP 完成後に改善する項目(Router タイムアウト・記憶抽出のレイテンシ/頻度・
+ログ保存先・未制作スプライト・キャラ改名 等)は、独立した
+**`docs/optimization-backlog.md`** に集約した(2026-06 ドキュメント整理)。
+本ファイルは実装過程の判断ログ(N-xx)に専念する。

@@ -82,7 +82,7 @@
 >   npm 依存ではなく**外部エンジン**で、自前 HTTP クライアント(`AivisSpeechTtsEngine`)から叩く。
 >   エンジン/声モデルはユーザー領域に配置(同梱しない=コア<100MB維持)。声は寛容ライセンス(つくよみコーパス基盤の自作AIVM)。
 > - 配布サイズ:同梱増分は Silero v4(約1.8MB)のみ。Whisper・AivisSpeech は配布物に含めない。
-> 詳細は `docs/design-revision-voice.md` と `tasks/task_17_voice.md`、実装判断は N-17-8/9/10。
+> 詳細は `docs/archive/design-revision-voice.md` と `tasks/task_17_voice.md`、実装判断は N-17-8/9/10。
 
 #### バージョン指定方針
 
@@ -159,10 +159,21 @@ ene-desktop/
 ├── .prettierrc
 ├── .gitignore
 │
-├── docs/                          ← 設計・要件ドキュメント
-│   ├── 01_vision.md
-│   ├── 02_requirements.md
-│   └── 03_design.md
+├── docs/                          ← 設計・要件ドキュメント(現行の正本)
+│   ├── 00_philosophy.md            ← 思想の北極星(なぜこの形か)
+│   ├── 01_vision.md                ← プロダクトの本質・ロードマップ
+│   ├── 02_requirements.md          ← 機能/非機能要件
+│   ├── 03_design.md                ← 技術設計(本書・SSOT)
+│   ├── A_character_profile_samples.md ← キャラJSONサンプル
+│   ├── character-life-memory-canon-plan.md ← 人生記憶 canon の内容計画
+│   ├── implementation-notes.md     ← 実装判断ログ(N-xx)
+│   ├── optimization-backlog.md     ← 最適化・ブラッシュアップ バックログ
+│   └── archive/                    ← 経緯ドキュメント(現行ではない・README に対応表)
+│       ├── README.md
+│       ├── design-revision-memory-v2.md
+│       ├── design-revision-character-heart.md
+│       ├── design-revision-voice.md
+│       └── character-life-memory-draft.md
 │
 ├── tasks/                         ← 実装タスク
 │   └── task_NN_*.md
@@ -672,12 +683,12 @@ interface CacheEntry {
 
 > 📌 **MVP 0.3 実装済み(task_15・2026-06)**:中期記憶のスキーマ(`EpisodicMemory` v2 = `schemaVersion`/`entities`/`supersededBy`/`extra` 追加・全 optional 後方互換)と
 > 想起方式(**語彙＋entity＋ベクトルの RRF ハイブリッド**・`MemoryRetriever` 抽象・Router 非依存)を本節に反映済み。
-> 元の改訂案は **`docs/design-revision-memory-v2.md`**(マージ元)。想起・更新の処理詳細は `tasks/task_15_*.md`。
+> 元の改訂案は **`docs/archive/design-revision-memory-v2.md`**(マージ元)。想起・更新の処理詳細は `tasks/task_15_*.md`。
 >
 > 📌 **製品1.0 実装済み(task_16・2026-06)**:`EpisodicMemory` への `provenance`(user/self)・`valence`(感情価)・
 > `disclosureLevel`(開示段階)追加、人生記憶 canon(`characters/{id}/life-memory.json`)、心(感情価バイアス想起)・
 > 開示ゲーティング・現在状態レイヤーを本節/§3.1/§5 に反映済み。元の改訂案は
-> **`docs/design-revision-character-heart.md`**(マージ元)。処理詳細は `tasks/task_16_*.md`。
+> **`docs/archive/design-revision-character-heart.md`**(マージ元)。処理詳細は `tasks/task_16_*.md`。
 
 #### 主要型定義
 
@@ -1019,7 +1030,7 @@ export type ConversationResponse = ChatResponse | OsCommandResponse;
 > 自称検知は完成メッセージに対する既存の4層防御(§3.4 末尾)で担保済みのため、音声経路の
 > 文単位ゲートは現状ノーオペで通す。
 > - **`reading` がある場合は `reading` を合成**し、無ければ `message` を合成する(誤読対策)。
-> - **C1 ストリーミング再設計は未実施**:設計改訂(`docs/design-revision-voice.md` §2)で構想した
+> - **C1 ストリーミング再設計は未実施**:設計改訂(`docs/archive/design-revision-voice.md` §2)で構想した
 >   「制御ヘッダ＋本文stream＋コマンドトレーラ」方式のパーサ(`stream-parser.ts`)と文単位ゲート付き
 >   ストリーミング(`voice-chat.runVoiceChat`)は**純粋ロジック＋単体テストとして実装済みだが、
 >   ライブ会話フローには未配線**(将来のレイテンシ最適化レバーとして温存)。現行 `ConversationResponse` の
@@ -2810,7 +2821,7 @@ win:
 > 想定どおり **Conversation Layer は文字列受取のまま**(STT で確定テキスト化してから既存 `sendMessage` 経路へ)。
 > 機能要件は **§2.14 F-VOICE**、型・音声化フローは **§3.4**、IPC 契約は **§4.2(音声ブロック)**、
 > ライブラリ判断は **§1.2 の MVP 0.3 task_17 注記**を参照。詳細設計・実装判断は
-> `docs/design-revision-voice.md` / `docs/implementation-notes.md` N-17-x。
+> `docs/archive/design-revision-voice.md` / `docs/implementation-notes.md` N-17-x。
 > 残:C1 ストリーミング再設計(レイテンシ最適化・パーサは実装済みだが未配線)、振幅ドリブンのリップシンク
 > (現状は時間ベース近似=F-ANIM-05)、声/レイテンシの人間判定(task_17 Phase D)。
 
@@ -2823,7 +2834,7 @@ win:
 
 - **破棄**:入れ替え可能性は製品の売りにしない(固定キャラ・魚川トリミ)。
 - ただしキャラ依存値の JSON 外出し・`characters/{id}/` 構造は**クリーンさ・可逆性のため維持**する。
-- 注力先の振替 → §11.5 心、人生記憶 canon(`docs/design-revision-character-heart.md`)。
+- 注力先の振替 → §11.5 心、人生記憶 canon(`docs/archive/design-revision-character-heart.md`)。
 
 ### 11.4 高度な記憶検索
 
@@ -2835,13 +2846,13 @@ win:
 > **ローカル埋め込み＋派生ベクトル索引(再生成可キャッシュ)**を採用。会話時の想起は
 > `searchEpisodic`(明示フィルタ用に存続)とは別に **`MemoryRetriever` 抽象**(ベクトル＋語彙＋entity を
 > RRF 合流)を新設する。詳細は `tasks/task_15_memory_recall_update.md` と
-> `docs/design-revision-memory-v2.md`。埋め込みモデルは別DL・要承認(§1.2 更新を伴う)。
+> `docs/archive/design-revision-memory-v2.md`。埋め込みモデルは別DL・要承認(§1.2 更新を伴う)。
 
 ### 11.5 感情モデル / 心
 
 - 表情差分:ConversationResponse に `emotion?: string`(離散ラベル)を追加し、CharacterDisplay が表情を切り替える。
 - **心(感情価バイアス想起)**は別物で、**数値の感情状態を持たない**。記憶から心情を導出し想起を色づける。
-  詳細 `docs/design-revision-character-heart.md`・`tasks/task_16_heart.md`。
+  詳細 `docs/archive/design-revision-character-heart.md`・`tasks/task_16_heart.md`。
 
 ### 11.6 忘却機構(ビジョン§3 柱1由来・最重要拡張)
 
@@ -2849,7 +2860,7 @@ win:
 MVPでは実装しないが、**スケール想定の表(§3.3)で示した通り、
 中期記憶が増えるにつれ必須となる将来拡張**である。
 
-> 📌 **MVP 0.3 との関係**:記憶データモデル v2(`docs/design-revision-memory-v2.md`)は、忘却・統合の
+> 📌 **MVP 0.3 との関係**:記憶データモデル v2(`docs/archive/design-revision-memory-v2.md`)は、忘却・統合の
 > 受け皿として `RelationshipMemory`(人物gist)・関係ナラティブ(era)層・`importance` を**器として予約済み**。
 > 本機構＋能動的想起(follow-up)・パターン検出・共同想起は、task_14/15 では実装せず
 > **将来タスク(忘却・follow-up 用)**に送る(※ task_16 は別件=「心」。忘却は task_17 以降)。

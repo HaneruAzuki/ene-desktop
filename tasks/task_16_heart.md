@@ -14,18 +14,18 @@
 - 「最近ハマってるもの」など**“今”の近況**が会話に出る（現在状態レイヤー）
 
 > **重要（方針）**:心は**保存スカラーを持たず、記憶から導出**する。永続スカラー＋日次/週次ジョブ方式は
-> **採らない**（CLAUDE §5.3・部品最小・加害回避）。データの持ち方は `docs/design-revision-character-heart.md` §3 に定義済み。
+> **採らない**（CLAUDE §5.3・部品最小・加害回避）。データの持ち方は `docs/archive/design-revision-character-heart.md` §3 に定義済み。
 > 本タスクは**振る舞い（心情の導出・想起バイアス）**を実装する。
 
 ## 依存タスク
 
 - task_15（想起エンジン:`MemoryRetriever` の RRF 合流）完了済み
 - `EpisodicMemory.valence` 抽出と `provenance`（下記 Phase 0・task_15 と重複可）が実装済みであること
-- データモデル `docs/design-revision-character-heart.md` が承認済み
+- データモデル `docs/archive/design-revision-character-heart.md` が承認済み
 
 ## 関連ドキュメント
 
-- `docs/design-revision-character-heart.md` §3（心）/ §4（開示ゲーティング）/ §5（現在状態レイヤー）/ §6（型・定数）
+- `docs/archive/design-revision-character-heart.md` §3（心）/ §4（開示ゲーティング）/ §5（現在状態レイヤー）/ §6（型・定数）
 - `docs/character-life-memory-canon-plan.md`（人生記憶 canon の内容計画・開示Lv・ガードレールA/B/C）
 - `docs/00_philosophy.md` §4（倫理の一線）/ §6（感情・心の次元）
 - `CLAUDE.md` §5.3（最小状態管理・心の許容条件）/ §6.1（透明性）

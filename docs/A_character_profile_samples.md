@@ -42,6 +42,11 @@
 
 ## A.2 `background.json`(背景設定)
 
+> ⚠️ 下のサンプルは初期プレースホルダ(父=ITエンジニア 等)。**2026-06 方針転換後の正典(canon)では
+> 「父は放置PC・トリミは完全独学・軽い確執」**で、本サンプルと食い違う。実際の
+> `characters/ene/background.json` を canon に合わせる作業は別途の**創作タスク**
+> (`docs/character-life-memory-canon-plan.md` を入力)で行う。
+
 ```json
 {
   "characterId": "ene",
@@ -284,11 +289,12 @@ ENE の知識範囲を5段階で定義する。
 
 ---
 
-## A.5 portrait.png(参考情報)
+## A.5 portrait.png / 立ち絵(参考情報)
 
 - 形式:PNG(透過対応)
-- 推奨サイズ:幅240px × 高さ320px 程度
-- 配置:`/characters/ene/portrait.png`
+- 推奨サイズ:**全身立ち絵 832 × 1281 程度**(縦長・透過)。表示は `object-fit: contain` で枠に合わせる(N-13-2)
+  - 旧「240×320」は半身プレースホルダ前提の値。全身立ち絵では小さすぎ・縦横比も不一致のため改めた
+- 配置:`/characters/ene/portrait.png`(neutral・口閉じ兼フォールバック)。表情×口開閉の差分は A.7 の `animation.json` を参照
 - 注意:キャラ画像はライセンスに留意して用意すること
 
 ---
@@ -297,20 +303,26 @@ ENE の知識範囲を5段階で定義する。
 
 ```
 /characters/ene/
-├── identity.json              ← A.1
-├── background.json            ← A.2
-├── knowledge_domains.json     ← A.3
-├── fewshot.json               ← A.4
-├── portrait.png               ← A.5
-└── animation.json             ← A.6(任意・task_13)
+├── identity.json              ← A.1(人格コア)
+├── background.json            ← A.2(背景設定)
+├── knowledge_domains.json     ← A.3(知識ドメイン)
+├── fewshot.json               ← A.4(応答例)
+├── life-memory.json           ← 人生記憶 canon(provenance:self・読取専用・task_16)
+├── current-state.json         ← 現在状態“今”(任意・事実のみ・task_16)
+├── voice.json                 ← 声設定(emotion→styleId・任意・task_17)
+├── portrait.png               ← A.5(neutral・口閉じ兼フォールバック)
+├── portrait-{happy,dere,tsun,sad}[-talk].png ← 表情×口開閉の立ち絵(task_13)
+└── animation.json             ← A.7(任意・状態→フレーム・task_13)
 ```
 
-これらのファイルは MVP に同梱され、初回起動時に
+これらのファイルは配布物に同梱され、初回起動時に
 `active-character.json` の `characterId: "ene"` を介して読み込まれる。
+（`life-memory.json` の中身計画は `docs/character-life-memory-canon-plan.md`、
+`current-state.json`/`voice.json` の構造は `docs/03_design.md` §2/§3 を参照。）
 
 ---
 
-## A.6 animation.json(任意・task_13 アニメ基盤)
+## A.7 animation.json(任意・task_13 アニメ基盤)
 
 状態(emotion/口開閉/考え中/寝そべり)→ スプライトの対応を定義する。`frames` は
 `characters/{id}/` 直下の立ち絵ファイル名(N-13-1: sprites/ サブdirは作らない)。

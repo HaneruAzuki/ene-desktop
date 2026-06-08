@@ -10,19 +10,19 @@
 - 「田中さんと喧嘩」→ 話題の違う過去の「田中さん」言及も人物で束ねて想起
 - 「実は田中一郎さんだった」「鈴木は友達として好きだった」→ 旧記憶を**非破壊で更新**
 
-> データの**持ち方**は `docs/design-revision-memory-v2.md`（§3.3/§5.2 改訂）に定義済み。
+> データの**持ち方**は `docs/archive/design-revision-memory-v2.md`（§3.3/§5.2 改訂）に定義済み。
 > 本タスクは**振る舞い（想起・更新の処理）**を実装する。コスト最適化（Tier/キャッシュ）は
 > task_14 の別スコープ。忘却・統合（§11.6）と能動的想起（follow-up）は本タスクの範囲外（将来）。
 
 ## 依存タスク
 
 - task_03（Memory Layer）、task_04（Knowledge Router）、task_05（Conversation Layer）完了済み
-- `docs/design-revision-memory-v2.md` のデータモデルが承認済みであること
+- `docs/archive/design-revision-memory-v2.md` のデータモデルが承認済みであること
 
 ## 関連ドキュメント
 
-- `docs/design-revision-memory-v2.md` — データモデル v2（型・ディレクトリ・マイグレーション）
-- `docs/design-revision-character-heart.md` — 方針転換(2026-06): provenance/valence・人生記憶 canon・心(想起バイアス)
+- `docs/archive/design-revision-memory-v2.md` — データモデル v2（型・ディレクトリ・マイグレーション）
+- `docs/archive/design-revision-character-heart.md` — 方針転換(2026-06): provenance/valence・人生記憶 canon・心(想起バイアス)
 - `docs/03_design.md` §3.3（Memory Layer）/ §11.4（高度な記憶検索＝本タスクで前倒し）/ §11.6（忘却・将来）
 - `docs/00_philosophy.md` — 北極星（覚えている／関係の深化）、3設計則
 - `CLAUDE.md` §4.4（疎結合）/ §5.1（固定キャラ＋JSON外出し・記憶抽出は中立）/ §6.1（可搬性）/ §7.1（外部送信制限）
