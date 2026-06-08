@@ -103,6 +103,8 @@ MVP(task_00〜12)完成後の新機能フェーズ。方針・ロードマップ
 | 14 | [task_14_memory_request_optimization.md](task_14_memory_request_optimization.md) | MVP 0.3「記憶リクエスト最適化」: Tier0/1/2 再構成＋プロンプトキャッシュ＋クリック起点ウォーム | task_05, 08 |
 | 15 | [task_15_memory_recall_update.md](task_15_memory_recall_update.md) | MVP 0.3「記憶の会話活用強化」: 想起エンジン(ベクトル＋語彙＋entity ハイブリッド)＋記憶更新(supersede)＋valence/provenance | task_03, 04, 05 |
 | 16 | [task_16_heart.md](task_16_heart.md) | 製品 1.0「関係の深化」: 心(感情価バイアス想起・記憶から心情を導出・人生記憶 canon マージ) | task_15 |
+| 17 | [task_17_voice.md](task_17_voice.md) | MVP 0.3「声と耳」: 双方向ローカル音声(TTS=AivisSpeech / STT=Whisper / VAD=Silero v4・barge-in) | task_13, 14, 15 |
+| 18 | [task_18_backchannel.md](task_18_backchannel.md) | 能動的リスニング: 相槌・思考フィラーエンジン(ローカル・超軽量・二層=リアルタイム判定＋Claude内省) | task_17, 13 |
 
 > - MVP 0.2「存在感」のコード作業は task_13 に集約(アニメ用の別タスク task_14 は作らない)。
 > - task_14 = **MVP 0.3 のコスト最適化**(記憶リクエストの Tier 再構成＋キャッシュ)。

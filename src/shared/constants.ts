@@ -73,6 +73,21 @@ export const VAD_SPEECH_PAD_MS = 200;
 /** barge-in(ENE発話中の割り込み)確定に必要な発話継続(ms)。エコー残響での誤割り込みを抑えるため長め。 */
 export const VAD_BARGE_IN_MIN_SPEECH_MS = 320;
 
+// --- 能動的リスニング(相槌エンジン・task_18 Phase A) ---
+// 既存 VAD の発話確率列(silero-vad / vad-segmenter)に相乗りして、
+// 「持続発話 → 短い言いよどみ(turn-end より手前)」を相槌のスロットとして検出する。
+// 値は「良い聞き手とは」で決める。**Claude が返るまでの時間では決めない**(設計の憲法・task_18)。
+
+/** 最初の相槌を打つまでに必要な持続発話(ms)。短い発話に被せない。 */
+export const BACKCHANNEL_MIN_SPEECH_MS = 1200;
+/** 相槌の最小間隔(ms・頻度ガバナ)。打ちすぎ(うるさい)を防ぐ。 */
+export const BACKCHANNEL_MIN_INTERVAL_MS = 2500;
+/**
+ * 言いよどみ(発話中の短い無音)が相槌スロットとみなされる継続(ms)。
+ * 必ず VAD_MIN_SILENCE_MS(=ターン終了)より小さくする(ターン終了は相槌でなく応答の入り)。
+ */
+export const BACKCHANNEL_PAUSE_TRIGGER_MS = 280;
+
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 
 /** 心情導出の時定数(日)。負は速く減衰=復元力(非対称)。 */
