@@ -1,6 +1,6 @@
 # ENE Desktop Agent
 
-一生付き合える、人格を持ったデスクトップの相棒(コードネーム: **ENE**)。
+一生そばにいてくれる、人格を持ったデスクトップの存在(コードネーム: **ENE**)。
 
 Windows デスクトップに常駐する透過ウィンドウのAIキャラクターアプリ。
 詳細なビジョン・要件・設計は `docs/` を参照。
@@ -35,12 +35,12 @@ npm run package:portable # Windows 向け portable exe を生成(dist/ENE-Deskto
 `npm run package:portable` で `dist/ENE-Desktop-<version>.exe` が生成される。
 インストール不要で、exe をどこに置いても動作する。初回起動時に API キーを設定する。
 
-- ユーザーデータ(記憶・設定・ログ)は **exe と同じディレクトリの `data/`** に生成される(可搬)。
+- ユーザデータ(記憶・設定・ログ)は **exe と同じディレクトリの `data/`** に生成される(可搬)。
 - API キーは暗号化されて **`%APPDATA%/ene-desktop/api-key.enc`** に保存される(マシン固定)。
 
 ## 更新方法(設計書 §11.8)
 
-新バージョン配布時、ユーザーは exe を差し替えるだけでよい。
+新バージョン配布時、ユーザは exe を差し替えるだけでよい。
 
 1. 新しい `ENE-Desktop-<version>.exe` をダウンロード
 2. 既存の exe を新しいものに置き換える(上書き)

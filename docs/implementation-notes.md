@@ -1,7 +1,7 @@
 # 実装ノート(設計書への反映待ちリスト)
 
 > ## ✅ 設計書反映 完了(2026-06-03)
-> 本ファイルの **🟡 要反映** 項目は、ユーザー承認のうえ `docs/03_design.md` に一括反映済み。
+> 本ファイルの **🟡 要反映** 項目は、ユーザ承認のうえ `docs/03_design.md` に一括反映済み。
 > 反映先(主な対応):§1.2(JSX/esbuild・N-00-3)、§1.3/§2(マルチエントリ・main ファイル群・N-09-2/N-07-1)、
 > §3.1(型名 CharacterKnowledgeDomains/CharacterFewshot・rationale 必須・リッチな CharacterContext・N-02-1/3)、
 > §3.2(RouterResult・classifyTopic DI・Prefill 廃止・N-04-1/2/3・N-09-7)、
@@ -25,7 +25,7 @@
 > 不備・矛盾・曖昧さ** を記録する作業用ログ。
 > プロジェクト完了時に、ここを見ながら設計書本体へまとめて反映する。
 >
-> - 即時に設計書本体を書き換えるのは、ユーザー承認が必要な変更(CLAUDE.md §2.5/§14)のうち
+> - 即時に設計書本体を書き換えるのは、ユーザ承認が必要な変更(CLAUDE.md §2.5/§14)のうち
 >   承認済みのものに限る(例: Node 20→24)。それ以外は本ファイルに記録して後でまとめて反映。
 > - 各項目: 「タスク」「該当箇所」「内容」「採用した判断」「設計書へどう反映すべきか」。
 
@@ -44,7 +44,7 @@
 ### N-00-1 🟢 ランタイム Node.js 20 LTS → 24 LTS
 - **該当**: 設計書 §1.2「技術スタック(確定)」開発時のみ / ランタイム
 - **内容**: winget の `OpenJS.NodeJS.LTS` が 2026 時点で Node 24 系のみ提供し、20.x が入手不可。
-- **判断**: ユーザー承認のうえ Node 24 LTS を採用。
+- **判断**: ユーザ承認のうえ Node 24 LTS を採用。
 - **反映**: §1.2 を「24 LTS」に更新済み(理由注記付き)。`@types/node` は Electron 30 同梱 Node(20系)に合わせ `^20` 固定。
 
 ### N-00-2 🟡 設定ファイル名の不一致(`.eslintrc.cjs`/`.prettierrc` vs `.json`)
@@ -63,7 +63,7 @@
 - **該当**: 設計書 §1.2 / CLAUDE §2.2(Electron は「同梱」=dependencies)
 - **内容**: CLAUDE §2.2 と §1.2 は Electron を dependencies に分類。一方 electron-builder の一般的な慣習は electron を devDependencies に置く(dependencies にあると asar 同梱でビルドが肥大/失敗する懸念)。
 - **判断**: 規約どおり dependencies に配置(task_00 時点で dev 起動・typecheck・lint は問題なし)。
-- **反映**: **task_11(ビルド)でパッケージング検証**し、問題があれば「Electron は devDependencies、ただし配布物には含まれる(electron-builder がランタイムを同梱)」と分類定義を整理する案をユーザーに提示。§1.2/§2.2 の「同梱=dependencies」の定義に注記が必要かもしれない。
+- **反映**: **task_11(ビルド)でパッケージング検証**し、問題があれば「Electron は devDependencies、ただし配布物には含まれる(electron-builder がランタイムを同梱)」と分類定義を整理する案をユーザに提示。§1.2/§2.2 の「同梱=dependencies」の定義に注記が必要かもしれない。
 
 ### N-00-5 🟡 task_00 提供の tsconfig.json に `lib` 指定が無い
 - **該当**: task_00 §4 の tsconfig.json
@@ -212,8 +212,8 @@
 ### N-05-3 🔴 **重要**: SDK ^0.30.x に `messages.countTokens` が無い → ローカル見積もりに変更
 - **該当**: 設計書 §3.4「トークン数計測の実装方針」(`client.messages.countTokens` 使用)/ token-counter.ts
 - **内容**: 固定中の `@anthropic-ai/sdk@^0.30.x` には countTokens API が存在しない(後発版で追加)。`countAndCheck(client, request)` がコンパイル不能。
-- **判断**: SDK 更新はバージョン規約(CLAUDE §2.4・^0.30 を超える)上ユーザー承認が要るため、MVP では **ローカルの簡易トークン見積もり**(`CHARS_PER_TOKEN=2.5`)でガードレールを実装。`countAndCheck` のシグネチャを `(prompt: BuiltPrompt) => TokenCheck` に変更。
-- **反映(要判断)**: 次のいずれか。(a) 厳密計測が必要なら `@anthropic-ai/sdk` を countTokens 対応版へ更新(§1.2 を承認のうえ変更)、(b) MVP は見積もりで十分として §3.4 を「ローカル見積もり」に更新。**ユーザー判断が必要**。
+- **判断**: SDK 更新はバージョン規約(CLAUDE §2.4・^0.30 を超える)上ユーザ承認が要るため、MVP では **ローカルの簡易トークン見積もり**(`CHARS_PER_TOKEN=2.5`)でガードレールを実装。`countAndCheck` のシグネチャを `(prompt: BuiltPrompt) => TokenCheck` に変更。
+- **反映(要判断)**: 次のいずれか。(a) 厳密計測が必要なら `@anthropic-ai/sdk` を countTokens 対応版へ更新(§1.2 を承認のうえ変更)、(b) MVP は見積もりで十分として §3.4 を「ローカル見積もり」に更新。**ユーザ判断が必要**。
 
 ### N-05-4 🟡 messages の交互列正規化(`normalizeAlternation`)を追加
 - **該当**: 設計書 §3.4 の messages 構造
@@ -311,7 +311,7 @@
 - **該当**: 設計書 §8.1(window 240×320)/ §8.5(bubble max 400px)
 - **内容**: 240×320 のウィンドウ内に最大 400px の吹き出しは収まらない。吹き出し/入力欄はウィンドウ DOM 内に描画されるため、はみ出すと窓にクリップされる。
 - **判断(MVP)**: 吹き出しは上部・入力欄は下部にオーバーレイ配置し、`max-height: min(400px, calc(100vh - 90px))` でウィンドウ高に収める(キャラに重なる)。
-- **反映(要判断)**: (a) ウィンドウを大きくして吹き出し用スペースを確保(§8.1 変更・承認要)、(b) 吹き出し表示時にウィンドウを動的リサイズ(IPC 追加)、(c) MVP のオーバーレイで許容、のいずれか。**ユーザー判断が必要**。
+- **反映(要判断)**: (a) ウィンドウを大きくして吹き出し用スペースを確保(§8.1 変更・承認要)、(b) 吹き出し表示時にウィンドウを動的リサイズ(IPC 追加)、(c) MVP のオーバーレイで許容、のいずれか。**ユーザ判断が必要**。
 
 ### N-08-3 🟡 move-window の位置保存をデバウンス
 - **該当**: task_07 §7(move-window で毎回 saveWindowPosition)
@@ -335,7 +335,7 @@
 
 ### N-08-7 ⚪ React コンポーネントは単体テストせず dev 起動で検証
 - **該当**: 設計書 §1.2 / §10
-- **内容**: @vitejs/plugin-react / React Testing Library / jsdom を追加していない(§1.2 外・N-00-3)。コンポーネントは `npm run dev` + スクショで代理検証し、純粋ロジック(mouse-gesture)のみ単体テスト。インタラクション系はユーザーの手動確認。
+- **内容**: @vitejs/plugin-react / React Testing Library / jsdom を追加していない(§1.2 外・N-00-3)。コンポーネントは `npm run dev` + スクショで代理検証し、純粋ロジック(mouse-gesture)のみ単体テスト。インタラクション系はユーザの手動確認。
 - **反映**: §10 のテスト戦略に「Renderer は手動 + 純粋ロジックのみ自動」と明記。
 
 ---
@@ -393,14 +393,14 @@
 - **該当**: 設計書 §3.2 / NF-PERF-03(ROUTER_TIMEOUT_MS=800)
 - **内容**: 実機ログで `Router fallback used: domain=medium` が毎回。Haiku の往復が 800ms を超えるため、Router は実質的に常に fallback=medium になる。トピック判定が効かず、ドメイン別 few-shot(例: none/unknown_none)が使われない。
 - **緩和されている点**: キャラの知識境界(高校生が知らない領域=パチンコ等で自然に「知らない」)は **buildSystemPrompt(system)に含まれている**ため、medium 扱いでも ENE は「知らない」と返せる(成功基準4は system 側で担保)。診断でも確認済み。
-- **判断/反映(要検討)**: 次のいずれか。(a) タイムアウトを ~2000ms へ引き上げる(総応答が NF-PERF-02 の 3–5s を超えうる)、(b) Router を memory 構築と並列実行してレイテンシ吸収、(c) 現状の best-effort(fallback)を許容し Router を補助的位置づけのままにする。MVP は (c) で動作。**MVP 完成後にブラッシュアップ**(ユーザー方針)。
+- **判断/反映(要検討)**: 次のいずれか。(a) タイムアウトを ~2000ms へ引き上げる(総応答が NF-PERF-02 の 3–5s を超えうる)、(b) Router を memory 構築と並列実行してレイテンシ吸収、(c) 現状の best-effort(fallback)を許容し Router を補助的位置づけのままにする。MVP は (c) で動作。**MVP 完成後にブラッシュアップ**(ユーザ方針)。
 
 ### N-09-10 🟡 記憶抽出が毎メッセージ発火(短期20件超過後)→ コスト/レイテンシ増
 - **該当**: 設計書 §3.3「短期記憶の保持と抽出トリガ」/ short-term.ts の overflow
 - **内容**: 短期記憶が20件に達すると、以降は**メッセージごとに** overflow 抽出(`extractFromShortTerm('overflow')`)が走る。毎回 1 件だけを抽出するため、メッセージごとに抽出用の追加 Sonnet 呼び出しが発生し、コスト・レイテンシが増える。実機ログで毎メッセージ `memory extraction triggered: reason=overflow, entries=1` を確認。
 - **動作上の問題**: なし(記憶は正しく抽出・記録される)。効率の問題のみ。
 - **改善案(MVP後)**: (a) 未抽出が一定件数(例: 5–10)たまった時のみ抽出、(b) overflow 抽出をデバウンス/バッチ化、(c) 抽出をバックグラウンドキューに載せて会話レイテンシから切り離す。
-- **判断**: MVP は現状で動作。**MVP 完成後にブラッシュアップ**(ユーザー方針)。
+- **判断**: MVP は現状で動作。**MVP 完成後にブラッシュアップ**(ユーザ方針)。
 
 ---
 
@@ -423,7 +423,7 @@
 
 ### N-10-4 ⚪ 誕生日「祝われた」記録を send-message に追加(§3.1 / §5.4)
 - **該当**: task_10 §5 ステップ7
-- **内容**: `birthdayHint === 'today'` かつユーザー入力に祝福語(おめでとう等)が含まれる場合、`recordBirthdayCelebrated(year)` を呼ぶ。
+- **内容**: `birthdayHint === 'today'` かつユーザ入力に祝福語(おめでとう等)が含まれる場合、`recordBirthdayCelebrated(year)` を呼ぶ。
 - **反映**: 設計書 §3.1 の誕生日フローどおりの実装。
 
 ### N-10-5 ⚪ 起動挨拶は 'forgotten' 誕生日にも対応
@@ -434,16 +434,16 @@
 ### N-10-6 ⚪ before-quit で非同期終了処理(preventDefault + isQuitting ガード)
 - **該当**: task_10 §6/§7 / 設計書 §7.2
 - **内容**: `app.on('before-quit')` で preventDefault → runShutdownSequence(記憶抽出 + 短期記憶クリア)→ `app.quit()`。再入防止の isQuitting フラグ。runtime.apiKey がある時のみ実行。
-- **検証メモ**: 起動シーケンス(書込検証・APIキー・キャラ・記憶ディレクトリ・誕生日・ウィンドウ・挨拶)は実機で app starting→active character→app ready とエラー無しを確認。**graceful 終了時の抽出・短期記憶削除、初回起動挨拶(active-character.json 削除時)、誕生日反応、クラウド警告**はユーザーの手動確認に委ねる(実操作が必要)。
+- **検証メモ**: 起動シーケンス(書込検証・APIキー・キャラ・記憶ディレクトリ・誕生日・ウィンドウ・挨拶)は実機で app starting→active character→app ready とエラー無しを確認。**graceful 終了時の抽出・短期記憶削除、初回起動挨拶(active-character.json 削除時)、誕生日反応、クラウド警告**はユーザの手動確認に委ねる(実操作が必要)。
 
 ---
 
 ## task_11(ビルド・配布)
 
-### N-00-4 🟢 解決: Electron を devDependencies へ移動(ユーザー承認済み)
+### N-00-4 🟢 解決: Electron を devDependencies へ移動(ユーザ承認済み)
 - **該当**: CLAUDE §2.2 / 設計書 §1.2(Electron を「同梱=dependencies」に分類)
 - **内容**: `npm run package:portable` で `⨯ Package "electron" is only allowed in "devDependencies"` でビルド拒否(electron-builder の要件)。
-- **判断/反映**: ユーザー承認のうえ electron を devDependencies へ移動。CLAUDE §2.2 と設計書 §1.2 に「Electron は例外的に devDependencies、ただしランタイムは exe に同梱される」と注記済み。package-lock.json も更新。
+- **判断/反映**: ユーザ承認のうえ electron を devDependencies へ移動。CLAUDE §2.2 と設計書 §1.2 に「Electron は例外的に devDependencies、ただしランタイムは exe に同梱される」と注記済み。package-lock.json も更新。
 
 ### N-11-1 🟡 winCodeSign の展開がシンボリックリンク権限不足で失敗(回避策あり)
 - **該当**: electron-builder のパッケージング(Windows・非管理者/開発者モード無効)
@@ -480,14 +480,14 @@
   - `os-command-execution`: `executeOsCommand` のホワイトリスト(notepad/http限定/パストラバーサル拒否)。シェルはモック。
   - `api-security`: safeStorage モックで「保存物に平文 sk-ant- が出ない」往復・保存先が data/ 外。
   - `performance`: `dist/*.exe` のサイズ <100MB(未ビルド環境は `it.skipIf` で skip)。
-- **LLM応答の質・AIっぽさ(成功基準8)・UI体感**は `tests/acceptance/manual-check.md` の手動プロトコル(5質問×5項目=25)に分離。**自己合格させず、ユーザーが実機判定**(メモリ [[manual-check-division]])。
+- **LLM応答の質・AIっぽさ(成功基準8)・UI体感**は `tests/acceptance/manual-check.md` の手動プロトコル(5質問×5項目=25)に分離。**自己合格させず、ユーザが実機判定**(メモリ [[manual-check-division]])。
 - **反映(要検討)**: 設計書/タスクの受入テスト節に「人間判定項目は自動化しない」旨を明記。実 E2E(Playwright 等)は MVP スコープ外。
 
 ### N-12-3 🟡 代理起動した exe のディスク書き込みは Claude コンテナに仮想化される(受入手順に影響)
 - **該当**: task_12 手動確認(基準6 の api-key.enc 位置・基準1 の位置復元・基準5 の data/ 永続化)
-- **内容**: 開発支援ツール(PowerShell/Start-Process)が Claude のパッケージ化(MSIX 風)コンテナ内で動作し、`%APPDATA%` への書き込みが `…\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\…` に仮想化される。代理起動した ENE のデータもそこへ入り、ユーザーの実 `%APPDATA%\ene-desktop` には現れない(実 Explorer で「場所が利用できません」)。
-- **影響**: **会話品質(成功基準8)は代理起動インスタンスでも有効**(GUI 表示・Claude API は正常)。一方、**ディスク所在の手動確認(基準1/5/6 の保存先)はユーザー自身による exe ダブルクリック起動で行う必要がある**。
-- **判断**: ENE 製品側の不具合ではなく、検証環境固有の制約。受入手順に「ディスク確認系はユーザー実機起動で実施」と明記する。api-key.enc の暗号化内容(平文 sk-ant- を含まない / v10 DPAPI マーカー)は代理でも機械確認済み=基準6 暗号化は合格。
+- **内容**: 開発支援ツール(PowerShell/Start-Process)が Claude のパッケージ化(MSIX 風)コンテナ内で動作し、`%APPDATA%` への書き込みが `…\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\…` に仮想化される。代理起動した ENE のデータもそこへ入り、ユーザの実 `%APPDATA%\ene-desktop` には現れない(実 Explorer で「場所が利用できません」)。
+- **影響**: **会話品質(成功基準8)は代理起動インスタンスでも有効**(GUI 表示・Claude API は正常)。一方、**ディスク所在の手動確認(基準1/5/6 の保存先)はユーザ自身による exe ダブルクリック起動で行う必要がある**。
+- **判断**: ENE 製品側の不具合ではなく、検証環境固有の制約。受入手順に「ディスク確認系はユーザ実機起動で実施」と明記する。api-key.enc の暗号化内容(平文 sk-ant- を含まない / v10 DPAPI マーカー)は代理でも機械確認済み=基準6 暗号化は合格。
 
 ### N-12-2 🟢 vitest は専用 config を持たずデフォルト include で acceptance も収集
 - **該当**: task_12 受入条件「`npm run test` で受入テストが含まれて実行される」
@@ -618,7 +618,7 @@
 
 ## 方針転換(2026-06): 固定キャラ・人生記憶・心
 
-> ユーザー承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は
+> ユーザ承認済みの**方針転換**。原則は上位文書へ反映済み、設計詳細は
 > `docs/archive/design-revision-character-heart.md`(マージ元)。
 > **task_16 で実装完了(2026-06-07)**:N-16-1〜7 のデータ＋処理を実装し 03_design §2/§3.1/§3.3/§5 へ反映済み。
 > 実装固有の追加判断は N-16-8〜11 を参照。実機検証:valence 抽出(負イベント→-2)・関係事実記録・心/canon/キャッシュ共存を確認。
@@ -639,7 +639,7 @@
 
 ### N-16-3 🟢 人生記憶 canon は characters/{id}/life-memory.json(キャラ資産・配布物)
 - **該当**: 03_design §2(characters/ ツリー)/ §5、別添A
-- **内容**: キャラ自身の人生エピソードを canon として同梱。data/(ユーザー領域)へはコピーしない=不変・忘却外。
+- **内容**: キャラ自身の人生エピソードを canon として同梱。data/(ユーザ領域)へはコピーしない=不変・忘却外。
   想起時に user episodic と統合プールにマージ。
 - **反映**: §2 の `characters/{id}/` ツリーに `life-memory.json` を追記。別添A にサンプル追加(執筆時)。
 
@@ -648,7 +648,7 @@
 - **内容**: 「-100〜+100 を保存し日次±1/週次回帰」案は**不採用**。心情は直近 episodic の `valence` を
   recency 重み付き平均で**導出**(状態を貯めない)。減衰=直近重み。非対称(τ_neg<τ_pos)＋ `MOOD_FLOOR` で
   暗転ロック回避。想起バイアスは RRF に `λ·clampedMood·valence` 加算＋softmax。相手別は entity 限定の同式。
-- **判断根拠**: §5.3 整合・部品最小(スカラー案より少ない)・脆弱ユーザーへの加害回避(倫理の一線)。
+- **判断根拠**: §5.3 整合・部品最小(スカラー案より少ない)・脆弱ユーザへの加害回避(倫理の一線)。
 - **反映**: 処理は task_16、データは design-revision-character-heart。03_design §3.3 へマージ。
 
 ### N-16-5 🟢 開示ゲーティング(関係に応じた記憶の開示)
@@ -659,7 +659,7 @@
 
 ### N-16-6 🟢 現在状態レイヤー(更新可能な"今")
 - **該当**: CLAUDE §5.3/§6.1/§6.4、design-revision-character-heart §5、task_16(Phase 5)
-- **内容**: 記憶を3層化。①固定canon(過去)=`life-memory.json`(不変) ②**現在の私(今)**=`current-state.json`(マイブーム/最近の家族の状況/追加趣味/現況・**事実のみ**) ③ユーザー episodic。趣味=核(固定)＋現在(可変)で「追加できる」を満たす。
+- **内容**: 記憶を3層化。①固定canon(過去)=`life-memory.json`(不変) ②**現在の私(今)**=`current-state.json`(マイブーム/最近の家族の状況/追加趣味/現況・**事実のみ**) ③ユーザ episodic。趣味=核(固定)＋現在(可変)で「追加できる」を満たす。
 - **判断根拠**: 「永遠だが今を生きる」を支える。MVP は**開発者更新でキャラ資産配布**(自律ドリフトなし)。自己更新は post-MVP・per-user で `data/`(所有権 §6.4)。
 - **反映**: design-revision-character-heart §5。03_design §2(characters/ ツリー)/§5 へマージ。
 
@@ -676,7 +676,7 @@
 - **反映**: §3.3(mood.ts)。design-revision-character-heart §3.2 の式に prior を補う改訂。
 
 ### N-16-9 🟢 familiarityStage=接触の事実3要素・連言・Lv5≈1年
-- **内容**: 経過日数 AND 会話実日数 AND ターン累計の**全部**が閾値を満たす最大段(`FAMILIARITY_THRESHOLDS`)。事実は `active-character.json` の `relationship`(firstMetAt/lastConversationDate/distinctConversationDays/totalTurns)に記録(誕生日履歴と同列の“事実”)。ユーザー決定:**Lv5≈1年**(365日/80会話日/800ターン)。`recordConversationTurn()` を user ターンで呼ぶ。
+- **内容**: 経過日数 AND 会話実日数 AND ターン累計の**全部**が閾値を満たす最大段(`FAMILIARITY_THRESHOLDS`)。事実は `active-character.json` の `relationship`(firstMetAt/lastConversationDate/distinctConversationDays/totalTurns)に記録(誕生日履歴と同列の“事実”)。ユーザ決定:**Lv5≈1年**(365日/80会話日/800ターン)。`recordConversationTurn()` を user ターンで呼ぶ。
 - **反映**: §3.1/§5.4(ActiveCharacter に relationship)。§3.3(familiarity.ts)。
 
 ### N-16-10 🟢 canon は recall-pool で統合(索引含む)・mood/安全網は user のみ
@@ -688,9 +688,9 @@
 - **反映**: §3.3(retriever.ts)。既存 retriever テスト群は回帰なし(251緑)。
 
 ### N-17-1 🟡 音声方針の確定(2026-06-07 設計セッション・task_17)
-- **内容**: 4決定 = ①ルート=ローカルファースト(脳=Claudeストリーミング・STT/VAD/Turnはローカル・§4.2維持) ②役割=双方向の音声会話 ③TTS=`TtsEngine`差し替え可能＋完全ローカル開始(§4.4) ④声=同梱・戦略A「寛容ライセンス声を採用＋味付け」(Kokoro/MeloTTS等をin-process・pitch/speedをJSON外出し)。旧「ユーザー各自VOICEVOXインストール」は任意オプションへ降格。
+- **内容**: 4決定 = ①ルート=ローカルファースト(脳=Claudeストリーミング・STT/VAD/Turnはローカル・§4.2維持) ②役割=双方向の音声会話 ③TTS=`TtsEngine`差し替え可能＋完全ローカル開始(§4.4) ④声=同梱・戦略A「寛容ライセンス声を採用＋味付け」(Kokoro/MeloTTS等をin-process・pitch/speedをJSON外出し)。旧「ユーザ各自VOICEVOXインストール」は任意オプションへ降格。
 - **判断根拠**: ローカルファーストは**プライバシー(§4.2 外部送信はClaudeのみ)**が要請。クラウドS2Sに頼らずとも、ローカルのターンテイキング(Smart Turn v3.2)＋ストリーミングで実用レイテンシは達成できる。同梱要望に対し寛容ライセンス声で無料配布を両立。
-- **⚠️ 2026-06 是正**: 当時の「速さは追わない/リアルタイム性は抑える対象」という根拠は**誤り**(哲学 §4 設計則④で是正)。決定(双方向ローカル音声)は維持しつつ、**速さは常に最大化**する。
+- **⚠️ 2026-06 是正**: 当時の「速さは追わない/リアルタイム性は抑える対象」という根拠は**誤り**(哲学 §1.4 軸②で是正)。決定(双方向ローカル音声)は維持しつつ、**速さは常に最大化**する。
 - **反映**: `tasks/task_17_voice.md`。memory `voice-plan-decisions-2026`。
 
 ### N-17-2 🟡 STT=VAD区切りWhisper(ストリーミングSTT不要)・SenseVoice回避
@@ -710,7 +710,7 @@
 - **反映**: task_17 ライセンス制約。
 
 ### N-17-6 🟢 §4.2例外を承認(AivisSpeechエンジン/モデルの初回DL)
-- **内容**: ユーザー明示承認(2026-06-07)。音声機能で **AivisSpeech エンジン＋音声モデル(AIVM)を初回起動時にネット取得**することを許可。**§4.2/§7.1/§12「Claude以外への外部通信」への限定的例外**。届け方=管理サイドカー(手動インストール不要で"同梱体験"・コア<100MB維持)。
+- **内容**: ユーザ明示承認(2026-06-07)。音声機能で **AivisSpeech エンジン＋音声モデル(AIVM)を初回起動時にネット取得**することを許可。**§4.2/§7.1/§12「Claude以外への外部通信」への限定的例外**。届け方=管理サイドカー(手動インストール不要で"同梱体験"・コア<100MB維持)。
 - **スコープ厳守**: 取得対象は**エンジン/モデル本体のみ**。**音声データ・会話・記憶・テレメトリは一切送信しない**。取得後は localhost:10101 サイドカーで完結。
 - **声**: クリーンな女性ボイス(つくよみ→自作AIVM)。**Anneli は無断クローン問題で不可**(N-17-5/voice-plan)。
 - **反映**: `docs/archive/design-revision-voice.md` §4.3/§8。承認後 03_design §4.2/§7.1 に「音声エンジン取得の例外」を明記してマージ。
@@ -721,11 +721,11 @@
 
 ### N-17-8 🟢 Phase B(STT・マイク入力)実装＋実機検証(2026-06-08)
 - **構成判断(重要)**: STT は **main プロセス + onnxruntime-node + ローカル事前配置モデル**で実装。`src/memory/embedder.ts` と**完全同型**(`env.allowRemoteModels=false`／`env.localModelPath=getModelsDir()`／別DLスクリプトで `data/models/` へ配置)。当初検討した「renderer + transformers.js + WebGPU」は **renderer の CSP/WASM/onnxruntime-web 統合リスク**が大きく、§7.1 の「実行時に外部からモデルを取らない」確立パターンとも乖離するため**不採用**。renderer は **getUserMedia によるマイク取得のみ**(CSP 変更ゼロ)。
-- **モデル**: `onnx-community/whisper-large-v3-turbo`(encoder=fp32／decoder=q8`_quantized`)。**精度最優先**の選択(ユーザー要求「とにかく正確に」)。turbo はデコーダ4層で large-v3 比 約8倍速。`scripts/download-stt-model.mjs`(`npm run download:stt-model`)が HF API でファイル一覧を引き、configs＋encoder＋decoder＋**external-data(`*.onnx_data`)** を取得。**落とし穴**: 大きい ONNX は重みを `encoder_model.onnx_data` に分離(ONNX external data 形式)。連れファイル未取得だとロード時に `*.onnx_data not found` で落ちる → スクリプトで `<onnx>_data` を必ず同伴取得。
+- **モデル**: `onnx-community/whisper-large-v3-turbo`(encoder=fp32／decoder=q8`_quantized`)。**精度最優先**の選択(ユーザ要求「とにかく正確に」)。turbo はデコーダ4層で large-v3 比 約8倍速。`scripts/download-stt-model.mjs`(`npm run download:stt-model`)が HF API でファイル一覧を引き、configs＋encoder＋decoder＋**external-data(`*.onnx_data`)** を取得。**落とし穴**: 大きい ONNX は重みを `encoder_model.onnx_data` に分離(ONNX external data 形式)。連れファイル未取得だとロード時に `*.onnx_data not found` で落ちる → スクリプトで `<onnx>_data` を必ず同伴取得。
 - **実機検証(`npm run stt:smoke`)**: torimi 自身の TTS 音声(voice-smoke-out)を書き起こし。**ロード3.0s／~3s音声を~3sで認識(CPUで等倍)／日本語精度=非常に良好**(2文は完全一致、固有名詞「魚川トリミ」のみ音写)。**CPU で実用域=GPU は任意**を実証(main+CPU 判断が妥当)。WebGPU は将来の速度最適化レバーとして温存。
 - **マイク権限**: `window.ts` で当該 session に `setPermissionRequestHandler`/`setPermissionCheckHandler` を設定し **`media` のみ許可**(他権限は拒否=最小権限)。録音音声は外部送信せずローカル STT にのみ使用(§4.2/§7.1)。
 - **UX**: 入力欄に 🎤 **push-to-talk**(押下中だけ録音→離すと認識→既存 `sendMessage` へ流す=テキスト入力と同経路)。`src/renderer/mic-capture.ts` は `AudioContext({sampleRate:16000})` で 16kHz mono Float32 を直接取得(手動リサンプル不要)、gain=0 ノードでハウリング回避、ScriptProcessorNode 採用(AudioWorklet 用の別バンドルを避ける)。IPC `ene:transcribe-audio` は §6.2 厳守で**本文を出さず文字数のみログ**。
-- **残(手動・人間判定)**: 実際にマイクへ発話しての end-to-end(getUserMedia→IPC→認識→送信→TTS往復)はハードウェア依存=ユーザー手動確認。固有名詞精度は Whisper 一般の限界(将来 initial_prompt/語彙バイアスで改善余地)。
+- **残(手動・人間判定)**: 実際にマイクへ発話しての end-to-end(getUserMedia→IPC→認識→送信→TTS往復)はハードウェア依存=ユーザ手動確認。固有名詞精度は Whisper 一般の限界(将来 initial_prompt/語彙バイアスで改善余地)。
 - **反映**: design-revision-voice §3(STT)。
 
 ### N-17-9 🔴 落とし穴: Silero VAD v5 は onnxruntime-node で壊れる → **v4 を採用**(2026-06-08)
@@ -736,11 +736,11 @@
 - **教訓**: ローカル ONNX は「ロードできる/エラーが出ない」≠「正しく計算される」。**実データのスモークで数値を必ず確認**(STT/VAD とも実音声で検証して初めて分かった)。
 - **反映**: design-revision-voice §4(VAD)。`scripts/download-vad-model.mjs` は v4.0 を取得。
 
-### N-17-10 🟢 マイクUI統合＋入力方式の設定化(2026-06-08・ユーザー要望)
+### N-17-10 🟢 マイクUI統合＋入力方式の設定化(2026-06-08・ユーザ要望)
 - **統合**: 旧「入力欄内の🎤(PTT)＋右下🎧(ハンズフリー)」の2ボタンを廃止し、**入力欄の下・中央の単一マイクボタン(大きめ48px)** に統合。ON(リッスン中=ハンズフリー起動中 or PTT 押下中)で緑に点灯・OFF は白。**状態テキスト(聞いてるよ/考え中)は廃止**=ボタンの ON/OFF だけで「聞いている/いない」を示す。聞き取り中はキャラ neutral、考え中は従来どおり吹き出し「…」(transcribing 状態 ＋ respond の thinking で表示)。
 - **設定**: 右クリックメニューに「マイク入力方式」サブメニュー(radio: Push-to-Talk / ハンズフリー)。`data/config/app-settings.json`(平文JSON・新規・§6.1)に永続化。main 起動時に読み込み runtime へ。変更は menu→main 保存＋`ene:voice-input-mode-changed` で renderer へ通知。IPC `ene:get-voice-input-mode`。
 - **新規/変更**: `shared/types/settings.ts`(VoiceInputMode/AppSettings)・`storage/app-settings.ts`・`getAppSettingsPath`(paths)。`character-context-menu.ts` にサブメニュー。`InputArea` はテキストのみへ戻し、PTT 録音ロジックは `App` の統合ボタンへ集約(PTT=push-to-talk hold、ハンズフリー=click トグル)。方式切替時は旧方式を停止。
-- **設計書差分**: `data/config/app-settings.json` は §2 ディレクトリ表に未記載の新規設定ファイル(config 配下・ユーザー設定の自然な追加)。→ **N-17-11 で §2 へ反映済み**。
+- **設計書差分**: `data/config/app-settings.json` は §2 ディレクトリ表に未記載の新規設定ファイル(config 配下・ユーザ設定の自然な追加)。→ **N-17-11 で §2 へ反映済み**。
 
 ### N-17-11 🟢 task_17 を正本へ反映(2026-06-08・ドキュメント整合)
 - **内容**: Phase A〜C で確定した実装実態を SSOT へ反映。
@@ -752,11 +752,11 @@
 - **反映**: 02_requirements §2.14 / 03_design §1.2・§2・§3.4・§4.2・§11.1。
 
 ### N-18-1 🟡 task_18 起こし＋相槌エンジン Phase A(純粋ロジック)実装(2026-06-08)
-- **背景**: ユーザーとの設計セッションで「能動的リスニング(相槌・思考フィラー)」を独立タスク task_18 として切り出し。**設計の憲法=三原則**(①性格を言い訳に遅さを正当化しない ②遅延の利用は速すぎる応答を一定の"間"まで遅らせるだけ ③相槌・フィラーは正当な機能でその時間は"棚からぼたもち")＋判別テスト「一瞬でも要るか?」を確定(`optimization-backlog.md` 冒頭・task_18)。
-- **重要な開発制約**: 開発者は一人で**調教(学習データ作成・反復チューニング)ができない** → **Claude が本PC・本CPUで開発**。学習を要する設計を避け**ルールベース第一**、モデルを使うなら**Claude生成の合成データから本CPUで訓練**。ユーザー関与は**最終試聴判定のみ**(成功基準8=人間判定・§9.3)。
+- **背景**: ユーザとの設計セッションで「能動的リスニング(相槌・思考フィラー)」を独立タスク task_18 として切り出し。**設計の憲法=三原則**(①性格を言い訳に遅さを正当化しない ②遅延の利用は速すぎる応答を一定の"間"まで遅らせるだけ ③相槌・フィラーは正当な機能でその時間は"棚からぼたもち")＋判別テスト「一瞬でも要るか?」を確定(`optimization-backlog.md` 冒頭・task_18)。
+- **重要な開発制約**: 開発者は一人で**調教(学習データ作成・反復チューニング)ができない** → **Claude が本PC・本CPUで開発**。学習を要する設計を避け**ルールベース第一**、モデルを使うなら**Claude生成の合成データから本CPUで訓練**。ユーザ関与は**最終試聴判定のみ**(成功基準8=人間判定・§9.3)。
 - **アーキ(二層)**: リアルタイム層=完全ローカル(脳/ネット非依存・既存VAD確率列に相乗り) / 内省層=Claudeが設計・合成データ生成・評価(本番に居ない)。相槌=聞くターン、思考フィラー「うーん」=答える入り(熟考時のみ・F-ANIM-04の音声ツイン・Phase C・判別は B-15 と共有)。
 - **Phase A 実装(本CPUで完結検証)**: `backchannel-engine.ts`(`VadSegmenter` 同型の純粋状態機械=「持続発話→turn-end手前の短い言いよどみ」を検出・頻度ガバナ・1スロット1回)/ `backchannel-pool.ts`(`selectBackchannel`=型→語・反復回避・RNG注入)/ `shared/types/backchannel.ts` / `constants.ts`(`BACKCHANNEL_*`)/ `characters/ene/backchannels.json`(語彙外出し §4.5)。**typecheck/lint/全349テスト緑(新規17)。ハードウェア・調教不要。**
-- **残(Phase B 以降・実機/人間判定)**: main 配線(`VadRuntime` 相乗り→`ene:backchannel` イベント)＋renderer 再生(事前合成WAV/即時合成)＋非言語アニメ(うなずき)＋韻律(RMS)による型選択 → Phase C 思考フィラー → Phase D 評価ループ＋ユーザー試聴。
+- **残(Phase B 以降・実機/人間判定)**: main 配線(`VadRuntime` 相乗り→`ene:backchannel` イベント)＋renderer 再生(事前合成WAV/即時合成)＋非言語アニメ(うなずき)＋韻律(RMS)による型選択 → Phase C 思考フィラー → Phase D 評価ループ＋ユーザ試聴。
 - **レイテンシ施策**: 同セッションで `optimization-backlog.md` に三原則＋B-13(忘却=記憶容量ガバナ §11.6)・B-14(想起パスのローカル高速化)・B-15(ローカル判別器＋二段Claude)・B-16(ノブ)を追記、B-06(ストリーミング)を TTS辞書→`reading`廃止案で補強。
 - **反映予定(task_18 完了時)**: 02_requirements F-LISTEN-xx / 03_design §2・§11。
 
@@ -768,11 +768,11 @@
 - **スコープ**: 型は **continuer 固定**(語の反復回避で変化はつく)。**韻律(RMS)による型選択(understanding/surprise)は次**。思考フィラー「うーん」は Phase C(B-15 の深い/浅い判別と連動)。
 - **検証**: typecheck/lint/**全358テスト緑**(新規9=loader6/controller3。engine9・pool8 は Phase A)/build 緑。**ハードウェア・調教不要で静的検証完結**。
 - **⚠️ 要実機検証(N-17-9 と同根)**: 相槌はユーザ発話中に鳴る→マイク回り込みで(a)録音(Whisper入力)汚染 (b)VAD 誤発火 のリスク。`echoCancellation` 前提。**問題が出たら nod-only(audio 無効)へ縮退可能**(タイミング/うなずきはそのまま)。
-- **残(実機/人間判定=ユーザー)**: タイミングの自然さ・「聞いてもらえている」感・打ちすぎ/早すぎ・エコーの実害。次の実装=韻律型選択 → Phase C 思考フィラー → Phase D 評価ループ。
+- **残(実機/人間判定=ユーザ)**: タイミングの自然さ・「聞いてもらえている」感・打ちすぎ/早すぎ・エコーの実害。次の実装=韻律型選択 → Phase C 思考フィラー → Phase D 評価ループ。
 
-### N-17-12 🟢 音声エンジンのライフサイクル化(起動時 auto-spawn・終了時 kill)(2026-06-09・ユーザー要望)
+### N-17-12 🟢 音声エンジンのライフサイクル化(起動時 auto-spawn・終了時 kill)(2026-06-09・ユーザ要望)
 - **背景(不具合)**: exe を起動しても AivisSpeech が立ち上がらず声が出ない。原因は**エンジンを起動するコードが存在しない**こと。`voice-runtime.ts` は `http://127.0.0.1:10101` へ**接続を試みるだけ**で、`voice-provisioner.ts` の `ProvisionEnv`(`startEngine`/`waitHealthy` を定義)を実装する**副作用アダプタが未実装・未配線**だった(メモリの積み残し「プロビジョナ副作用アダプタ」)。
-- **配布方針(ユーザー合意)**: エンジンは 818MB(+BERT 623MB+声モデル 238MB ≒ 初回 1.7GB)で **100MB上限(§4.3)に同梱不可**。過去の承認 N-17-6 どおり **方針A=初回サイレント自動DL**(exe<100MB維持・「DLしますか?」と聞かない)を採用。**BERT と既定モデルはエンジン自身が初回起動時に HF から自動取得**するため、アプリは「起動して待つ」だけでよい(取得を肩代わりしない)。エンジン配置先=**`data/voice/engine/`**(ポータブル)。
+- **配布方針(ユーザ合意)**: エンジンは 818MB(+BERT 623MB+声モデル 238MB ≒ 初回 1.7GB)で **100MB上限(§4.3)に同梱不可**。過去の承認 N-17-6 どおり **方針A=初回サイレント自動DL**(exe<100MB維持・「DLしますか?」と聞かない)を採用。**BERT と既定モデルはエンジン自身が初回起動時に HF から自動取得**するため、アプリは「起動して待つ」だけでよい(取得を肩代わりしない)。エンジン配置先=**`data/voice/engine/`**(ポータブル)。
 - **サイズ実態の調査**: 818MB の大半は日本語読み辞書(sudachi 208MB+追加辞書 196MB+openjtalk 99MB≒500MB=誤読対策の本体)。**安全に削れるのは GPU 用 `DirectML.dll`(18MB)のみ**(CPU限定方針 N-17-4)。BERT は既に fp16、torimi.aivmx は単一 neutral=いずれも最小構成。"lite" エンジンは存在しない。
 - **Phase 1 実装(本変更・この PC で実機検証可)**: `src/main/voice-engine.ts`(= 欠けていた副作用アダプタ)。**純粋ロジックと副作用を分離**(既存 DI 流儀): `decideEngineAction(reachable,present)`=skip/spawn/absent、`waitHealthy(probe,opts)`=probe 注入のポーリング(単体テスト対象)。`ensureVoiceEngine()`=`/version` 到達なら再利用(spawn しない=ポート衝突回避・**外部起動を kill しない** `ownsEngine` フラグ)/未配置なら `absent`(テキストのみ続行)/未到達&有りなら `spawn(run.exe, ['--host','127.0.0.1','--port','10101'], {cwd:engineDir, shell:false, windowsHide:true, stdio:'ignore'})`→`waitHealthy`。`stopVoiceEngine()`=`child.kill()`→猶予後 `taskkill /PID /T /F`(ツリー停止・冪等)。
 - **配線**: `lifecycle.ts` で **Step 4.5 に `void ensureVoiceEngine()`(背景起動・await しない)**。ヘルス到達に実測 ~8s かかるため await するとウィンドウ表示後の `initialGreeting` 設定が遅れ、renderer の一度きり pull(`getInitialGreeting`)が null を掴んで**挨拶が消える**。背景起動なら挨拶も即・エンジンは初回メッセージまでに温まる。`initVoice` は従来どおり(未到達なら bundled voice.json で有効化。**bundled styleId 1736267264 は実エンジン値と一致**するため reconcile を待つ必要なし)。終了は `shutdown.ts` 冒頭で `stopVoiceEngine()`、保険で `index.ts` の `app.on('will-quit')` でも呼ぶ(apiKey 未設定で before-quit 非同期分岐に入らない経路の孤児防止)。
@@ -780,6 +780,37 @@
 - **新規 npm 無し**。spawn は固定パス+引数配列+shell:false(§7.2 準拠・N-17-6 承認例外)。`scripts/setup-voice-engine.mjs`(`npm run setup:voice-engine`)=scratch→`data/voice/engine/` コピー(DirectML.dll 除外・冪等)。**開発/ローカル配置ツール**で配布物に含めない。
 - **残(Phase 2・配布用・別途)**: 初回サイレント自動DL を `ensureVoiceEngine` の `absent` 分岐で `provisionVoice(env)` 実装。`downloadEngine`=自前ホストの **engine.zip → Windows 標準 `Expand-Archive`/`tar.exe` で展開**(公式は分割 .7z で Node 展開不可のため zip 再ホスト前提)、`downloadModel`=torimi.aivmx を `%APPDATA%\AivisSpeech-Engine\Models\` へ、初回 UI=トリミ口調の進捗(許可プロンプトなし)。**未確定=① engine.zip / torimi.aivmx のホスティング先 URL ② zip 展開を OS 標準ツールで行う最終確認**。
 - **反映**: 03_design §2(`data/voice/engine/` 追記)・§7.2(音声 spawn の承認済み例外を明記)。02_requirements は F-VOICE で TTS 差し替え可と既述のため変更なし。
+
+---
+
+## レイテンシー最適化 Tier 0(optimization-backlog B-01/B-02/B-14a/B-03b・2026-06-09)
+
+> ユーザ承認のうえ着手(推奨順 Tier 0)。設計の憲法(レイテンシと"間"の三原則・原則1「計算は常に最小化」)に沿う**純粋な無駄取り**。品質劣化ゼロ・閉じた記憶層/オーケストレーション変更。typecheck/lint/**全385テスト緑**(新規 extraction-scheduler 4・short-term 刷新)。
+
+### N-LAT-1 🟡 記憶抽出を応答クリティカルパスから外す(B-01/B-02・N-09-10 解消)
+- **該当**: `short-term.ts` / `extraction-trigger.ts` / 新規 `extraction-scheduler.ts` / `ipc.ts` / `shutdown.ts` / 設計書 §3.3「短期記憶の保持と抽出トリガ」
+- **変更**:
+  - `appendShortTerm(entry, onOverflow?)` → `appendShortTerm(entry)`。`ShortTermOverflowHandler` 型を廃止し、overflow 時の**同期抽出をやめた**。
+  - トリム方針を「古い順に**抽出済み(extracted=true)のみ**落とす」へ(`trimExtractedOverflow`)。**未抽出は絶対に捨てない**ので、抽出を背景化してもバッファが一時的に20件を超えるだけで記憶を失わない(抽出が追いつけば自己修復)。
+  - 新規 `src/memory/extraction-scheduler.ts`:`requestExtraction(complete)`(fire-and-forget・直列化ロック `inFlight`・走行中要求は1回だけ coalesce・**未抽出が `EXTRACTION_BATCH_THRESHOLD`(=8)以上で**発火)/ `flushExtraction(complete)`(走行中を待ってから閾値無視で残り全部抽出=終了/孤児回収用)。
+  - `ipc.ts handleSendMessage`:append から onOverflow を除去。assistant append 後に `requestExtraction(makeLlmComplete(apiKey))` を**await せず**発火。
+  - `shutdown.ts`:`extractFromShortTerm('shutdown')` → `flushExtraction(...)`(in-flight を待ってから clearShortTerm)。`lifecycle.ts` の起動時孤児回収は変更不要(起動時に背景抽出は走らない)。
+- **効果**: 満杯後に応答前段で直列していた抽出 Sonnet 呼び出し(user/assistant 両 append で最大2回/ターン・実測 +約9秒〜)を**応答経路から完全除去**。さらに毎メッセージ発火→8件バッチで Claude 抽出呼び出し回数を ~1/8 に削減(B-02)。
+- **副次**: 8件まとめて抽出するため1件ずつより**まとまった文脈で episodic 化**しやすい(B-04 の「中期記憶が残りにくい」体感の改善方向・要実機確認)。1抽出=最大1 episodic の制約は不変。
+- **クラッシュ耐性**: 背景抽出中にクラッシュしても未抽出は `short-term.json` に残り、次回起動の孤児回収か次の flush で抽出される(データ喪失なし・extracted フラグで二重抽出も防止)。
+- **🟡 要反映(設計書 §3.3)**: ①L795/797 の `ShortTermOverflowHandler`・`appendShortTerm(entry, onOverflow?)` を現行シグネチャへ。②「抽出トリガ」節(L900-905)トリガ1を「20件超過時の同期抽出」→「未抽出が閾値(8)以上で**背景**バッチ抽出(直列化ロック)・トリムは抽出済みのみ」へ。③N-09-10 注記(L928-930)を**解消済み**へ。④`extraction-scheduler.ts` を主要関数/ディレクトリ図(L262 付近)に追記。
+
+### N-LAT-2 🟡 episodic 二重ロード解消＋Router/想起の並列化(B-14a/B-14d/B-03b 部分)
+- **該当**: `context-builder.ts` / `retriever.ts` / `ipc.ts`
+- **変更**:
+  - `RetrieverDeps` に `recallPool?: EpisodicRecord[]` を追加。`retrieveRecords` は `deps.recallPool ?? await loadRecallPool()`(未指定なら従来どおり=後方互換)。
+  - 新 `buildConversationMemory(query)`:`loadAllEpisodicFiles()`(user)・`loadLifeMemory()`(canon)・`loadOrCreateActiveCharacter()` を**1回だけ並列ロード**し、mood/familiarity 導出と recallPool で**使い回す**。従来 `buildHeartDeps` ＋ `retrieve(loadRecallPool)` で**2回**走っていた `loadAllEpisodicFiles` が1回に。
+  - `buildHeartDeps` 廃止(buildConversationMemory に内包)。`buildMemoryContext(query, deps)` は下位ビルダとして存続。
+  - `ipc.ts` step2/3:独立な `classifyTopic`(Router)と `buildConversationMemory` を `Promise.all` で並列化(B-03b)。Router 往復(~800ms タイムアウト)を記憶構築に重ねて隠す。
+- **注意**: Router タイムアウトが実 Haiku 往復を下回り fallback=medium になる **B-03 本体(few-shot 不発)は未解決**(並列化で critical path から隠れただけ)。B-03 は backlog 残置。
+- **🟡 要反映(設計書 §3.3 L811-814)**: `RetrieverDeps` に `recallPool?` を追記。会話経路の記憶構築を `buildConversationMemory`(episodic 1回ロード)として記述。
+
+> **残(Tier 0 続き・実機計測後に着手)**: B-14b(想起/埋め込みのワーカースレッド化)・B-14c(埋め込み起動時ウォーム＋クエリ埋め込みキャッシュ)。本3点(B-01/B-02/B-14a/B-03b)の実機レイテンシ計測を挟んでから判断する。
 
 ---
 
