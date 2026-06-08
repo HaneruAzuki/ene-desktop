@@ -3,6 +3,7 @@ import { log } from '../shared/logger';
 import { acquireSingleInstanceLock } from './single-instance';
 import { runStartupSequence } from './lifecycle';
 import { runShutdownSequence } from './shutdown';
+import { stopVoiceEngine } from './voice-engine';
 import type { AppRuntime } from './ipc';
 
 // Electron main エントリポイント(設計書 §7)。
@@ -54,6 +55,12 @@ if (!acquireSingleInstanceLock()) {
       shuttingDown = true;
       void runShutdownSequence(runtime).finally(() => app.quit());
     }
+  });
+
+  // 保険: 記憶抽出フロー(apiKey 必須)に入らない経路でも音声サイドカーを止め、孤児プロセスを残さない。
+  // stopVoiceEngine は冪等なので、通常終了で既に停止済みでも安全(N-17-12)。
+  app.on('will-quit', () => {
+    void stopVoiceEngine();
   });
 
   void start();

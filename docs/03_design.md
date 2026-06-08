@@ -350,6 +350,10 @@ ene-desktop/
 │       ├── models/                ← ローカルモデル(別DL・コア非汚染・task_15/17)
 │       │   ├── ruri-v3-310m/      ← 埋め込み ONNX int8(約316MB)・scripts/download-model.mjs(task_15)
 │       │   └── whisper-large-v3-turbo/ ← STT ONNX・scripts/download-stt-model.mjs(task_17)
+│       ├── voice/                  ← 音声サイドカー資産(別配置・コア非汚染・task_17/N-17-12)
+│       │   └── engine/            ← AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/・約800MB)
+│       │                            起動時に main が spawn(shell:false)→/version ヘルス→終了時 kill
+│       │                            ※声モデル(.aivmx)/BERT は %APPDATA%/AivisSpeech-Engine/(エンジン仕様で変更不可)
 │       ├── logs/                  ← アプリ動作ログ(個人情報を含まないメタ情報のみ)
 │       ├── config/
 │       │   ├── window-position.json
@@ -1544,6 +1548,16 @@ export async function execute(cmd: OsCommand): Promise<OsCommandResult> {
 | パストラバーサル | `path.relative` で境界チェック。`..` を含むパスを拒否 |
 | ユーザーホーム外アクセス | ホームディレクトリ配下に限定。`C:\Windows` 等を防ぐ |
 | `notepad.exe` 偽装 | 引数なし固定のため、コマンドラインからファイルを開かれない |
+
+> **音声エンジンの spawn は別枠の承認済み例外(N-17-6 / N-17-12)**
+> 上の OS 操作ホワイトリスト(キャラの `os_command` 機能)とは独立に、`src/main/voice-engine.ts` が
+> 起動時に AivisSpeech サイドカー(`data/voice/engine/run.exe`)を `child_process.spawn` で起動する。
+> これは**キャラ駆動ではなくアプリ内部のライフサイクル**であり、安全性は OS 操作と同じ原則で担保する:
+> **固定パスの既知バイナリ + 引数配列(`--host 127.0.0.1 --port 10101`)+ `shell:false` + `windowsHide:true`**。
+> 既に到達可能なら spawn しない(ポート衝突回避)。終了時は自分が起動した場合のみ `child.kill()`、
+> 残れば Windows は `taskkill /PID <pid> /T /F`(これも固定引数・`shell:false`)でツリーを停止する。
+> 外部送信は無く(localhost 完結)、§4.2/§7.1 の「Claude 以外への外部通信禁止」には抵触しない
+> (エンジン/モデルの**初回取得**のみが N-17-6 で承認された限定例外)。
 
 #### キャラ応答との統合
 

@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import path from 'node:path';
 import { readJson } from './json-store';
-import { VAD_MODEL_FILE } from '../shared/constants';
+import { VAD_MODEL_FILE, VOICE_ENGINE_DIR, VOICE_ENGINE_EXE } from '../shared/constants';
 
 // ファイルパスの統一管理(設計書 §3.6 / §5.5)。
 //
@@ -66,6 +66,25 @@ function getConfigDir(): string {
  */
 export function getModelsDir(): string {
   return path.join(getPortableDataDir(), 'models');
+}
+
+/**
+ * 音声サイドカー資産の置き場(data/voice/)。アプリ共通(キャラ非依存)。
+ * エンジン本体は exe に同梱せず、ここへ別配置する(コア<100MB維持・§4.3・N-17-6)。
+ * data/ は .gitignore 済み＝リポジトリには含めない。
+ */
+export function getVoiceDir(): string {
+  return path.join(getPortableDataDir(), 'voice');
+}
+
+/** AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/)の配置先(data/voice/engine/)。 */
+export function getVoiceEngineDir(): string {
+  return path.join(getVoiceDir(), VOICE_ENGINE_DIR);
+}
+
+/** data/voice/engine/run.exe(spawn 対象の実行ファイル)。 */
+export function getVoiceEngineExePath(): string {
+  return path.join(getVoiceEngineDir(), VOICE_ENGINE_EXE);
 }
 
 /** data/config/active-character.json(active キャラに依存しない固定パス)。 */
@@ -162,6 +181,11 @@ export function getAnimationPath(characterId: string): string {
 /** characters/{characterId}/voice.json(音声設定・emotion→スタイル/パラメータ・任意・task_17)。 */
 export function getVoiceConfigPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'voice.json');
+}
+
+/** characters/{characterId}/backchannels.json(相槌の語彙・任意・task_18)。 */
+export function getBackchannelPoolPath(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'backchannels.json');
 }
 
 /** characters/{characterId}/{file}(スプライト等・animation.json の frames が指す実ファイル)。 */

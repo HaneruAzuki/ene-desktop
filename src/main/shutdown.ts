@@ -2,14 +2,23 @@ import { log } from '../shared/logger';
 import { extractFromShortTerm } from '../memory/extraction-trigger';
 import { clearShortTerm } from '../memory/short-term';
 import { makeLlmComplete } from '../conversation/client';
+import { stopVoiceEngine } from './voice-engine';
 import type { AppRuntime } from './ipc';
 
 // 終了シーケンス(設計書 §7.2)。
+// 0) 音声サイドカーを停止(自分が起動した場合のみ・孤児プロセス防止・N-17-12)。
 // 1) 未抽出の短期記憶を中期記憶へ抽出 → 2) 短期記憶ファイル削除。
 // 失敗しても終了は妨げない(記憶は失われるがアプリは終了する)。
 
 export async function runShutdownSequence(runtime: AppRuntime): Promise<void> {
   log.info('shutdown sequence started');
+
+  // 記憶抽出より先にエンジンを止める(確実に子プロセスを回収する)。
+  try {
+    await stopVoiceEngine();
+  } catch (e) {
+    log.warn('failed to stop voice engine', { name: (e as Error).name });
+  }
 
   if (runtime.apiKey) {
     try {

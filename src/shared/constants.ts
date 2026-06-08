@@ -78,15 +78,19 @@ export const VAD_BARGE_IN_MIN_SPEECH_MS = 320;
 // 「持続発話 → 短い言いよどみ(turn-end より手前)」を相槌のスロットとして検出する。
 // 値は「良い聞き手とは」で決める。**Claude が返るまでの時間では決めない**(設計の憲法・task_18)。
 
-/** 最初の相槌を打つまでに必要な持続発話(ms)。短い発話に被せない。 */
-export const BACKCHANNEL_MIN_SPEECH_MS = 1200;
-/** 相槌の最小間隔(ms・頻度ガバナ)。打ちすぎ(うるさい)を防ぐ。 */
-export const BACKCHANNEL_MIN_INTERVAL_MS = 2500;
+// 値は「落ち着いた聞き手(前のめりにならない)」を狙ってチューニング(2026-06-09 実機試聴・ユーザー)。
+/** 最初の相槌を打つまでに必要な持続発話(ms)。長めにして「前のめり」を抑える。 */
+export const BACKCHANNEL_MIN_SPEECH_MS = 2000;
+/** 相槌の最小間隔(ms・頻度ガバナ)。広めにして打ちすぎ(うるさい・機械的)を防ぐ。 */
+export const BACKCHANNEL_MIN_INTERVAL_MS = 4500;
 /**
  * 言いよどみ(発話中の短い無音)が相槌スロットとみなされる継続(ms)。
  * 必ず VAD_MIN_SILENCE_MS(=ターン終了)より小さくする(ターン終了は相槌でなく応答の入り)。
+ * 大きめにして微小な息継ぎに反応しない=落ち着いた相づちにする。
  */
-export const BACKCHANNEL_PAUSE_TRIGGER_MS = 280;
+export const BACKCHANNEL_PAUSE_TRIGGER_MS = 400;
+/** 相槌の発話速度倍率(neutral 比)。1未満=少しゆっくり=機械的さを和らげ気持ち長く。 */
+export const BACKCHANNEL_SPEED_SCALE = 0.92;
 
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 
@@ -125,6 +129,27 @@ export const FAMILIARITY_THRESHOLDS: ReadonlyArray<{
   { stage: 4, days: 120, talkDays: 40, turns: 350 },
   { stage: 5, days: 365, talkDays: 80, turns: 800 },
 ];
+
+// --- 音声合成エンジン(AivisSpeech サイドカー・task_17 / N-17-6・N-17-12) ---
+// エンジン本体は配布物(exe)に同梱せず data/voice/engine/ に別配置(コア<100MB維持・§4.3)。
+// 起動時にアプリが run.exe を spawn(shell:false)してヘルス確認、終了時に kill する。
+
+/** data/voice/ 配下のエンジン配置ディレクトリ名。 */
+export const VOICE_ENGINE_DIR = 'engine';
+/** AivisSpeech-Engine の実行ファイル名(run.exe 一式と engine_internal/・resources/ が同階層)。 */
+export const VOICE_ENGINE_EXE = 'run.exe';
+/** サイドカーの待受ホスト(ローカル固定・外部公開しない)。 */
+export const VOICE_ENGINE_HOST = '127.0.0.1';
+/** サイドカーの待受ポート(VOICEVOX/AivisSpeech 既定)。 */
+export const VOICE_ENGINE_PORT = 10101;
+/** TTS クライアントが叩く baseUrl(voice.json の baseUrl と一致させる)。 */
+export const VOICE_ENGINE_BASE_URL = `http://${VOICE_ENGINE_HOST}:${VOICE_ENGINE_PORT}`;
+/** spawn 後 /version が応答するまでの待ち上限(ms)。BERT/モデルがキャッシュ済みなら数秒で立つ。 */
+export const VOICE_ENGINE_HEALTH_TIMEOUT_MS = 30000;
+/** ヘルスポーリングの間隔(ms)。 */
+export const VOICE_ENGINE_HEALTH_INTERVAL_MS = 600;
+/** kill 要求後、プロセスツリーを強制終了(taskkill)に切り替えるまでの猶予(ms)。 */
+export const VOICE_ENGINE_STOP_GRACE_MS = 2000;
 
 // --- ウィンドウ(設計書 §8.1) ---
 // task_13: 全身立ち絵(比≈0.65)を中央帯に置き、上=吹き出し余白/下=入力欄余白を確保する縦長窓。

@@ -18,6 +18,7 @@ import { createMainWindow } from './window';
 import { createTray } from './tray';
 import { registerIpcHandlers, type AppRuntime } from './ipc';
 import { initVoice } from './voice-runtime';
+import { ensureVoiceEngine } from './voice-engine';
 import { generateGreeting } from './greeting';
 import {
   loadWindowPosition,
@@ -69,6 +70,13 @@ export async function runStartupSequence(
       throw new Error('user quit at cloud-folder warning');
     }
   }
+
+  // Step 4.5: 音声サイドカー(AivisSpeech)を**背景で**起動する(N-17-12)。
+  // ヘルス到達まで数秒かかるため await しない(挨拶表示やウィンドウ表示をブロックしない)。
+  // 既に立っていれば再利用、未配置ならテキストのみで続行。立てば後続の speak() が喋れる
+  // (bundled voice.json の styleId は実エンジン値と一致するため reconcile を待つ必要はない)。
+  // 初回 API キー入力ダイアログやキャラ/記憶ロードと並行して温まる。
+  void ensureVoiceEngine();
 
   // Step 5: APIキー(無ければダイアログ。キャンセルなら終了)
   let apiKey = await loadAndDecryptApiKey();
@@ -133,8 +141,10 @@ export async function runStartupSequence(
   // マイク入力方式(設定)を読み込む(task_17 Phase C・既定 push-to-talk)。
   runtime.voiceInputMode = (await loadAppSettings()).voiceInputMode;
 
-  // Step 10.5: 音声を best-effort 初期化(エンジン未起動でも起動は続行・task_17 Phase A)。
-  // AivisSpeech が立っていれば /speakers で実 styleId を解決して喋れる状態にする。
+  // Step 10.5: 音声を best-effort 初期化(エンジンは Step 4.5 で背景起動済み・task_17 Phase A)。
+  // この時点ではまだヘルス到達前のことが多いので listStyles は失敗しうるが、その場合は
+  // bundled voice.json(styleId は実値と一致)で有効化する。tts は非 null になり、
+  // エンジンが立ち次第そのまま喋れる(初回メッセージまでに数秒あれば間に合う)。
   const voice = await initVoice(active.characterId);
   runtime.tts = voice?.tts ?? null;
   runtime.voiceConfig = voice?.voiceConfig ?? null;

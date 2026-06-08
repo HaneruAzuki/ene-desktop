@@ -688,8 +688,9 @@
 - **反映**: §3.3(retriever.ts)。既存 retriever テスト群は回帰なし(251緑)。
 
 ### N-17-1 🟡 音声方針の確定(2026-06-07 設計セッション・task_17)
-- **内容**: 4決定 = ①ルート=ローカルファースト(脳=Claudeストリーミング・STT/VAD/Turnはローカル・§4.2維持) ②役割=双方向の音声会話(速さは追わない) ③TTS=`TtsEngine`差し替え可能＋完全ローカル開始(§4.4) ④声=同梱・戦略A「寛容ライセンス声を採用＋味付け」(Kokoro/MeloTTS等をin-process・pitch/speedをJSON外出し)。旧「ユーザー各自VOICEVOXインストール」は任意オプションへ降格。
-- **判断根拠**: 哲学「リアルタイム性は抑える対象」ゆえクラウドS2Sの速度優位は不要。ローカルのターンテイキングはSmart Turn v3.2で解決済。同梱要望に対し寛容ライセンス声で無料配布を両立。
+- **内容**: 4決定 = ①ルート=ローカルファースト(脳=Claudeストリーミング・STT/VAD/Turnはローカル・§4.2維持) ②役割=双方向の音声会話 ③TTS=`TtsEngine`差し替え可能＋完全ローカル開始(§4.4) ④声=同梱・戦略A「寛容ライセンス声を採用＋味付け」(Kokoro/MeloTTS等をin-process・pitch/speedをJSON外出し)。旧「ユーザー各自VOICEVOXインストール」は任意オプションへ降格。
+- **判断根拠**: ローカルファーストは**プライバシー(§4.2 外部送信はClaudeのみ)**が要請。クラウドS2Sに頼らずとも、ローカルのターンテイキング(Smart Turn v3.2)＋ストリーミングで実用レイテンシは達成できる。同梱要望に対し寛容ライセンス声で無料配布を両立。
+- **⚠️ 2026-06 是正**: 当時の「速さは追わない/リアルタイム性は抑える対象」という根拠は**誤り**(哲学 §4 設計則④で是正)。決定(双方向ローカル音声)は維持しつつ、**速さは常に最大化**する。
 - **反映**: `tasks/task_17_voice.md`。memory `voice-plan-decisions-2026`。
 
 ### N-17-2 🟡 STT=VAD区切りWhisper(ストリーミングSTT不要)・SenseVoice回避
@@ -758,6 +759,27 @@
 - **残(Phase B 以降・実機/人間判定)**: main 配線(`VadRuntime` 相乗り→`ene:backchannel` イベント)＋renderer 再生(事前合成WAV/即時合成)＋非言語アニメ(うなずき)＋韻律(RMS)による型選択 → Phase C 思考フィラー → Phase D 評価ループ＋ユーザー試聴。
 - **レイテンシ施策**: 同セッションで `optimization-backlog.md` に三原則＋B-13(忘却=記憶容量ガバナ §11.6)・B-14(想起パスのローカル高速化)・B-15(ローカル判別器＋二段Claude)・B-16(ノブ)を追記、B-06(ストリーミング)を TTS辞書→`reading`廃止案で補強。
 - **反映予定(task_18 完了時)**: 02_requirements F-LISTEN-xx / 03_design §2・§11。
+
+### N-18-2 🟡 相槌エンジン Phase B 配線(continuer＋うなずき)実装(2026-06-09)
+- **方針**: best-effort・gated。音声無効(エンジン未起動/voice.json/backchannels.json なし)なら相槌は出ず会話は成立。**ハンズフリー時のみ**(VAD フレーム供給がある経路)。
+- **main**: `backchannel-controller.ts`=`BackchannelController`(`prepare`=hands-free 開始時に相槌語を一度ずつ**事前合成**してキャッシュ・非ブロッキング/`onFrame`=**ENE 非発話中のみ**`BackchannelEngine` に投入→判定したら合成済み WAV を送信/`reset`=ターン境界)。`character/backchannel-loader.ts`=`backchannels.json` 検証ロード(continuer 必須)。`vad-runtime.ts` のフレームループに相乗り(`!this.speaking` のときだけ `onFrame`・エコー自己発火回避)。`ipc.ts` で構築(**tts/voiceConfig は起動順=registerIpcHandlers が initVoice より前 のため遅延参照**)。
+- **renderer**: `backchannel-player.ts`=単発再生(応答キュー `audio-player` とは別系統)。`App` の `onBackchannel`→即時再生＋`nodKey++`。`CharacterDisplay` に `nodKey`→CSS `ene-nod`(うなずき・スプライト不要・breathe より後勝ち)。
+- **IPC/型**: `ene:backchannel`(WAV)・preload `onBackchannel`(単一リスナー)・`EneAPI.onBackchannel`・`paths.getBackchannelPoolPath`。
+- **スコープ**: 型は **continuer 固定**(語の反復回避で変化はつく)。**韻律(RMS)による型選択(understanding/surprise)は次**。思考フィラー「うーん」は Phase C(B-15 の深い/浅い判別と連動)。
+- **検証**: typecheck/lint/**全358テスト緑**(新規9=loader6/controller3。engine9・pool8 は Phase A)/build 緑。**ハードウェア・調教不要で静的検証完結**。
+- **⚠️ 要実機検証(N-17-9 と同根)**: 相槌はユーザ発話中に鳴る→マイク回り込みで(a)録音(Whisper入力)汚染 (b)VAD 誤発火 のリスク。`echoCancellation` 前提。**問題が出たら nod-only(audio 無効)へ縮退可能**(タイミング/うなずきはそのまま)。
+- **残(実機/人間判定=ユーザー)**: タイミングの自然さ・「聞いてもらえている」感・打ちすぎ/早すぎ・エコーの実害。次の実装=韻律型選択 → Phase C 思考フィラー → Phase D 評価ループ。
+
+### N-17-12 🟢 音声エンジンのライフサイクル化(起動時 auto-spawn・終了時 kill)(2026-06-09・ユーザー要望)
+- **背景(不具合)**: exe を起動しても AivisSpeech が立ち上がらず声が出ない。原因は**エンジンを起動するコードが存在しない**こと。`voice-runtime.ts` は `http://127.0.0.1:10101` へ**接続を試みるだけ**で、`voice-provisioner.ts` の `ProvisionEnv`(`startEngine`/`waitHealthy` を定義)を実装する**副作用アダプタが未実装・未配線**だった(メモリの積み残し「プロビジョナ副作用アダプタ」)。
+- **配布方針(ユーザー合意)**: エンジンは 818MB(+BERT 623MB+声モデル 238MB ≒ 初回 1.7GB)で **100MB上限(§4.3)に同梱不可**。過去の承認 N-17-6 どおり **方針A=初回サイレント自動DL**(exe<100MB維持・「DLしますか?」と聞かない)を採用。**BERT と既定モデルはエンジン自身が初回起動時に HF から自動取得**するため、アプリは「起動して待つ」だけでよい(取得を肩代わりしない)。エンジン配置先=**`data/voice/engine/`**(ポータブル)。
+- **サイズ実態の調査**: 818MB の大半は日本語読み辞書(sudachi 208MB+追加辞書 196MB+openjtalk 99MB≒500MB=誤読対策の本体)。**安全に削れるのは GPU 用 `DirectML.dll`(18MB)のみ**(CPU限定方針 N-17-4)。BERT は既に fp16、torimi.aivmx は単一 neutral=いずれも最小構成。"lite" エンジンは存在しない。
+- **Phase 1 実装(本変更・この PC で実機検証可)**: `src/main/voice-engine.ts`(= 欠けていた副作用アダプタ)。**純粋ロジックと副作用を分離**(既存 DI 流儀): `decideEngineAction(reachable,present)`=skip/spawn/absent、`waitHealthy(probe,opts)`=probe 注入のポーリング(単体テスト対象)。`ensureVoiceEngine()`=`/version` 到達なら再利用(spawn しない=ポート衝突回避・**外部起動を kill しない** `ownsEngine` フラグ)/未配置なら `absent`(テキストのみ続行)/未到達&有りなら `spawn(run.exe, ['--host','127.0.0.1','--port','10101'], {cwd:engineDir, shell:false, windowsHide:true, stdio:'ignore'})`→`waitHealthy`。`stopVoiceEngine()`=`child.kill()`→猶予後 `taskkill /PID /T /F`(ツリー停止・冪等)。
+- **配線**: `lifecycle.ts` で **Step 4.5 に `void ensureVoiceEngine()`(背景起動・await しない)**。ヘルス到達に実測 ~8s かかるため await するとウィンドウ表示後の `initialGreeting` 設定が遅れ、renderer の一度きり pull(`getInitialGreeting`)が null を掴んで**挨拶が消える**。背景起動なら挨拶も即・エンジンは初回メッセージまでに温まる。`initVoice` は従来どおり(未到達なら bundled voice.json で有効化。**bundled styleId 1736267264 は実エンジン値と一致**するため reconcile を待つ必要なし)。終了は `shutdown.ts` 冒頭で `stopVoiceEngine()`、保険で `index.ts` の `app.on('will-quit')` でも呼ぶ(apiKey 未設定で before-quit 非同期分岐に入らない経路の孤児防止)。
+- **検証(実機)**: 同一引数/cwd で spawn→`/version` が **7.9s で 200(`1.3.0-dev`)**、`/speakers` に **魚川トリミ/ノーマル styleId=1736267264**(=bundled 一致)、`taskkill /T /F` 後 `/version` 不達(クリーン停止)。typecheck/lint/**全364テスト緑**(新規 voice-engine 6)。`setup:voice-engine` で `data/voice/engine/`(801MB・DirectML.dll 除外・git-ignored)配置。
+- **新規 npm 無し**。spawn は固定パス+引数配列+shell:false(§7.2 準拠・N-17-6 承認例外)。`scripts/setup-voice-engine.mjs`(`npm run setup:voice-engine`)=scratch→`data/voice/engine/` コピー(DirectML.dll 除外・冪等)。**開発/ローカル配置ツール**で配布物に含めない。
+- **残(Phase 2・配布用・別途)**: 初回サイレント自動DL を `ensureVoiceEngine` の `absent` 分岐で `provisionVoice(env)` 実装。`downloadEngine`=自前ホストの **engine.zip → Windows 標準 `Expand-Archive`/`tar.exe` で展開**(公式は分割 .7z で Node 展開不可のため zip 再ホスト前提)、`downloadModel`=torimi.aivmx を `%APPDATA%\AivisSpeech-Engine\Models\` へ、初回 UI=トリミ口調の進捗(許可プロンプトなし)。**未確定=① engine.zip / torimi.aivmx のホスティング先 URL ② zip 展開を OS 標準ツールで行う最終確認**。
+- **反映**: 03_design §2(`data/voice/engine/` 追記)・§7.2(音声 spawn の承認済み例外を明記)。02_requirements は F-VOICE で TTS 差し替え可と既述のため変更なし。
 
 ---
 
