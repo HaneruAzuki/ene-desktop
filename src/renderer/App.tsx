@@ -4,6 +4,7 @@ import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea } from './components/InputArea';
 import { playClick } from './sound';
 import { enqueueAudio, stopPlayback, setPlaybackHandlers } from './audio-player';
+import { playBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
@@ -34,6 +35,7 @@ export function App(): React.ReactElement | null {
   const [voiceInputMode, setVoiceInputMode] = useState<VoiceInputMode>('push-to-talk');
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
+  const [nodKey, setNodKey] = useState(0); // 相槌のうなずき(増えるたびに1回うなずく・task_18)
   const [charState, setCharState] = useState<CharacterState>({
     activity: 'idle',
     emotion: 'neutral',
@@ -74,6 +76,14 @@ export function App(): React.ReactElement | null {
   // 音声応答チャンク(WAV)を逐次再生(task_17 Phase A)
   useEffect(() => {
     window.ene.onVoiceChunk((chunk) => void enqueueAudio(chunk));
+  }, []);
+
+  // 相槌(聞くターン・task_18 Phase B): WAV があれば即時再生＋必ずうなずく(音声未準備でもうなずきは出す)。
+  useEffect(() => {
+    window.ene.onBackchannel((wav) => {
+      if (wav) void playBackchannel(wav);
+      setNodKey((k) => k + 1);
+    });
   }, []);
 
   // 実際の再生開始/終了に「ENE 発話中」フラグを連動(task_17 Phase C・barge-in)。
@@ -293,6 +303,7 @@ export function App(): React.ReactElement | null {
         portraitUrl={characterInfo.portraitUrl}
         animation={characterInfo.animation}
         state={charState}
+        nodKey={nodKey}
         onClick={openInput}
       />
       {inputVisible && (

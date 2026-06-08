@@ -59,6 +59,29 @@ body,
   }
 }
 
+/* 相槌のうなずき(task_18 Phase B・聞くターンの非言語表現・スプライト不要)。
+   breathe より後に定義し、両クラス併用時はこちらが後勝ちで一時的に上書きする。 */
+.character--nod {
+  animation: ene-nod 0.55s ease-in-out;
+}
+@keyframes ene-nod {
+  0% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(4.5%);
+  }
+  55% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(2%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
 /* 考える間(thinking)の小さな表示(F-ANIM-04・専用スプライト未制作のため「…」) */
 .bubble--thinking {
   width: auto;

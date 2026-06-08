@@ -26,4 +26,20 @@ export interface BackchannelPoolData {
 export interface BackchannelDecision {
   kind: 'backchannel';
   cue: BackchannelCue;
+  /** デバッグ/調律用: 直近ピーク/平常 のエネルギー比(Lv2・韻律による型選択)。 */
+  energyRatio?: number;
+  /** デバッグ/調律用: 直近の発話ピーク(絶対RMS)。 */
+  energyPeak?: number;
+  /** デバッグ/調律用: 平常エネルギー(絶対RMS・長期平均)。 */
+  energyBaseline?: number;
+  /** デバッグ/調律用: 直近ピッチ/平常 のピッチ比(Lv2・主信号)。 */
+  pitchRatio?: number;
+  /** デバッグ/調律用: 直近の発話ピッチ山(Hz)。 */
+  pitchPeak?: number;
+  /** デバッグ/調律用: 平常ピッチ(Hz・長期平均)。 */
+  pitchBaseline?: number;
+  /** デバッグ/調律用: 判定に使った自己キャリブレーション閾値(ピッチ・Lv2)。 */
+  pitchThreshold?: number;
+  /** デバッグ/調律用: 判定に使った自己キャリブレーション閾値(エネルギー・Lv2)。 */
+  energyThreshold?: number;
 }

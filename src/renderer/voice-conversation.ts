@@ -29,7 +29,9 @@ export class VoiceMic {
         channelCount: 1,
         echoCancellation: true,
         noiseSuppression: true,
-        autoGainControl: true,
+        // AGC は音量を均して「声の勢い(強調)」を潰すため OFF(相槌の韻律型選択 Lv2 のため)。
+        // echoCancellation/noiseSuppression は維持(barge-in エコー対策)。
+        autoGainControl: false,
       },
     });
     this.ctx = new AudioContext({ sampleRate: STT_SAMPLE_RATE });

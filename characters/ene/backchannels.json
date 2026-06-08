@@ -1,8 +1,8 @@
 {
   "version": 1,
   "cues": {
-    "continuer": ["うん", "うんうん", "ふんふん"],
-    "understanding": ["なるほど", "そっか", "ふーん"],
+    "continuer": ["うん", "うん、うん"],
+    "understanding": ["そっか", "ふーん"],
     "surprise": ["えっ", "へえ", "ほんと?"],
     "empathy": ["そっかぁ", "わかる", "うんうん"]
   },

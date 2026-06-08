@@ -91,6 +91,20 @@ export const BACKCHANNEL_MIN_INTERVAL_MS = 4500;
 export const BACKCHANNEL_PAUSE_TRIGGER_MS = 400;
 /** 相槌の発話速度倍率(neutral 比)。1未満=少しゆっくり=機械的さを和らげ気持ち長く。 */
 export const BACKCHANNEL_SPEED_SCALE = 0.92;
+/**
+ * 相槌の型を韻律(声の勢い)で出し分ける閾値(task_18 Lv2)。
+ * いまの発話ピーク / 典型的な発話ピーク(文単位の長期平均) がこれ以上=強調・興奮 → surprise(へえ/えっ)。
+ * 未満 → continuer(うん)。同レベルなら≈1.0、実機ログで興奮時の絶対ピークは平常の≈1.6倍。
+ * **実機ログ(ratio=…)で平坦/興奮の実値の間に調律する**。
+ */
+export const BACKCHANNEL_EMPHASIS_RATIO = 1.4;
+/**
+ * 相槌の型をピッチ(声の高さ)で出し分ける閾値(task_18 Lv2・主信号)。
+ * いまの発話ピッチ山 / 典型的な発話ピッチ山(文単位の長期平均) がこれ以上=興奮 → surprise。
+ * 興奮で声が高くなる(大きさより安定した信号)。emphasisRatio(エネルギー)との OR で判定。
+ * **実機ログ(pRatio=…)で平常/興奮の実値の間に調律する**。
+ */
+export const BACKCHANNEL_PITCH_RATIO = 1.2;
 
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 

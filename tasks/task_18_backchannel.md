@@ -76,7 +76,7 @@
 |---|---|---|---|
 | **0 設計** | 本ファイル・三原則・CPU/no-調教制約・装置の地図 | Claude | ✅ |
 | **A 純粋ロジック** | `BackchannelEngine`(タイミング状態機械)＋`selectBackchannel`(語選択)＋型＋定数＋`backchannels.json`＋単体テスト。**ハードウェア・調教不要** | Claude(本CPU) | ✅(2026-06-08・全349テスト緑/新規17・N-18-1) |
-| **B 配線** | main: `VadRuntime` に相乗り(frameごとに判定)→`ene:backchannel` イベント / renderer: 再生＋非言語アニメ。韻律(RMS)による型選択。実機スモーク | Claude＋実機 | — |
+| **B 配線** | main: `VadRuntime` に相乗り(frameごとに判定)→`ene:backchannel` イベント / renderer: 再生＋非言語アニメ。韻律(RMS)による型選択。実機スモーク | Claude＋実機 | 🟡配線実装済(continuer・nod・typecheck/lint/358テスト/build緑・N-18-2)。韻律型選択は次。**実機/試聴は未** |
 | **C 思考フィラー** | 答える入りの「うーん」(深い/浅い判別=`optimization-backlog.md` B-15 に連動・F-ANIM-04の音声ツイン)。(任意)極小モデルを Claude生成合成データから本CPU訓練 | Claude(本CPU) | — |
 | **D 評価・受入** | 合成テスト＋指標(相槌位置一致・打ちすぎ率)＋**人間判定(ユーザー試聴=成功基準8)** | Claude＋ユーザー | — |
 
@@ -98,6 +98,13 @@
 - [ ] `BackchannelEngine`:発話継続なしでは発火しない/最小発話後の言いよどみで発火/頻度ガバナ(連続発火しない)/turn-end手前でのみ発火/reset
 - [ ] `selectBackchannel`:型に応じた語を返す/直前と同じ語を避ける/空プールはフォールバック
 - [ ] 既存テストが回帰しない
+
+### リッスン専用テストモード(レイテンシ問題と切り離して相槌だけ検証・N-18-2)
+- `ENE_LISTEN_ONLY=1` で `npm run dev` を起動すると、ハンズフリーのターン終了時に**文字起こし・応答(Claude/記憶=レイテンシ源)をスキップ**し、VAD＋相槌だけが動く。
+  - PowerShell: `$env:ENE_LISTEN_ONLY='1'; npm run dev`
+  - 相槌音声には AivisSpeech 起動＋`voice.json`＋`backchannels.json` が必要。**うなずきだけなら Silero VAD のみ**(Whisper/Claude 不要)。
+  - 既定 OFF・本番無影響(env 未設定なら通常動作)。
+- 検証後は env を外して(または別シェルで)通常起動に戻す。
 
 ### 手動(ユーザー・人間判定=成功基準8)
 - [ ] 相槌のタイミングが自然(早すぎ/打ちすぎでない)

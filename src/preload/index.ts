@@ -47,6 +47,11 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:voice-chunk');
     ipcRenderer.on('ene:voice-chunk', (_event, chunk: ArrayBuffer) => cb(chunk));
   },
+  onBackchannel: (cb) => {
+    // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:backchannel');
+    ipcRenderer.on('ene:backchannel', (_event, wav: ArrayBuffer | null) => cb(wav));
+  },
   onAppReady: (cb) => {
     ipcRenderer.on('ene:app-ready', () => cb());
   },

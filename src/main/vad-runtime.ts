@@ -2,7 +2,9 @@ import type { BrowserWindow } from 'electron';
 import { log } from '../shared/logger';
 import { SileroVad } from '../conversation/silero-vad';
 import { VadSegmenter } from '../conversation/vad-segmenter';
+import { frameRms, frameF0 } from '../conversation/backchannel-engine';
 import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
+import type { BackchannelController } from './backchannel-controller';
 import { VAD_FRAME_SIZE, VAD_SPEECH_PAD_MS, STT_SAMPLE_RATE } from '../shared/constants';
 
 // ハンズフリー VAD ループ(main・task_17 Phase C)。
@@ -31,11 +33,20 @@ export class VadRuntime {
   private recorded: Float32Array[] = [];
   private ring: Float32Array[] = []; // 直近フレーム(先読みパディング用)
 
-  constructor(private readonly win: BrowserWindow) {}
+  // 相槌(task_18 Phase B・任意)。ユーザ発話中の言いよどみで相槌を打つ。
+  // listenOnly: 相槌テスト用(env ENE_LISTEN_ONLY=1)。ターン終了時に文字起こし・応答(Claude/記憶)を
+  //   スキップし、VAD＋相槌だけを動かす。レイテンシ問題と無関係に相槌の体感を検証できる。
+  constructor(
+    private readonly win: BrowserWindow,
+    private readonly backchannel?: BackchannelController,
+    private readonly listenOnly = false,
+  ) {}
 
   /** VAD セッション開始。モデル未配置なら false(呼び出し側は push-to-talk のまま)。 */
   async start(): Promise<boolean> {
-    if (!(await isSttModelAvailable())) return false;
+    // listenOnly(相槌テスト)は Whisper を使わないので STT モデル無しでも開始できる。
+    if (!this.listenOnly && !(await isSttModelAvailable())) return false;
+    if (this.listenOnly) log.warn('VAD listen-only mode: responses disabled (backchannel test)');
     this.seg.reset();
     this.vad.reset();
     this.recording = false;
@@ -51,6 +62,9 @@ export class VadRuntime {
       return false;
     }
     this.active = true;
+    // 相槌の語彙を事前合成(best-effort・非ブロッキング)。初回 hands-free は数秒後に有効化される。
+    void this.backchannel?.prepare();
+    this.backchannel?.reset();
     this.sendState('listening');
     return true;
   }
@@ -62,6 +76,7 @@ export class VadRuntime {
     this.ring = [];
     this.seg.reset();
     this.vad.reset();
+    this.backchannel?.reset();
   }
 
   /** ENE 発話中フラグ。barge-in 検出を厳しめデバウンスに切替え、エコー誤割り込みを抑える。 */
@@ -84,6 +99,11 @@ export class VadRuntime {
       }
 
       const prob = await this.vad.process(frame);
+      // 相槌は「ユーザの番」だけ(ENE 発話中は自分の声へ相槌を打たない・エコー誤発火回避)。
+      // rms(勢い)＋f0(声の高さ)も渡して韻律で型を出し分ける(Lv2・ピッチ主/エネルギー補助)。
+      if (!this.speaking && this.backchannel) {
+        this.backchannel.onFrame(prob, frameRms(frame), frameF0(frame));
+      }
       const ev = this.seg.push(prob);
       if (ev === 'speech-start') this.onSpeechStart();
       else if (ev === 'speech-end') this.onSpeechEnd();
@@ -113,6 +133,13 @@ export class VadRuntime {
   private endTurn(): void {
     if (!this.recording) return;
     this.recording = false;
+    this.backchannel?.reset(); // ターン終了=次の発話は相槌カウンタを 0 から
+    if (this.listenOnly) {
+      // 相槌テスト: 文字起こし・応答(Claude/記憶=レイテンシ源)をスキップし聞き取りに戻る。
+      this.recorded = [];
+      this.sendState('listening');
+      return;
+    }
     const audio = concat(this.recorded);
     this.recorded = [];
     this.sendState('transcribing');

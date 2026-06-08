@@ -64,6 +64,9 @@ export interface EneAPI {
   getVoiceInputMode(): Promise<VoiceInputMode>;
   onVoiceInputModeChanged(callback: (mode: VoiceInputMode) => void): void;
 
+  // 相槌受信(main → renderer・task_18 Phase B)。wav があれば再生、null でも**うなずき**は出す。
+  onBackchannel(callback: (wav: ArrayBuffer | null) => void): void;
+
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
   onError(callback: (error: string) => void): void;

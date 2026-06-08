@@ -16,8 +16,13 @@ interface Props {
   portraitUrl: string; // フォールバック(アニメ無し時)
   animation?: CharacterAnimationData;
   state: CharacterState;
+  /** 増えるたびに1回うなずく(相槌の非言語表現・task_18 Phase B)。 */
+  nodKey?: number;
   onClick: () => void;
 }
+
+/** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる)。 */
+const NOD_MS = 500;
 
 interface PressState {
   startX: number;
@@ -29,7 +34,7 @@ interface PressState {
 }
 
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
-  function CharacterDisplay({ portraitUrl, animation, state, onClick }, ref) {
+  function CharacterDisplay({ portraitUrl, animation, state, nodKey, onClick }, ref) {
     const imgRef = useRef<HTMLImageElement>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const onClickRef = useRef(onClick);
@@ -38,6 +43,8 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
 
     // 口パク(talking 中のみ開閉トグル)。
     const [flapOpen, setFlapOpen] = useState(false);
+    // うなずき(相槌・task_18): nodKey が増えた瞬間に短時間 true。
+    const [nodding, setNodding] = useState(false);
 
     useEffect(() => {
       onClickRef.current = onClick;
@@ -73,6 +80,14 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     useEffect(() => {
       drawToCanvas();
     }, [displaySrc]);
+
+    // 相槌のうなずき: nodKey 変化で短時間だけ nod クラスを当てる(0/未指定は無視)。
+    useEffect(() => {
+      if (!nodKey) return;
+      setNodding(true);
+      const id = setTimeout(() => setNodding(false), NOD_MS);
+      return () => clearTimeout(id);
+    }, [nodKey]);
 
     useImperativeHandle(
       ref,
@@ -161,7 +176,11 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     }
 
     // 呼吸の微動は idle 中のみ(CSS keyframes・スプライト不要・F-ANIM-03)。
-    const className = state.activity === 'idle' ? 'character character--breathe' : 'character';
+    // うなずき(相槌)は最後に付け、breathe より後勝ちで一時的に上書きする(CSS の定義順)。
+    const classes = ['character'];
+    if (state.activity === 'idle') classes.push('character--breathe');
+    if (nodding) classes.push('character--nod');
+    const className = classes.join(' ');
 
     return (
       <img
