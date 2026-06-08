@@ -4,8 +4,15 @@ import { BackchannelEngine } from '../conversation/backchannel-engine';
 import { selectBackchannel } from '../conversation/backchannel-pool';
 import { loadBackchannelPool } from '../character/backchannel-loader';
 import { resolveStyle } from '../character/voice-loader';
+import {
+  loadBackchannelCalibration,
+  saveBackchannelCalibration,
+} from '../storage/backchannel-calibration';
 import type { BackchannelPoolData } from '../shared/types/backchannel';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
+
+/** 学習値をディスクに保存するまでの相槌回数(間引き・Lv2b)。 */
+const CALIBRATION_SAVE_EVERY = 5;
 
 // 相槌コントローラ(main・task_18 Phase B)。
 //
@@ -33,6 +40,10 @@ export class BackchannelController {
   private synth: Map<string, ArrayBuffer> | null = null;
   private preparing: Promise<void> | null = null;
   private lastPhrase: string | undefined;
+  /** 学習値(音響キャリブレーション)を一度だけ復元する(永続化・Lv2b)。 */
+  private calibrated = false;
+  /** 相槌の累計回数(学習値の間引き保存用)。 */
+  private fireCount = 0;
 
   constructor(private readonly deps: BackchannelDeps) {}
 
@@ -53,6 +64,11 @@ export class BackchannelController {
     try {
       this.pool ??= await loadBackchannelPool(this.deps.characterId);
       if (!this.pool) return; // backchannels.json なし → 相槌なし
+      if (!this.calibrated) {
+        // 前回までの学習値(声の平常・比の分布)を復元(継続利用で賢くする・Lv2b)。
+        this.engine.loadCalibration(await loadBackchannelCalibration());
+        this.calibrated = true; // null(初回)でも再試行しない=初期値で学習開始
+      }
       const tts = this.deps.getTts();
       const voiceConfig = this.deps.getVoiceConfig();
       if (tts && voiceConfig) {
@@ -91,6 +107,15 @@ export class BackchannelController {
         `ePeak=${decision.energyPeak?.toFixed(4) ?? 'n/a'} eBase=${decision.energyBaseline?.toFixed(4) ?? 'n/a'}`,
     );
     this.deps.send(wav);
+    // 学習値を間引いて保存(継続利用で賢くする・Lv2b)。best-effort・非ブロッキング。
+    this.fireCount += 1;
+    if (this.fireCount % CALIBRATION_SAVE_EVERY === 0) void this.save();
+  }
+
+  /** 学習値(音響キャリブレーション)をディスクへ保存する(best-effort・Lv2b)。 */
+  async save(): Promise<void> {
+    if (!this.calibrated) return; // 何も復元/学習していなければ書かない
+    await saveBackchannelCalibration(this.engine.getCalibration());
   }
 }
 

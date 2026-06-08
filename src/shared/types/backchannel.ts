@@ -20,6 +20,21 @@ export interface BackchannelPoolData {
 }
 
 /**
+ * 自己キャリブレーションの学習値(task_18 Lv2b・永続化対象)。
+ * その人の声の「平常の大きさ/高さ」と「比の分布」=音響キャリブレーションであり、
+ * 感情・好感度などの状態ではない(§5.3 非抵触)。data/config/ に平文JSONで保存し継続利用で賢くする。
+ */
+export interface BackchannelCalibration {
+  baselinePeak: number;
+  baselinePitch: number;
+  pRatioMean: number;
+  pRatioVar: number;
+  eRatioMean: number;
+  eRatioVar: number;
+  ratioCount: number;
+}
+
+/**
  * リアルタイム・エンジンが「今うつ」と判断したときの出力(聞くターンの相槌)。
  * 実際の語の選択は selectBackchannel(語プール)で行う。
  */

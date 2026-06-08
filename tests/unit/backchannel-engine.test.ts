@@ -225,6 +225,40 @@ describe('BackchannelEngine ピッチによる型選択 (task_18 Lv2・主信号
   });
 });
 
+describe('BackchannelEngine 学習値の保存/復元 (task_18 Lv2b・永続化)', () => {
+  it('getCalibration → loadCalibration で往復できる', () => {
+    const a = new BackchannelEngine(CFG);
+    // いくつか学習させる(ピッチ付きの文を数回)。
+    phrasePitch(a, 0.1, 150);
+    phrasePitch(a, 0.12, 200);
+    phrasePitch(a, 0.1, 160);
+    const cal = a.getCalibration();
+    expect(cal.ratioCount).toBeGreaterThan(0);
+
+    const b = new BackchannelEngine(CFG);
+    b.loadCalibration(cal);
+    expect(b.getCalibration()).toEqual(cal);
+  });
+
+  it('壊れた/欠けた値は無視して現在値を保つ', () => {
+    const eng = new BackchannelEngine(CFG);
+    phrasePitch(eng, 0.1, 150);
+    const before = eng.getCalibration();
+    // @ts-expect-error 異常値を意図的に渡す
+    eng.loadCalibration({ baselinePitch: 'x', ratioCount: -5, pRatioVar: NaN });
+    const after = eng.getCalibration();
+    expect(after.baselinePitch).toBe(before.baselinePitch); // 不正は無視
+    expect(after.ratioCount).toBeGreaterThanOrEqual(0); // 負は弾く
+    expect(Number.isFinite(after.pRatioVar)).toBe(true);
+  });
+
+  it('null/undefined を渡しても安全(何もしない)', () => {
+    const eng = new BackchannelEngine(CFG);
+    expect(() => eng.loadCalibration(null)).not.toThrow();
+    expect(() => eng.loadCalibration(undefined)).not.toThrow();
+  });
+});
+
 describe('adaptiveThreshold (task_18 Lv2・自己キャリブレーション)', () => {
   const P = { fixed: 1.2, floor: 1.12, ceil: 1.7, warmup: 6, k: 1.3 };
 

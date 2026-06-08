@@ -77,6 +77,7 @@ export class VadRuntime {
     this.seg.reset();
     this.vad.reset();
     this.backchannel?.reset();
+    void this.backchannel?.save(); // 学習値を永続化(ハンズフリー終了時・Lv2b)
   }
 
   /** ENE 発話中フラグ。barge-in 検出を厳しめデバウンスに切替え、エコー誤割り込みを抑える。 */

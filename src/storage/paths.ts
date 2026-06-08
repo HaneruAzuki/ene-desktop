@@ -102,6 +102,11 @@ export function getAppSettingsPath(): string {
   return path.join(getConfigDir(), 'app-settings.json');
 }
 
+/** data/config/backchannel-calibration.json(相槌の音響キャリブレーション学習値・task_18 Lv2b)。 */
+export function getBackchannelCalibrationPath(): string {
+  return path.join(getConfigDir(), 'backchannel-calibration.json');
+}
+
 /** data/logs/(アプリ動作ログ・個人情報を含めない)。 */
 export function getLogsDir(): string {
   return path.join(getPortableDataDir(), 'logs');

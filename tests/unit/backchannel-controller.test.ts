@@ -8,6 +8,11 @@ vi.mock('../../src/character/backchannel-loader', () => ({
     cues: { continuer: ['うん', 'うんうん'] },
   })),
 }));
+// 永続化(Lv2b)は実ファイルI/Oなのでモック(テストを hermetic に保つ)。
+vi.mock('../../src/storage/backchannel-calibration', () => ({
+  loadBackchannelCalibration: vi.fn(async () => null),
+  saveBackchannelCalibration: vi.fn(async () => {}),
+}));
 
 import { BackchannelController } from '../../src/main/backchannel-controller';
 import type { TtsEngine, VoiceConfig } from '../../src/shared/types/voice';

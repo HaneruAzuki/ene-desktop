@@ -10,7 +10,16 @@ import {
   BACKCHANNEL_EMPHASIS_RATIO,
   BACKCHANNEL_PITCH_RATIO,
 } from '../shared/constants';
-import type { BackchannelCue, BackchannelDecision } from '../shared/types/backchannel';
+import type {
+  BackchannelCalibration,
+  BackchannelCue,
+  BackchannelDecision,
+} from '../shared/types/backchannel';
+
+/** 数値で有限ならそれを、さもなくば fallback を返す(壊れた保存値への防御)。 */
+function finiteOr(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
 
 /** 1フレームの RMS(二乗平均平方根=エネルギー)。韻律(声の勢い)判定に使う。純粋。 */
 export function frameRms(frame: Float32Array): number {
@@ -311,5 +320,30 @@ export class BackchannelEngine {
     // 直近の山は毎ターン仕切り直し(baseline=平常 は保持して相対判定を安定させる)。
     this.recentPeak = 0;
     this.recentPitchPeak = 0;
+  }
+
+  /** 学習値(音響キャリブレーション)を取り出す(永続化用・Lv2b)。 */
+  getCalibration(): BackchannelCalibration {
+    return {
+      baselinePeak: this.baselinePeak,
+      baselinePitch: this.baselinePitch,
+      pRatioMean: this.pRatioMean,
+      pRatioVar: this.pRatioVar,
+      eRatioMean: this.eRatioMean,
+      eRatioVar: this.eRatioVar,
+      ratioCount: this.ratioCount,
+    };
+  }
+
+  /** 保存済みの学習値を復元する(壊れた値は無視して現在値を維持・Lv2b)。 */
+  loadCalibration(c: Partial<BackchannelCalibration> | null | undefined): void {
+    if (!c || typeof c !== 'object') return;
+    this.baselinePeak = Math.max(0, finiteOr(c.baselinePeak, this.baselinePeak));
+    this.baselinePitch = Math.max(0, finiteOr(c.baselinePitch, this.baselinePitch));
+    this.pRatioMean = finiteOr(c.pRatioMean, this.pRatioMean);
+    this.pRatioVar = Math.max(0, finiteOr(c.pRatioVar, this.pRatioVar));
+    this.eRatioMean = finiteOr(c.eRatioMean, this.eRatioMean);
+    this.eRatioVar = Math.max(0, finiteOr(c.eRatioVar, this.eRatioVar));
+    this.ratioCount = Math.max(0, Math.floor(finiteOr(c.ratioCount, this.ratioCount)));
   }
 }
