@@ -670,7 +670,7 @@
 - **ガードレール**: A=ハッキングは才能(深い理解)のみ・実行は `refuse`・クーポンは過去の黒歴史。B=性的無知の失敗は**語ズラし**(非性的な大人語)へ・開示Lv5・性的会話に乗らない refuse 線。C=初恋は事実のみ認め**身体面は恒久はぐらかし**・深い開示は感情(ツン由来直結)。
 - **判断根拠**: 未成年キャラ×性的/違法題材の製品リスク(審査・評判・脱獄)を、芯(電脳少女・無邪気な失敗・過去の恋)を残しつつ回避。
 - **反映**: 個別記憶の執筆＋`characters/ene/life-memory.json` への JSON 変換・配置は**実装セッション**(計画書を入力)。
-- **実装(task_16)**: draft の41記憶を `characters/ene/life-memory.json` に配置済み(全 provenance:self・valence 分布 ポジ23/中立7/ネガ11・開示Lv 1〜5)。ガードレール A/B/C は canon 文面に反映済み。実行系ハッキング refuse・性的会話 refuse 線は fewshot/knowledge_domains 側(将来の創作タスクで強化)。
+- **実装(task_16)**: draft の41記憶を `characters/ene/life-memory.json` に配置済み(全 provenance:self・valence 分布 ポジ23/中立7/ネガ11・開示Lv 1〜5)。ガードレール A/B/C は canon 文面に反映済み。実行系ハッキング refuse(A)・初恋の身体面はぐらかし(C)の**専用 fewshot は N-16-12(B-12)で反映済み**。性的無知(B)は語ズラし＋成人向け refuse 線で充足。
 
 ### N-16-8 🟢 心情に中立プライアを追加(設計の正規化平均を補正)
 - **内容**: 設計 §3.2 の `Σw·v/Σw`(正規化平均)は**古い負記憶だけが残ると 0 に戻らず暗転ロック**する。分母に `MOOD_PRIOR_WEIGHT=1` を足し `Σw·v/(Σw+prior)` とした。→ 沈黙(記憶が古い/少ない)で mood が 0 へ縮約・数件では微細、を実現(設計の「沈黙で0へ」§3.2 の意図を満たす)。
@@ -687,6 +687,14 @@
 ### N-16-11 🟢 心/開示は retriever の deps ゲートで後方互換
 - **内容**: `RetrieverDeps={embedder?,mood?,familiarityStage?,rng?}`。未指定=mood0(バイアス無)・stage5(全開示)・argmax(決定論)=**task_15 の挙動と同一**。会話経路(`buildHeartDeps`)が now=`Date.now()` で mood/familiarity＋`Math.random` を注入。softmax サンプリング(`RECALL_SOFTMAX_TEMP`)で揺らぎ。λ/温度は調律可。
 - **反映**: §3.3(retriever.ts)。既存 retriever テスト群は回帰なし(251緑)。
+
+### N-16-12 🟢 B-12 完了: ガードレール A/C の専用 fewshot を追加(canon の実行系 refuse を fewshot へ反映)(2026-06-10)
+- **該当**: `characters/ene/fewshot.json` / optimization-backlog B-12 / N-16-7 の積み残し / canon計画書 §5-5
+- **背景**: N-16-7 で canon 文面にはガードレール A/B/C を反映済みだったが、**実行系ハッキング refuse(A)と初恋の身体面はぐらかし(C)の専用 fewshot 例**が未作成で「将来の創作タスク」へ送られていた(=B-12)。これを実装し B-12 を閉じた。
+- **追加**: ①`examples.refuse` に**ハッキング実行依頼を断る**例(才能=「仕組みは分かる」は残し実行は拒否・「昔痛い目見た/もうやらない」= canon「仕組みを覗く才能(セキュリティ)」と整合)。②新キー `examples.love_boundary` に**過去の交際は事実のみ認める/身体面は恒久はぐらかし**(「そ、そんなの言うわけないでしょ!?」= canon「過去に交際していた事実」と整合)。
+- **仕組み上の確認**: `prompt-builder.buildFixedFewshot` は `examples` の**全キーを毎ターン同順で投入**(`fewshotKey` は選択に未使用=メタデータ)。よって新キー追加だけでプロンプトに載る。`CharacterFewshot.examples` は `Record<string, FewshotExample[]>` で任意キー可・loader はキー集合を固定検証しない。
+- **B(性的無知)は新規 fewshot 不要と判断**: 題材ズラし(非性的な大人スラング)＋成人向け=refuse 線は既存(canon「知ったかぶりの大恥」＋`knowledge_domains.refuse`「成人向けコンテンツ」)で充足。
+- **検証**: fewshot.json パース OK(examples 7キー・refuse 3件・love_boundary 2件)。`character-loader`/`prompt-builder` テスト 17 件緑。
 
 ### N-17-1 🟡 音声方針の確定(2026-06-07 設計セッション・task_17)
 - **内容**: 4決定 = ①ルート=ローカルファースト(脳=Claudeストリーミング・STT/VAD/Turnはローカル・§4.2維持) ②役割=双方向の音声会話 ③TTS=`TtsEngine`差し替え可能＋完全ローカル開始(§4.4) ④声=同梱・戦略A「寛容ライセンス声を採用＋味付け」(Kokoro/MeloTTS等をin-process・pitch/speedをJSON外出し)。旧「ユーザ各自VOICEVOXインストール」は任意オプションへ降格。

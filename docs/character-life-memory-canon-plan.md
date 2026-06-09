@@ -177,8 +177,11 @@
 
 ## 5. 次のステップ
 
-1. 本書のテーブルを最終確認（テーマ・val・imp・開示の微調整）。
-2. 各行を **`EpisodicMemory`（`provenance:'self'`）の個別記憶**として執筆（summary 文・tags・entities・lifeStage）。
-3. `characters/ene/life-memory.json` へ JSON 変換・配置（**実装セッション**）。
-4. `knowledge_domains.json` の `none`（酒・投資・運転・医療・パチンコ）と矛盾しないか突き合わせ。
-5. ガードレール（A:refuse／B:refuse線／C:身体恒久はぐらかし）を fewshot / プロンプト制約へ反映（実装セッション）。
+> **状況（2026-06-10）：1〜5 すべて完了。** canon は `characters/ene/life-memory.json` に配置済み（36件・全 `provenance:'self'`・N-16-3 / N-16-7）。
+> ガードレールの fewshot 反映は **N-16-12（B-12）で完了**（A=ハッキング実行 refuse／C=初恋の身体面はぐらかし `love_boundary`／B=語ズラし＋成人向け refuse 線で充足）。本書は以後、内容の SSOT（履歴）として参照する。
+
+1. ~~本書のテーブルを最終確認（テーマ・val・imp・開示の微調整）。~~ ✅
+2. ~~各行を **`EpisodicMemory`（`provenance:'self'`）の個別記憶**として執筆（summary 文・tags・entities・lifeStage）。~~ ✅
+3. ~~`characters/ene/life-memory.json` へ JSON 変換・配置。~~ ✅
+4. ~~`knowledge_domains.json` の `none`（酒・投資・運転・医療・パチンコ）と矛盾しないか突き合わせ。~~ ✅
+5. ~~ガードレール（A:refuse／B:refuse線／C:身体恒久はぐらかし）を fewshot / プロンプト制約へ反映。~~ ✅（N-16-12）
