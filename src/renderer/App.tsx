@@ -28,6 +28,9 @@ function rectContains(el: HTMLElement | null, x: number, y: number): boolean {
 /** これ未満の長さ(秒)の push-to-talk 録音は誤タップ扱いで無視する。 */
 const MIN_RECORDING_SEC = 0.3;
 
+/** 起動準備が整うまで吹き出しに出す「まだ話しかけないで」サイン(音声エンジン起動・ウォーム中)。 */
+const WAIT_MESSAGE = 'ちょっと待って、…いま準備してるところ。';
+
 export function App(): React.ReactElement | null {
   const [characterInfo, setCharacterInfo] = useState<CharacterInfo | null>(null);
   const [inputVisible, setInputVisible] = useState(false);
@@ -51,17 +54,26 @@ export function App(): React.ReactElement | null {
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
   const voiceModeRef = useRef(false); // 非同期コールバックから handsFreeOn を読む
+  const readyRef = useRef(false); // 起動準備完了(多重通知の冪等化)
+  const interactedRef = useRef(false); // 既にユーザーが会話を始めたか(準備完了後の挨拶差し替え判定)
 
   // ON(リッスン中)かどうか: ハンズフリーは VAD 起動中、PTT は押下中。
   const micActive = voiceInputMode === 'hands-free' ? handsFreeOn : recording;
 
-  // 起動時に CharacterInfo / マイク入力方式を取得
+  // 起動時に CharacterInfo / マイク入力方式を取得 ＋ 起動準備の状態を反映。
+  // 準備が整うまでは挨拶を出さず「ちょっと待って、」を表示する(整い次第・挨拶へ差し替え)。
   useEffect(() => {
     void window.ene.getCharacterInfo().then(setCharacterInfo);
-    void window.ene.getInitialGreeting().then((greeting) => {
-      if (greeting) setBubble(greeting);
-    });
     void window.ene.getVoiceInputMode().then(setVoiceInputMode);
+    void window.ene.isReady().then((r) => {
+      if (r) markReady();
+      else if (!readyRef.current && !interactedRef.current) setBubble(WAIT_MESSAGE);
+    });
+  }, []);
+
+  // 準備完了の通知(push)。pull(isReady)との競合は readyRef で冪等化する。
+  useEffect(() => {
+    window.ene.onAppReady(() => markReady());
   }, []);
 
   // トレイ / コンテキストメニューからのイベント＋マイク入力方式の変更通知
@@ -169,11 +181,31 @@ export function App(): React.ReactElement | null {
     setCharState((s) => ({ ...s, pose: 'stand' }));
   }
 
+  /** 起動挨拶を1回取得して吹き出しに出す(pull・取得後 main 側でクリア)。 */
+  async function showGreeting(): Promise<void> {
+    const greeting = await window.ene.getInitialGreeting();
+    if (greeting) setBubble(greeting);
+  }
+
+  /** 起動準備が整った時の処理(pull/push どちらから来ても冪等)。 */
+  function markReady(): void {
+    if (readyRef.current) return;
+    readyRef.current = true;
+    if (!interactedRef.current) {
+      // 「ちょっと待って、」を挨拶へ差し替える(まだ会話していない場合のみ)。
+      void showGreeting();
+    } else {
+      // 既に会話中なら、待ちメッセージが残っていれば消すだけ。
+      setBubble((b) => (b === WAIT_MESSAGE ? null : b));
+    }
+  }
+
   /**
    * ユーザー発話(テキスト or 音声認識)に応答する共通フロー。
    * 「ENE 発話中」フラグ(barge-in 用)は実際の音声再生に連動(setPlaybackHandlers 参照)。
    */
   async function respond(text: string): Promise<void> {
+    interactedRef.current = true; // 会話開始 → 準備完了後に挨拶で上書きしない
     setBubble(null);
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' }));
@@ -212,6 +244,8 @@ export function App(): React.ReactElement | null {
       setBubble('…ごめん、耳がまだ準備できてないみたい。');
       return;
     }
+    // 聞き取り開始の時点で Tier0 キャッシュを温める(ハンズフリーは入力欄を開かないため・レイテンシ施策)。
+    void window.ene.warmCache();
     try {
       micRef.current ??= new VoiceMic();
       await micRef.current.start();
@@ -233,6 +267,8 @@ export function App(): React.ReactElement | null {
   // --- push-to-talk(押している間だけ録音) ---
   async function startPtt(): Promise<void> {
     if (recording) return;
+    // 録音開始の時点で Tier0 キャッシュを温める(録音→認識の間に書き込まれる・レイテンシ施策)。
+    void window.ene.warmCache();
     try {
       recorderRef.current = await startRecording();
       setRecording(true);

@@ -47,3 +47,24 @@ export function todayLocalYmd(): { year: number; month: number; day: number } {
   const d = new Date();
   return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
 }
+
+/**
+ * 指定した年月日時のローカル ISO 8601 + TZ オフセットを返す(忘却サマリの合成日付など)。
+ * 例: localIsoFromParts(2026, 5, 15) → "2026-05-15T00:00:00+09:00"。
+ * `new Date(y, mo-1, d, ...)` はローカル時刻として解釈されるため §5.6 に適合する。
+ */
+export function localIsoFromParts(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+): string {
+  const d = new Date(year, month - 1, day, hour, minute, second);
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+    tzOffset(d)
+  );
+}

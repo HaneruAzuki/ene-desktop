@@ -1,6 +1,7 @@
-import { createVoiceStreamParser } from './stream-parser';
+import { createVoiceStreamParser, type VoiceStreamParser } from './stream-parser';
 import { splitSentences } from './sentence-splitter';
 import { detectAiSelfReference } from './ai-self-check';
+import { stripRuby, rubyToReading } from './ruby';
 import { resolveStyle } from '../character/voice-loader';
 import type { EmotionLabel } from '../shared/types/animation';
 import type { OsCommand } from '../shared/types/os';
@@ -23,6 +24,8 @@ export interface VoiceChatDeps {
   onAudio: (wav: ArrayBuffer) => void;
   /** emotion 確定時に表情/スタイルへ反映(任意)。 */
   onEmotion?: (emotion: EmotionLabel) => void;
+  /** ストリーム書式パーサの生成(既定=bracket 形式。JSON ストリーミングは createJsonStreamParser を渡す)。 */
+  makeParser?: () => VoiceStreamParser;
 }
 
 export interface VoiceChatResult {
@@ -40,21 +43,25 @@ export async function runVoiceChat(
   stream: ModelStream,
   deps: VoiceChatDeps,
 ): Promise<VoiceChatResult> {
-  const parser = createVoiceStreamParser();
+  const parser = (deps.makeParser ?? createVoiceStreamParser)();
   let emotion: EmotionLabel = 'neutral';
   let emotionEmitted = false;
   const spoken: string[] = [];
   let blocked = false;
 
-  /** 1文を発話する。自称検知したら false(=打ち切り)。 */
+  /**
+   * 1文を発話する。自称検知したら false(=打ち切り)。
+   * ルビ(漢字《よみ》)は **表示用は除去**(自称検知・記録も除去後で行う)、**音声は読み下し**で合成する。
+   */
   const speakSentence = async (s: string): Promise<boolean> => {
-    if (detectAiSelfReference(s, deps.neverCallsSelf).detected) {
+    const display = stripRuby(s);
+    if (detectAiSelfReference(display, deps.neverCallsSelf).detected) {
       blocked = true;
       return false;
     }
-    const wav = await deps.tts.speak(s, resolveStyle(deps.voiceConfig, emotion));
+    const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion));
     deps.onAudio(wav);
-    spoken.push(s);
+    spoken.push(display);
     return true;
   };
 

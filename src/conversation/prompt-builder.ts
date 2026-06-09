@@ -16,19 +16,23 @@ const OUTPUT_FORMAT_SPEC = [
   '# 出力形式(厳守)',
   '必ず次のいずれかの JSON 1個だけで応答してください(前後に文章を付けない):',
   '',
-  '通常の会話:',
-  '{"type": "chat", "message": "あなたの返答", "reading": "あなたのへんとうのよみ", "emotion": "neutral"}',
+  '通常の会話(キーの順番もこの通りに:emotion を message より前に置く):',
+  '{"type": "chat", "emotion": "neutral", "message": "あなたの返答"}',
   '- message: 画面に表示する文(普通の漢字かな交じり)。',
-  '- reading: message を声に出すときの読みを【全てひらがな】で書く(音声合成用・必ず付ける)。',
-  '  漢字・数字・記号・英語も読み下す。例:「3冊」→「さんさつ」、「今日」→文脈に合う「きょう」、「AI」→「えーあい」、「100%」→「ひゃくぱーせんと」。',
-  '  顔文字や声に出さない記号は読みから省く。意味は message と同じにする(言い換えない)。',
+  '- 読みのルビ:読み方が文脈で割れる語(同じ漢字で読みが変わる語)や難読の固有名詞には、',
+  '  青空文庫式ルビ「漢字《よみ》」を付ける(よみは全てひらがな)。これは音声合成が正しく読むためのもの。',
+  '  例:「最近、夏目漱石の心《こころ》を読んだ。向上心《こうじょうしん》は大切だ」',
+  '   →「心」は文脈で こころ/しん に分かれるのでルビで指定する。',
+  '  自明な語にはルビを付けない(付けすぎない・普通に読める語はそのまま)。',
+  '  基底(ルビを振る範囲)の区切りが曖昧なときは ｜(全角縦棒)で基底の先頭を示す:「私の｜心《こころ》」。',
+  '  数字や記号も読みが紛れるならルビで補う。例:「3冊《さんさつ》」「100%《ひゃくぱーせんと》」。',
   '- emotion は任意。今の気持ちに合うものを次から1つ選んでよい(迷ったら入れなくてよい):',
   '  neutral(平常) / joy(うれしい) / anger(ツン・むっと) / sorrow(哀しい) / surprise(驚き) / embarrassed(照れ)。',
   '',
-  'OS操作(以下の3種類のみ。それ以外の action は使えない。message と同様 reading も付ける):',
-  'メモ帳を開く: {"type": "os_command", "message": "...", "reading": "...", "command": {"action": "open_notepad"}}',
-  'ブラウザでURLを開く(http/https のみ): {"type": "os_command", "message": "...", "reading": "...", "command": {"action": "open_browser", "target": "https://..."}}',
-  'フォルダを開く(ユーザーのホーム配下の絶対パスのみ): {"type": "os_command", "message": "...", "reading": "...", "command": {"action": "open_folder", "target": "C:\\\\Users\\\\..."}}',
+  'OS操作(以下の3種類のみ。それ以外の action は使えない。message のルビ規則は同じ):',
+  'メモ帳を開く: {"type": "os_command", "message": "...", "command": {"action": "open_notepad"}}',
+  'ブラウザでURLを開く(http/https のみ): {"type": "os_command", "message": "...", "command": {"action": "open_browser", "target": "https://..."}}',
+  'フォルダを開く(ユーザーのホーム配下の絶対パスのみ): {"type": "os_command", "message": "...", "command": {"action": "open_folder", "target": "C:\\\\Users\\\\..."}}',
   '',
   'これら以外の操作を求められた場合は、chat 型で「それはできない」とあなたの口調で説明してください。',
 ].join('\n');
@@ -57,9 +61,36 @@ function formatSemantic(semantic: SemanticMemory): string {
   return `# あなたの長期的な記憶\n${body}`;
 }
 
+/** 一件の整形(日付＋要約)。 */
+function fmtEpisodicLine(m: EpisodicMemory): string {
+  return `- [${m.date.slice(0, 10)}] ${m.summary}`;
+}
+
+/**
+ * 想起した記憶を「あなた自身の経験(canon=provenance:'self')」と
+ * 「相手について覚えていること(provenance:'user')」の2セクションに分けて提示する。
+ *
+ * なぜ分けるか:混ぜると、相手の人間関係(相手の知人・恋愛など)を自分のものと取り違える
+ * (provenance 混同。例「友達は?」に対し相手の想い人を自分の友達として挙げる)。canon を
+ * 'self' で持つ設計意図(自分の人生 vs 相手のこと)は、ここで明示しないとプロンプト上で消える。
+ * キャラ名はハードコードせず「あなた」基準で書く(§5.1)。
+ */
 function formatEpisodic(episodic: EpisodicMemory[]): string {
-  if (episodic.length === 0) return '- (関連する過去の出来事はない)';
-  return episodic.map((m) => `- [${m.date.slice(0, 10)}] ${m.summary}`).join('\n');
+  const own = episodic.filter((m) => m.provenance === 'self');
+  const aboutUser = episodic.filter((m) => m.provenance !== 'self');
+  const lines: string[] = [
+    '# あなた自身の思い出(あなたが実際に経験したこと。あなたの人生・友人・家族)',
+    own.length > 0
+      ? own.map(fmtEpisodicLine).join('\n')
+      : '- (この話題に関する、あなた自身の思い出はない)',
+    '',
+    '# 相手について覚えていること(相手＝話し相手の身に起きたこと。あなた自身の経験ではない。' +
+      '相手の知人・恋愛などを、あなた自身のものと混同しないこと)',
+    aboutUser.length > 0
+      ? aboutUser.map(fmtEpisodicLine).join('\n')
+      : '- (この話題に関する、相手の出来事はない)',
+  ];
+  return lines.join('\n');
 }
 
 /** 連続する同一 role を結合し、user で始まる正しい交互列にする(Claude API の制約)。 */
@@ -127,7 +158,6 @@ function buildVolatileContext(
   routerResult: RouterResult,
 ): string {
   const parts: string[] = [
-    '# 関連する過去の出来事',
     formatEpisodic(memoryContext.relevantEpisodic),
     '',
     '# このトピックに対する振る舞い',

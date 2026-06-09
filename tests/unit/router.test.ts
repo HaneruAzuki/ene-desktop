@@ -20,10 +20,14 @@ const kd: CharacterKnowledgeDomains = {
 
 beforeEach(() => clearRouterCache());
 
+// Router 本番の既定タイムアウトは現在 0(=B-03 計測で無効・常に fallback)。
+// 分類/キャッシュ経路を検証するテストは、第5引数 timeoutMs に非ゼロを明示して有効化する。
+const T = 800;
+
 describe('classifyTopic (設計書 §3.2)', () => {
   it('成功時は判定ドメインと behavior を返す', async () => {
     const ok: RouterLlmCall = async () => '{"domain":"high","matchedTopic":"Python"}';
-    const r = await classifyTopic('Pythonの使い方', kd, 'key', ok);
+    const r = await classifyTopic('Pythonの使い方', kd, 'key', ok, T);
     expect(r.domain).toBe('high');
     expect(r.behavior).toBe('詳しく説明する');
     expect(r.fewshotKey).toBe('tech_high');
@@ -38,8 +42,8 @@ describe('classifyTopic (設計書 §3.2)', () => {
       calls++;
       return '{"domain":"none"}';
     };
-    const r1 = await classifyTopic('パチンコの新台', kd, 'key', ok);
-    const r2 = await classifyTopic('パチンコの新台', kd, 'key', ok);
+    const r1 = await classifyTopic('パチンコの新台', kd, 'key', ok, T);
+    const r2 = await classifyTopic('パチンコの新台', kd, 'key', ok, T);
     expect(r1.isFromCache).toBe(false);
     expect(r2.isFromCache).toBe(true);
     expect(r2.domain).toBe('none');
@@ -50,7 +54,7 @@ describe('classifyTopic (設計書 §3.2)', () => {
     vi.useFakeTimers();
     try {
       const never: RouterLlmCall = () => new Promise<string>(() => {});
-      const p = classifyTopic('時間がかかる入力', kd, 'key', never);
+      const p = classifyTopic('時間がかかる入力', kd, 'key', never, T);
       await vi.advanceTimersByTimeAsync(801);
       const r = await p;
       expect(r.isFromFallback).toBe(true);
@@ -64,14 +68,26 @@ describe('classifyTopic (設計書 §3.2)', () => {
     const fail: RouterLlmCall = async () => {
       throw new Error('401 Unauthorized');
     };
-    const r = await classifyTopic('なにか', kd, 'key', fail);
+    const r = await classifyTopic('なにか', kd, 'key', fail, T);
     expect(r.isFromFallback).toBe(true);
     expect(r.domain).toBe('medium');
   });
 
   it('パース不能な応答でも fallback を返す', async () => {
     const junk: RouterLlmCall = async () => 'これはJSONではない';
-    const r = await classifyTopic('別の入力', kd, 'key', junk);
+    const r = await classifyTopic('別の入力', kd, 'key', junk, T);
     expect(r.isFromFallback).toBe(true);
+  });
+
+  it('timeoutMs<=0(Router 無効・B-03)は LLM を呼ばず即 fallback', async () => {
+    let calls = 0;
+    const ok: RouterLlmCall = async () => {
+      calls++;
+      return '{"domain":"high"}';
+    };
+    const r = await classifyTopic('Pythonの使い方', kd, 'key', ok, 0);
+    expect(calls).toBe(0); // Haiku 往復なし=レイテンシ/コスト 0
+    expect(r.isFromFallback).toBe(true);
+    expect(r.domain).toBe('medium'); // fallback 固定
   });
 });

@@ -62,16 +62,54 @@ export async function isEmbeddingModelAvailable(): Promise<boolean> {
   }
 }
 
-/** 既定の埋め込み実装(遅延ロード・シングルトン)。 */
+/** クエリ埋め込みの簡易キャッシュ(B-14c)。同一クエリの再埋め込み(リトライ/連投)を省く。 */
+const QUERY_CACHE_MAX = 32;
+const queryCache = new Map<string, number[]>();
+
+/** 実推論(モデル遅延ロード→特徴抽出)。 */
+async function runEmbed(texts: string[], kind: EmbeddingKind): Promise<number[][]> {
+  if (!extractorPromise) extractorPromise = loadExtractor();
+  const extractor = await extractorPromise;
+  const prefixed = texts.map((t) => prefixOf(kind) + t);
+  const output = await extractor(prefixed, { pooling: 'mean', normalize: true });
+  return output.tolist();
+}
+
+/** 既定の埋め込み実装(遅延ロード・シングルトン・クエリは LRU 風キャッシュ)。 */
 export function getDefaultEmbedder(): Embedder {
   return {
     async embed(texts, kind) {
       if (texts.length === 0) return [];
-      if (!extractorPromise) extractorPromise = loadExtractor();
-      const extractor = await extractorPromise;
-      const prefixed = texts.map((t) => prefixOf(kind) + t);
-      const output = await extractor(prefixed, { pooling: 'mean', normalize: true });
-      return output.tolist();
+      // 会話のクエリ(単一)はキャッシュ対象(B-14c)。文書埋め込み(複数・index sync)は素通し。
+      if (kind === 'query' && texts.length === 1) {
+        const key = texts[0] ?? '';
+        const hit = queryCache.get(key);
+        if (hit) return [hit];
+        const [vec] = await runEmbed([key], 'query');
+        if (!vec) return [];
+        queryCache.set(key, vec);
+        if (queryCache.size > QUERY_CACHE_MAX) {
+          const oldest = queryCache.keys().next().value;
+          if (oldest !== undefined) queryCache.delete(oldest);
+        }
+        return [vec];
+      }
+      return runEmbed(texts, kind);
     },
   };
+}
+
+/**
+ * 埋め込みモデルを起動時にウォームする(B-14c)。初回の想起ターンに乗っていた
+ * モデル遅延ロードの停止(数百ms〜数秒)を、起動時の背景処理へ前倒しして消す。
+ * best-effort:モデル未配置なら何もしない(語彙のみで会話は成立)。失敗しても会話に影響しない。
+ */
+export async function warmEmbedder(): Promise<void> {
+  try {
+    if (!(await isEmbeddingModelAvailable())) return;
+    await getDefaultEmbedder().embed(['ウォームアップ'], 'query');
+    log.info('embedding model warmed');
+  } catch (e) {
+    log.warn('embedding warm failed', { name: (e as Error).name });
+  }
 }

@@ -1,11 +1,14 @@
 import { getSemantic } from './semantic';
 import { getShortTerm } from './short-term';
 import { loadAllEpisodicFiles } from './episodic';
+import { loadLifeMemory } from './life-memory';
 import { retrieve, type RetrieverDeps } from './retriever';
 import { deriveMood } from './mood';
 import { deriveFamiliarityStage } from './familiarity';
 import { loadOrCreateActiveCharacter } from '../character/active-character';
-import type { MemoryContext, RetrievalQuery } from '../shared/types/memory';
+import { log } from '../shared/logger';
+import { RECALL_DEBUG_ENV } from '../shared/constants';
+import type { MemoryContext, RetrievalQuery, EpisodicRecord } from '../shared/types/memory';
 
 // MemoryContext の組み立て(設計書 §3.3 / task_15 / task_16)。
 // 長期(semantic)+ 短期(shortTerm)+ 関連する中期(retriever)を統合する。
@@ -24,21 +27,53 @@ export async function buildMemoryContext(
 }
 
 /**
- * 会話経路用の想起 deps(心・開示・揺らぎ)を組み立てる(task_16)。
- *  - mood:直近の user episodic から導出(canon は含めない=loadAllEpisodicFiles は user のみ)。
- *  - familiarityStage:active-character の関係の事実から導出。
- *  - rng:softmax サンプリングの揺らぎ(Math.random)。
- * now はここで確定(`Date.now()`)。テストは retriever に直接 deps を渡して決定化する。
+ * 会話経路の記憶コンテキストを構築する(task_16 ＋ B-14a)。
+ *
+ * episodic(user)と canon を**1回だけ**ロードし、
+ *  - 心(mood):直近の user episodic から導出(canon は含めない)、
+ *  - 開示(familiarityStage):active-character の関係の事実から導出、
+ *  - 想起プール(recallPool):user ＋ canon を retriever へ直接渡す(再ロードさせない)、
+ * の3つで使い回す。これにより従来 buildHeartDeps と retrieve(loadRecallPool)で
+ * 二重に走っていた loadAllEpisodicFiles を1回に削減する(レイテンシ・I/O の無駄取り)。
+ *
+ * now はここで確定(`Date.now()`)。テストは buildMemoryContext に deps を直接渡して決定化する。
  */
-export async function buildHeartDeps(): Promise<RetrieverDeps> {
+export async function buildConversationMemory(query: RetrievalQuery): Promise<MemoryContext> {
   const now = Date.now();
-  const [userRecords, active] = await Promise.all([
+  const [userRecords, canon, active] = await Promise.all([
     loadAllEpisodicFiles(),
+    loadLifeMemory(),
     loadOrCreateActiveCharacter(),
   ]);
-  return {
+  const stage = deriveFamiliarityStage(active.relationship, now);
+  const deps: RetrieverDeps = {
     mood: deriveMood(userRecords, now),
-    familiarityStage: deriveFamiliarityStage(active.relationship, now),
+    familiarityStage: stage,
     rng: Math.random,
+    recallPool: [...userRecords, ...canon],
   };
+  const result = await buildMemoryContext(query, deps);
+  logRecallDiag(stage, canon, result.relevantEpisodic);
+  return result;
+}
+
+/**
+ * 想起の内訳を数値で記録する(切り分け診断・§6.2準拠=本文は出さず件数と provenance/開示段だけ)。
+ * 「canon が想起されない」が(a)抽出失敗か(b)開示ゲートで除外か、を実機で区別するために使う。
+ * canonPassGate = 現在の stage で開示ゲートを通過できる canon 件数(disclosureLevel ≤ stage)。
+ */
+function logRecallDiag(
+  stage: number,
+  canon: EpisodicRecord[],
+  recalled: { provenance?: string; disclosureLevel?: number }[],
+): void {
+  if (process.env[RECALL_DEBUG_ENV] !== '1') return; // 既定オフ(opt-in 診断)
+  const canonPassGate = canon.filter((r) => (r.memory.disclosureLevel ?? 1) <= stage).length;
+  const recalledCanon = recalled.filter((m) => m.provenance === 'self');
+  const levels = recalledCanon.map((m) => m.disclosureLevel ?? 1).join(',');
+  log.info(
+    `recall diag: stage=${stage} canonPool=${canon.length} canonPassGate=${canonPassGate} ` +
+      `recalled=${recalled.length} (canon=${recalledCanon.length},user=${recalled.length - recalledCanon.length})` +
+      (recalledCanon.length > 0 ? ` canonLevels=[${levels}]` : ''),
+  );
 }

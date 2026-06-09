@@ -27,6 +27,12 @@ export interface RetrieverDeps {
   familiarityStage?: number;
   /** softmax サンプリング用 RNG(0..1)。未指定=決定論(スコア降順)。 */
   rng?: () => number;
+  /**
+   * 想起プール(user episodic ＋ canon)を呼出側が事前ロードして渡す(B-14a)。
+   * 未指定なら従来どおり loadRecallPool() で都度ロードする。
+   * 会話経路では心の導出と想起で同じ episodic を共有し、二重ロードを避けるために使う。
+   */
+  recallPool?: EpisodicRecord[];
 }
 
 let defaultVectorDisabled = false;
@@ -112,7 +118,8 @@ export async function retrieveRecords(
 ): Promise<EpisodicRecord[]> {
   const limit = query.limit ?? DEFAULT_RETRIEVAL_LIMIT;
   const stage = deps.familiarityStage ?? 5; // 未指定=全開示(後方互換)
-  const all = await loadRecallPool();
+  // 呼出側が事前ロードしたプールがあれば再ロードしない(B-14a: 二重ロード解消)。
+  const all = deps.recallPool ?? (await loadRecallPool());
 
   // current(非 superseded・category・**開示段階内**)の母集団。
   const byId = new Map<string, EpisodicRecord>();

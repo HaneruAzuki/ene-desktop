@@ -15,6 +15,7 @@ const eneAPI: EneAPI = {
   setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke('ene:set-ignore-mouse-events', ignore),
   showCharacterContextMenu: () => ipcRenderer.invoke('ene:show-character-context-menu'),
   warmCache: () => ipcRenderer.invoke('ene:warm-cache'),
+  isReady: () => ipcRenderer.invoke('ene:is-ready'),
   transcribeAudio: (samples) => ipcRenderer.invoke('ene:transcribe-audio', samples),
   startVad: () => ipcRenderer.invoke('ene:vad-start'),
   sendVadFrame: (frame) => ipcRenderer.send('ene:vad-frame', frame),
@@ -53,6 +54,8 @@ const eneAPI: EneAPI = {
     ipcRenderer.on('ene:backchannel', (_event, wav: ArrayBuffer | null) => cb(wav));
   },
   onAppReady: (cb) => {
+    // 二重登録防止(dev StrictMode で effect が2回走る対策)=常に単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:app-ready');
     ipcRenderer.on('ene:app-ready', () => cb());
   },
   onError: (cb) => {

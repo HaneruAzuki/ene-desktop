@@ -1,6 +1,7 @@
 import type { ConversationResponse } from '../shared/types/conversation';
 import type { OsAction } from '../shared/types/os';
 import { EMOTION_LABELS, type EmotionLabel } from '../shared/types/animation';
+import { stripRuby, rubyToReading } from './ruby';
 
 // JSON 応答パースの三段構え(設計書 §3.4「パース成功率の三段構え」)。
 // zod 等は使わず手書きの型ガードで検証する。
@@ -55,19 +56,23 @@ export function parseConversationResponse(raw: string): ConversationResponse | n
     const parsed: unknown = JSON.parse(text);
     if (!isValidResponse(parsed)) return null;
     const o = parsed as Record<string, unknown>;
-    // reading(任意・音声読み上げ用のひらがな・task_17)。欠落時は呼び出し側が message を読む。
-    const reading = typeof o.reading === 'string' && o.reading.length > 0 ? o.reading : undefined;
+    // Claude振り仮名方式:message に青空文庫式ルビ(漢字《よみ》)が埋め込まれる。
+    //  - 表示用 message = ルビを除去した素の漢字かな交じり。
+    //  - reading(音声用)= ルビを解決した読み下しテキスト(ルビが無ければ undefined=message を読む)。
+    const display = stripRuby(parsed.message);
+    const ttsText = rubyToReading(parsed.message);
+    const reading = ttsText !== display ? ttsText : undefined;
     // chat は emotion(任意)を許可ラベルへ正規化して付与する(task_13)。
     if (parsed.type === 'chat') {
       const emotion = normalizeEmotion(o.emotion);
       return {
         type: 'chat',
-        message: parsed.message,
+        message: display,
         ...(emotion ? { emotion } : {}),
         ...(reading ? { reading } : {}),
       };
     }
-    return reading ? { ...parsed, reading } : parsed;
+    return { ...parsed, message: display, ...(reading ? { reading } : {}) };
   } catch {
     return null;
   }

@@ -16,6 +16,7 @@ const runtime: AppRuntime = {
   tts: null,
   voiceConfig: null,
   voiceInputMode: 'push-to-talk', // 起動時に lifecycle で設定ファイルから上書きする
+  ready: false, // 音声エンジン＋ウォーム完了で true（lifecycle が背景で確定し ene:app-ready を送る）
 };
 let mainWindow: BrowserWindow | null = null;
 let shuttingDown = false;

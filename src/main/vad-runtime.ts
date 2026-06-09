@@ -1,11 +1,17 @@
 import type { BrowserWindow } from 'electron';
+import { performance } from 'node:perf_hooks';
 import { log } from '../shared/logger';
 import { SileroVad } from '../conversation/silero-vad';
 import { VadSegmenter } from '../conversation/vad-segmenter';
 import { frameRms, frameF0 } from '../conversation/backchannel-engine';
 import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
 import type { BackchannelController } from './backchannel-controller';
-import { VAD_FRAME_SIZE, VAD_SPEECH_PAD_MS, STT_SAMPLE_RATE } from '../shared/constants';
+import {
+  VAD_FRAME_SIZE,
+  VAD_SPEECH_PAD_MS,
+  VAD_MIN_SILENCE_MS,
+  STT_SAMPLE_RATE,
+} from '../shared/constants';
 
 // ハンズフリー VAD ループ(main・task_17 Phase C)。
 //
@@ -148,10 +154,17 @@ export class VadRuntime {
   }
 
   private async transcribeAndSend(audio: Float32Array): Promise<void> {
+    // 計測:喋り終わり〜送信の"見えないレイテンシ"。stt=文字起こし時間。
+    //   この前に必ず VAD_MIN_SILENCE_MS の無音待ちが入る(喋り終わってから死に時間=無音 + stt)。
+    const t = performance.now();
     try {
       const text = await transcribe(audio);
       if (text && this.active) {
-        log.info(`vad transcript (${text.length} chars)`); // §6.2: 本文は出さない
+        // §6.2: 本文は出さない(文字数と ms のみ)。
+        log.info(
+          `vad transcript (${text.length} chars, stt=${Math.round(performance.now() - t)}ms; ` +
+            `+silence ${VAD_MIN_SILENCE_MS}ms before)`,
+        );
         this.send('ene:voice-transcript', text);
       } else {
         this.sendState('listening'); // 空認識 → 聞き取りに戻る

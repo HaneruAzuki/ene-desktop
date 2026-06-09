@@ -67,6 +67,11 @@ export interface EneAPI {
   // 相槌受信(main → renderer・task_18 Phase B)。wav があれば再生、null でも**うなずき**は出す。
   onBackchannel(callback: (wav: ArrayBuffer | null) => void): void;
 
+  // 起動準備の完了(音声エンジンのヘルス到達＋埋め込みウォーム)。
+  //  - isReady: 現在の準備状態を取得(初期表示用・pull)。
+  //  - onAppReady: 準備完了の通知(push)。renderer は完了まで「ちょっと待って、」を表示する。
+  isReady(): Promise<boolean>;
+
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
   onError(callback: (error: string) => void): void;

@@ -810,7 +810,53 @@
 - **注意**: Router タイムアウトが実 Haiku 往復を下回り fallback=medium になる **B-03 本体(few-shot 不発)は未解決**(並列化で critical path から隠れただけ)。B-03 は backlog 残置。
 - **🟡 要反映(設計書 §3.3 L811-814)**: `RetrieverDeps` に `recallPool?` を追記。会話経路の記憶構築を `buildConversationMemory`(episodic 1回ロード)として記述。
 
-> **残(Tier 0 続き・実機計測後に着手)**: B-14b(想起/埋め込みのワーカースレッド化)・B-14c(埋め込み起動時ウォーム＋クエリ埋め込みキャッシュ)。本3点(B-01/B-02/B-14a/B-03b)の実機レイテンシ計測を挟んでから判断する。
+### N-LAT-3 🟡 Claude振り仮名方式(青空文庫式ルビ)で読みを解決・`reading` フィールド廃止(B-06 前提)
+- **該当**: `conversation/ruby.ts`(新規)/ `response-parser.ts` / `prompt-builder.ts` / `types/conversation.ts` / 設計書 §3.4(出力形式)
+- **背景**: 同形異音語(心=こころ/しん 等)を文脈で読み分けるには意味理解が要る。調査(wk3n8tig6)で、ローカル完結＋カスタム声＋寛容ライセンス＋文脈読みを**1エンジンで満たす候補は無し**(AivisSpeech は pyopenjtalk 静的辞書・BERTは韻律のみ/Fish Speech はNC失格)と確定。→ 既に持つ理解器(Claude or 任意のブレインLLM)に読みを担わせる方式を採用。
+- **変更**: Claude は `message` に**曖昧語だけ**青空文庫式ルビ「漢字《よみ》」(基底曖昧時は `｜`)を付ける。`reading` フィールドは**廃止**。パーサが ①表示用 `message`(`stripRuby`=《よみ》除去)②音声用 `reading`(`rubyToReading`=基底《よみ》→よみ・他はエンジン辞書)へ分解。表示・自称検知・履歴・リップシンクは全て**ルビ除去済の message** を使う(パーサが唯一の継ぎ目)。
+- **プロバイダ非依存(ユーザ制約)**: ルビ書式は**自前定義・自前パース**=Claude固有API機能に依存しない。他社/ローカルLLMでも同じ書式で動く(§11.7 マルチプロバイダと整合)。voice は LLM 必須でもない(ルビ無し=エンジン辞書読み)。
+- **レイテンシ**: 曖昧語だけ注釈=全文ふりがな(旧 reading)よりトークン少=生成が速い。`message` は文単位ストリーミング可=B-06 第一声短縮の前提が整った。
+- **検証**: typecheck/lint/**全405テスト緑**(新規 ruby 6・response-parser 刷新 5)。例「最近、夏目漱石の心《こころ》を読みました。向上心《こうじょうしん》は大切だと思いました。」→ 表示=漢字のまま/音声=「…のこころを…こうじょうしんは…」と読み分け確認。
+- **残(B-06 本体)**: 素テキスト文単位ストリーミングの実配線(SDK stream＋sentence-splitter＋音声キュー)・C2(文単位 自称検知ゲート)。任意:ローカル読み基盤(ユーザ辞書＋Yomikata・要ライセンス確認)。
+- **🟡 要反映(設計書 §3.4)**: 出力形式から `reading` フィールドを削除し、**message の青空文庫式ルビ規則**＋パーサの表示/音声分解(`ruby.ts`)を記述。
+
+### N-LAT-4 🟡 音声ストリーミング本体(C1)を実装=第一声短縮(B-06・既定オフ)
+- **該当**: `json-stream-parser.ts`(新規)/ `voice-chat.ts`(runVoiceChat)/ `client.ts`(makeStreamCall)/ `voice-runtime.ts`(streamVoiceChat)/ `prompt-builder.ts` / `ipc.ts` / 設計書 §3.4・§11.1
+- **方式の選択**: 既存の bracket 形式ストリームパーサ(`stream-parser.ts`)は**別出力契約＋few-shot/キャッシュ分岐**を要するため不採用。**JSON契約を1本に保ったまま** `message` 文字列値を逐次抽出する `json-stream-parser.ts`(同じ `VoiceStreamParser` IF)を新設し、`runVoiceChat` をパーサ差し替えで再利用。プロンプトは非ストリーミングと同一(emotion を message より前へ並べ替え=第一声前に emotion 確定)。
+- **流れ**: `makeStreamCall`(SDK `stream:true`・text_delta を yield)→ `json-stream-parser`(emotion 早期確定＋message を文単位に割る・JSONエスケープ解決)→ `runVoiceChat`(**C2 文単位自称ゲート**＋**ルビ解決**:表示/検知=`stripRuby`、合成=`rubyToReading`)→ WAV を `ene:voice-chunk` で renderer へ。確定 `ConversationResponse` を吹き出し/記憶/OSコマンド用に返す。
+- **4層防御の割り切り**: ストリーミングは第1層(プロンプト)＋**C2(文単位自称検知)**で守る。発話済みは取り消せないため**再生成(第3層)は使わず**、自称文は喋らず打ち切り→吹き出しはフォールバック文。非ストリーミング経路は従来の4層を維持。
+- **安全/ゲート**: **`ENE_VOICE_STREAMING=1` のときだけ有効**(既定オフ)。会話の最重要パスで**未実機検証**のため。ストリーミングが例外を投げたら**非ストリーミングへフォールバック**(`chat()`)。音声は streamVoiceChat 内で送出済みなので、最終 `speakOut` は非ストリーミング時のみ。
+- **検証**: typecheck/lint/**全413テスト緑**(新規 json-stream-parser 8・既存 voice-chat は makeParser 既定＋ルビ no-op で後方互換)。**実機(実 Claude streaming＋AivisSpeech＋renderer)での第一声短縮・文割れ・C2・emotion 早期確定は未検証**=有効化前に要確認。
+- **🟡 要反映(設計書 §3.4/§11.1)**: ストリーミング音声経路(JSON逐次抽出・C2・既定オフのフラグ)を「実装済(未実機検証)」として記述。`stream-parser.ts`(bracket)は不使用の旧案として注記。
+
+### N-LAT-5 ⚪ 埋め込み起動時ウォーム＋クエリキャッシュ(B-14c)
+- **該当**: `embedder.ts`(`warmEmbedder`・クエリ LRU キャッシュ)/ `lifecycle.ts`(Step8.4 背景ウォーム)
+- **内容**: 初回想起ターンに乗っていたモデル遅延ロード(数百ms〜数秒)を起動時の背景処理へ前倒し(`void warmEmbedder()`・モデル未配置なら no-op)。＋単一クエリ埋め込みを LRU 風キャッシュ(リトライ/連投で再埋め込みを省略・最大32件)。品質劣化ゼロ・低リスク。typecheck/lint/全413テスト緑。
+- **残 B-14b(ワーカー化)**: 効果は要計測(onnxruntime 既に裏スレッド・B-03b で Router 裏)＋統合リスク(worker から electron `app` 不可=パス注入・パッケージ版 native/asar)。**実機計測で main 詰まりが実在した場合のみ着手**。
+
+> **Tier 0 まとめ**: B-01/B-02(抽出背景化)・B-14a(二重ロード)・B-03b/B-14d(並列化)・B-14c(ウォーム/キャッシュ)= **着地済**。残=B-14b(計測条件付き)。実機レイテンシ計測で締める。
+
+---
+
+## 忘却機構(B-13 / 設計書 §11.6・task_19・2026-06-09)
+
+### N-FORGET-1 🟡 忘却機構を実装(月次/年次サマリ＋重要度しきい値の物理削除・**既定オフ**)
+- **該当**: 設計書 §11.6 / optimization-backlog B-13 / `tasks/task_19_forgetting.md`
+- **新規**: `consolidation-policy.ts`(純粋計画)・`summarizer.ts`(期間再要約・LlmComplete DI・失敗時 throw)・`forgetting.ts`(orchestrator＋直列化ロック＋ゲート)・`consolidation-state.ts`。追加=`episodic.deleteEpisodicById`・`index-vector.pruneVectorIndex`・`datetime.localIsoFromParts`・`paths.getConsolidationStatePath`・`extraction-scheduler.enforceShortTermCap`。
+- **設計判断**: ①サマリは**通常 EpisodicMemory**(`category="summary"`＋`extra.summaryTier`、importance 月次4/年次5、valence 0=mood 不変)で保存=既存スキーマ/索引/想起を流用・後方互換・平文可搬。②**物理削除**(§6.4)。③**要約成功→削除**の順(サマリ無しで記憶を失わない)。④起動時**背景**実行＋冪等(済み期間はサマリ有無で判定)。⑤**既定オフ**=`ENE_FORGETTING=1` のときだけ `lifecycle` が起動(破壊的のため実データ前にレビュー)。⑥短期ハード上限(採用(a))=`SHORT_TERM_HARD_MAX=80` で同期抽出強制。
+- **段階(§11.6)**: 月次=完了月の生記録を1サマリ化→importance≤2 削除/≥3 残。年次=`currentYear-Y≥2` の年の月次サマリ＋残存詳細を再要約→月次サマリ削除・生 importance≤3 削除/≥4 残。canon(self)は対象外。5年サマリ・「忘れて」指示削除は将来。
+- **索引整合**: 物理削除後 `rebuildInvertedIndex()`＋`pruneVectorIndex()`(派生キャッシュ・真実の源は episodic 本体)。
+- **検証**: typecheck/lint/**全399テスト緑**(新規 consolidation-policy 8・forgetting 3)。**実機での有効化(ENE_FORGETTING=1)での挙動・初回大量統合のレイテンシは未確認**(背景実行だが I/O 量に注意)。
+- **🟡 要反映(設計書 §11.6)**: 「将来拡張」→「**実装済み(月次/年次・既定オフ・物理削除・サマリ=summary カテゴリ EpisodicMemory)**」へ更新。`task_19` を正本参照に追加。
+
+### N-RECALL-1 🔴 **重要バグ**: canon(自分の人生)と user 記憶をプロンプトで混同 → 相手の人間関係を自分のものとして発話
+- **該当**: 設計書 §3.4 / `prompt-builder.ts` `formatEpisodic` / task_16 canon(`provenance:'self'`)
+- **症状**: 「友達の名前は?」に対し、キャラ自身の友達(canon=美月)に加えて、**ユーザーが過去に話した相手の知人(鈴木=`provenance:'user'`)を自分の友達として列挙**した(「いるわよ、美月とか鈴木とか」)。
+- **真因**: `formatEpisodic` が想起結果(`user`＋`self` 混在)を**1つの「# 関連する過去の出来事」に provenance 無区別で投入**していた。canon を `provenance:'self'` で持つ設計意図(自分の人生 vs 相手のこと)が**プロンプト生成段で消失**し、LLM が誰の記憶か判別不能だった。想起・開示ゲート・抽出は正常(切り分け済み)。
+- **修正**: `formatEpisodic` を2セクションに分離 — `# あなた自身の思い出(あなたが実際に経験したこと)`(`provenance==='self'`)と `# 相手について覚えていること(相手の身に起きたこと・あなたの経験ではない・混同しないこと)`(それ以外)。キャラ名はハードコードせず「あなた」基準(§5.1)。`buildVolatileContext` の旧見出しは撤去。
+- **切り分け診断**: `context-builder.buildConversationMemory` に数値のみの `recall diag`(stage/canonPool/canonPassGate/recalled の provenance 内訳・§6.2準拠)を追加。**既定オフ**=`ENE_DEBUG_RECALL=1` で ON(`RECALL_DEBUG_ENV`)。実機ログで `stage=1 canonPassGate=8 recalled=5(canon=1 level1=美月)` を確認し、葵・玲奈(disclosureLevel 2)は stage1 の開示ゲートで除外=設計通りと確定。
+- **検証**: typecheck 緑・`prompt-builder.test.ts` に provenance 分離の回帰テスト追加(14件緑)・実機で鈴木混同の解消を確認。
+- **⚪ 設計書反映候補**: §3.4 プロンプト構成に「episodic は provenance(self/user)で2セクション分離」を明記(現状は本ノートで代替)。
 
 ---
 

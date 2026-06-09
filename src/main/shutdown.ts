@@ -1,5 +1,5 @@
 import { log } from '../shared/logger';
-import { extractFromShortTerm } from '../memory/extraction-trigger';
+import { flushExtraction } from '../memory/extraction-scheduler';
 import { clearShortTerm } from '../memory/short-term';
 import { makeLlmComplete } from '../conversation/client';
 import { stopVoiceEngine } from './voice-engine';
@@ -22,7 +22,9 @@ export async function runShutdownSequence(runtime: AppRuntime): Promise<void> {
 
   if (runtime.apiKey) {
     try {
-      await extractFromShortTerm('shutdown', makeLlmComplete(runtime.apiKey));
+      // 走行中のバックグラウンド抽出(B-01)を待ってから、残った未抽出を全て抽出する。
+      // これを待たずに短期記憶を消すと、抽出途中の記憶を取りこぼす。
+      await flushExtraction(makeLlmComplete(runtime.apiKey));
     } catch (e) {
       log.warn('memory extraction on shutdown failed', { name: (e as Error).name });
     }

@@ -72,6 +72,29 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     expect(lastUserText(p)).toContain('過去にラーメンの話をした');
   });
 
+  it('canon(self)と user 記憶は別セクションに分けて提示される(provenance 混同防止)', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        // canon = キャラ自身の友達
+        { date: '2018-06-25T00:00:00+09:00', topic: '友達', summary: '美月は初めての友達', importance: 5, category: 'friendship', provenance: 'self' },
+        // user = 相手の知人(混同してはいけない)
+        { date: '2025-11-02T00:00:00+09:00', topic: '相手の話', summary: '相手は鈴木のことが好きだと打ち明けた', importance: 3, category: 'relationship', provenance: 'user' },
+      ],
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    // 2セクションの見出しが両方ある
+    expect(text).toContain('あなた自身の思い出');
+    expect(text).toContain('相手について覚えていること');
+    // canon の美月は「あなた自身」側、鈴木は「相手について」側に出る(順序で領域を確認)
+    const selfIdx = text.indexOf('あなた自身の思い出');
+    const userIdx = text.indexOf('相手について覚えていること');
+    const mizukiIdx = text.indexOf('美月は初めての友達');
+    const suzukiIdx = text.indexOf('相手は鈴木のことが好き');
+    expect(selfIdx).toBeLessThan(mizukiIdx);
+    expect(mizukiIdx).toBeLessThan(userIdx); // 美月は user セクションより前(=self セクション内)
+    expect(userIdx).toBeLessThan(suzukiIdx); // 鈴木は user セクション内
+  });
+
   it('連続する同一 role を作らない(交互列を保つ)', () => {
     const mc = makeMemoryContext({
       shortTerm: [{ role: 'user', text: '直前のユーザー発話', timestamp: 't', extracted: false }],

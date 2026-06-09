@@ -77,6 +77,18 @@ export async function syncVectorIndex(
   return index;
 }
 
+/**
+ * 現存する ID 集合に無いベクトルエントリを索引から除去する(忘却による物理削除後の掃除)。
+ * 埋め込みは不要(削るだけ)。残った記録の再埋め込みは次回 syncVectorIndex に任せる。
+ */
+export async function pruneVectorIndex(validIds: Set<string>): Promise<void> {
+  const index = await loadVectorIndex();
+  const kept = index.entries.filter((e) => validIds.has(e.id));
+  if (kept.length !== index.entries.length) {
+    await saveVectorIndex({ dim: index.dim, entries: kept });
+  }
+}
+
 /** 想起プール(user+canon)から索引を作り直す(欠落時・モデル後から導入時の一括生成)。 */
 export async function rebuildVectorIndex(embedder: Embedder): Promise<VectorIndex> {
   const records = await loadRecallPool();

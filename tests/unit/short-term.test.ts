@@ -26,6 +26,8 @@ function entry(i: number): ShortTermEntry {
   };
 }
 
+const ts = (i: number): string => entry(i).timestamp;
+
 beforeEach(async () => {
   h.memDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-st-'));
 });
@@ -38,18 +40,32 @@ describe('short-term (設計書 §3.3)', () => {
     expect(await getShortTerm()).toEqual([]);
   });
 
-  it('20件以内では onOverflow を呼ばない', async () => {
-    const onOverflow = vi.fn(async () => {});
-    for (let i = 0; i < 5; i++) await appendShortTerm(entry(i), onOverflow);
-    expect(onOverflow).not.toHaveBeenCalled();
+  it('20件以内ではトリムしない', async () => {
+    for (let i = 0; i < 5; i++) await appendShortTerm(entry(i));
     expect((await getShortTerm()).length).toBe(5);
   });
 
-  it('20件超過で onOverflow を呼び、20件にトリムする', async () => {
-    const onOverflow = vi.fn(async () => {});
-    for (let i = 0; i < 21; i++) await appendShortTerm(entry(i), onOverflow);
-    expect(onOverflow).toHaveBeenCalled();
-    expect((await getShortTerm()).length).toBe(20);
+  it('上限超過でも未抽出は捨てない(記憶喪失防止・B-01)', async () => {
+    // 全件 extracted:false のまま上限を超えても、未抽出は1件も落とさない。
+    // (バックグラウンド抽出が追いつくまでバッファは一時的に上限を超える)
+    for (let i = 0; i < 25; i++) await appendShortTerm(entry(i));
+    expect((await getShortTerm()).length).toBe(25);
+  });
+
+  it('上限超過分は古い「抽出済み」エントリのみ落とす', async () => {
+    // まず21件入れる(全未抽出 → 21件保持される)。
+    for (let i = 0; i < 21; i++) await appendShortTerm(entry(i));
+    // 古い10件を抽出済みにする。
+    await markAsExtracted([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(ts));
+    // もう1件追加 → 22件・上限超過2件 → 最古の抽出済み2件(0,1)を落として20件。
+    await appendShortTerm(entry(21));
+    const list = await getShortTerm();
+    expect(list.length).toBe(20);
+    expect(list.find((e) => e.timestamp === ts(0))).toBeUndefined();
+    expect(list.find((e) => e.timestamp === ts(1))).toBeUndefined();
+    // 3件目以降の抽出済み・未抽出は残る。
+    expect(list.find((e) => e.timestamp === ts(2))).toBeDefined();
+    expect(list.find((e) => e.timestamp === ts(21))).toBeDefined();
   });
 
   it('getUnextractedEntries は extracted:false のみ返す', async () => {

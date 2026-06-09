@@ -5,6 +5,55 @@
 /** 短期記憶の最大保持件数(超過時に抽出→トリム)。設計書 §3.3。 */
 export const SHORT_TERM_MAX_ENTRIES = 20;
 
+/**
+ * 記憶抽出をバッチ発火する未抽出エントリ数のしきい値(B-02)。
+ * 毎メッセージ発火(=1件ずつ抽出)をやめ、未抽出がこの件数たまった時だけ
+ * バックグラウンド抽出を1回回す。コスト削減＋まとまった文脈で episodic 化しやすくなる。
+ * 5〜10 が目安(optimization-backlog B-02)。値は体感・コストで調律可。
+ */
+export const EXTRACTION_BATCH_THRESHOLD = 8;
+
+/**
+ * 短期記憶の未抽出件数のハード上限(採用(a)・2026-06-09 ユーザ決定)。
+ * B-01 で「未抽出は捨てない」方針にしたため、抽出が長時間止まると短期が無制限に膨らむ縁がある。
+ * 未抽出がこの件数に達したら、会話経路で**同期抽出を1回強制**して確実に減らす(上限を守りつつ記憶も失わない)。
+ * 通常運用では到達しない安全網(到達は抽出が大幅に遅延/失敗している異常時のみ)。
+ */
+export const SHORT_TERM_HARD_MAX = 80;
+
+// --- 忘却機構(B-13 / 設計書 §11.6・段階的記憶縮退) ---
+// 中期記憶(Episodic)が青天井に増えないよう、月次/年次に再要約＋低重要度を物理削除して
+// 常時 ≤1000 件に収める恒久ガバナ。**破壊的処理(物理削除)のため既定はオフ**
+// (環境変数 ENE_FORGETTING=1 で有効化・実データ前にレビュー)。
+
+/** 忘却機構を有効化する環境変数名(値 "1" で ON)。既定は無効(安全側)。 */
+export const FORGETTING_ENABLED_ENV = 'ENE_FORGETTING';
+
+/**
+ * 音声ストリーミング(B-06・第一声短縮)を有効化する環境変数名(値 "1" で ON)。
+ * 既定は無効(安全側)=従来の非ストリーミング合成。会話の最重要パスのため、
+ * 実機(実 Claude streaming＋TTS＋renderer)での検証後に既定 ON へ切り替える。
+ * ストリーミングが失敗した場合は非ストリーミング経路へフォールバックする(配線は壊れない)。
+ */
+export const VOICE_STREAMING_ENABLED_ENV = 'ENE_VOICE_STREAMING';
+
+/** 想起の内訳を毎ターン記録する診断ログの有効化環境変数(値 "1" で ON)。既定オフ=通常ログを汚さない。 */
+export const RECALL_DEBUG_ENV = 'ENE_DEBUG_RECALL';
+/** 月次サマリ時に物理削除する importance の上限(これ以下を削除・§11.6)。 */
+export const FORGET_MONTHLY_DELETE_IMPORTANCE_MAX = 2;
+/** 年次サマリ時に物理削除する importance の上限(これ以下を削除・重要度≥4のみ詳細を残す)。 */
+export const FORGET_YEARLY_DELETE_IMPORTANCE_MAX = 3;
+/** 月次サマリ記録に付ける importance(想起での存在感。サマリの削除は別ロジック)。 */
+export const FORGET_MONTHLY_SUMMARY_IMPORTANCE = 4;
+/** 年次サマリ記録に付ける importance。 */
+export const FORGET_YEARLY_SUMMARY_IMPORTANCE = 5;
+/** 年 Y を年次サマリへ巻き上げる経過年数(currentYear - Y がこれ以上で年次対象=「1〜5年」帯)。 */
+export const FORGET_YEARLY_AGE_YEARS = 2;
+/** サマリ記録を格納する専用カテゴリ(実記録のカテゴリと衝突しない・ファイルパス上も分離)。 */
+export const FORGET_SUMMARY_CATEGORY = 'summary';
+/** 月次サマリ記録の合成日アンカー(月内固定日・ファイル名衝突回避)。 */
+export const FORGET_MONTHLY_SUMMARY_DAY = 15;
+
 /** Episodic 検索のデフォルト取得件数。要件 F-MEM-F-05。 */
 export const DEFAULT_EPISODIC_SEARCH_LIMIT = 5;
 
@@ -64,8 +113,13 @@ export const VAD_SPEECH_THRESHOLD = 0.5;
 /** 発話終了側の下側しきい値(ヒステリシス・チャタリング防止)。 */
 export const VAD_SILENCE_THRESHOLD = 0.35;
 
-/** 話し終わり(ターン終了)とみなす無音継続時間(ms)。「間のあるENE」哲学に合わせ気持ち長め。 */
-export const VAD_MIN_SILENCE_MS = 700;
+/**
+ * 話し終わり(ターン終了)とみなす無音継続時間(ms)。
+ * これは**ハンズフリーの"見えないレイテンシ"**=喋り終わってから処理が始まるまでの死に時間そのもの。
+ * 体感改善のため 700→500 に短縮(2026-06-09)。下限は BACKCHANNEL_PAUSE_TRIGGER_MS(400)より大きく保つこと
+ * (ターン終了と相槌の言いよどみを区別するため)。短くしすぎると言いよどみを誤確定して食い気味になる。
+ */
+export const VAD_MIN_SILENCE_MS = 500;
 /** 発話開始の確定に必要な最小発話継続(ms)。単発ノイズでの誤発火を防ぐ。 */
 export const VAD_MIN_SPEECH_MS = 160;
 /** 切り出し時に発話頭へ付ける先読みパディング(ms)。語頭の欠けを防ぐ。 */

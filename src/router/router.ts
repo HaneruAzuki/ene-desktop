@@ -9,7 +9,11 @@ import type { RouterResult } from '../shared/types/router';
 // Knowledge Router 本体(設計書 §3.2「ベストエフォート方式」)。
 // タイムアウト・失敗時は fallback を返し、本会話を絶対に止めない(例外を投げない)。
 
-const ROUTER_TIMEOUT_MS = 800; // NF-PERF-03
+// B-03 計測(2026-06-09): 0 にして Router をスキップ(常に medium fallback)。
+// 実 Haiku 往復(~1.5-2.5s)は 800ms 上限を必ず超え、毎回 fallback=medium になっていたため、
+// 無駄な ~800ms/ターンを回収する。0(以下)のときは Haiku 呼び出しもせず即 fallback(下の classifyTopic ガード)。
+// ※ トレードオフ:話題別 behavior は出なくなる(medium 固定)。速いまま正しく効かせるには B-15(ローカル判別器)。
+const ROUTER_TIMEOUT_MS = 0; // NF-PERF-03 / B-03 計測(0=Routerスキップ)
 const ROUTER_MODEL = 'claude-haiku-4-5-20251001';
 
 /** Haiku を1回呼んで生テキストを返す関数(テストで差し替え可能)。 */
@@ -92,7 +96,14 @@ export async function classifyTopic(
   knowledgeDomains: CharacterKnowledgeDomains,
   apiKey: string,
   llmCall: RouterLlmCall = defaultHaikuCall,
+  timeoutMs: number = ROUTER_TIMEOUT_MS,
 ): Promise<RouterResult> {
+  // タイムアウト 0(以下)= Router を実行せず即 fallback(B-03 計測)。Haiku 往復もしない=レイテンシ/コスト 0。
+  // 既定は本番の ROUTER_TIMEOUT_MS(現在 0=無効)。テストは非ゼロを渡して分類/キャッシュ経路を検証する。
+  if (timeoutMs <= 0) {
+    return buildFallbackResult(knowledgeDomains);
+  }
+
   const cached = routerCache.get(userText);
   if (cached) {
     return { ...cached, isFromCache: true };
@@ -101,7 +112,7 @@ export async function classifyTopic(
   try {
     const result = await Promise.race([
       classifyOnce(userText, knowledgeDomains, apiKey, llmCall),
-      timeout(ROUTER_TIMEOUT_MS),
+      timeout(timeoutMs),
     ]);
     routerCache.set(userText, result); // 成功結果のみキャッシュ(fallback は入れない)
     return result;

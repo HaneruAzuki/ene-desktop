@@ -7,9 +7,6 @@ import type { ShortTermEntry } from '../shared/types/memory';
 // 短期記憶(設計書 §3.3)。セッション内の直近会話を保持する。
 // 逐語ログではなく、抽出済みフラグ付きの一時バッファ(終了時に削除される)。
 
-/** overflow 時に呼ばれる抽出ハンドラ(Claude を使う抽出は呼出側が注入する)。 */
-export type ShortTermOverflowHandler = () => Promise<void>;
-
 export async function getShortTerm(): Promise<ShortTermEntry[]> {
   return (await readJson<ShortTermEntry[]>(getShortTermPath())) ?? [];
 }
@@ -19,28 +16,35 @@ async function saveShortTerm(entries: ShortTermEntry[]): Promise<void> {
 }
 
 /**
- * 短期記憶にエントリを追加する。
- * 追加後 SHORT_TERM_MAX_ENTRIES を超える場合は、onOverflow(中期記憶への抽出)を
- * 呼んでから古いエントリをトリムする(設計書 §3.3)。
+ * 上限超過分を、古い順に「抽出済み(extracted=true)」エントリだけ取り除く(in-place)。
+ * **未抽出エントリは絶対に捨てない**(中期記憶へ抽出される前に消えると記憶を失うため)。
+ * 抽出をバックグラウンド化(B-01)しても、抽出が追いつくまでバッファが一時的に
+ * 上限を超えるだけで、未抽出が落ちることはない(自己修復的に上限へ戻る)。
  */
-export async function appendShortTerm(
-  entry: ShortTermEntry,
-  onOverflow?: ShortTermOverflowHandler,
-): Promise<void> {
-  const list = await getShortTerm();
-  list.push(entry);
-  await saveShortTerm(list);
-
-  if (list.length > SHORT_TERM_MAX_ENTRIES) {
-    // 先に未抽出エントリを中期記憶へ抽出(extracted=true 化)してからトリムする。
-    if (onOverflow) {
-      await onOverflow();
-    }
-    const after = await getShortTerm();
-    if (after.length > SHORT_TERM_MAX_ENTRIES) {
-      await saveShortTerm(after.slice(after.length - SHORT_TERM_MAX_ENTRIES));
+function trimExtractedOverflow(list: ShortTermEntry[]): void {
+  let overflow = list.length - SHORT_TERM_MAX_ENTRIES;
+  for (let i = 0; i < list.length && overflow > 0; ) {
+    if (list[i]?.extracted) {
+      list.splice(i, 1);
+      overflow--;
+    } else {
+      i++;
     }
   }
+}
+
+/**
+ * 短期記憶にエントリを追加する。
+ * 追加後 SHORT_TERM_MAX_ENTRIES を超える場合は、抽出済みの古いエントリのみトリムする
+ * (設計書 §3.3)。中期記憶への抽出は呼出側がバックグラウンドで行う(B-01・extraction-scheduler)。
+ */
+export async function appendShortTerm(entry: ShortTermEntry): Promise<void> {
+  const list = await getShortTerm();
+  list.push(entry);
+  if (list.length > SHORT_TERM_MAX_ENTRIES) {
+    trimExtractedOverflow(list);
+  }
+  await saveShortTerm(list);
 }
 
 /** 短期記憶ファイルを削除する(アプリ終了時・設計書 §7.2)。 */

@@ -134,6 +134,11 @@ export function getShortTermPath(): string {
   return path.join(getMemoryDir(), 'short-term.json');
 }
 
+/** data/memory/{activeCharacterId}/consolidation-state.json(忘却機構の最終実行記録・§11.6)。 */
+export function getConsolidationStatePath(): string {
+  return path.join(getMemoryDir(), 'consolidation-state.json');
+}
+
 // --- 派生キャッシュ(真実の源ではない・JSON から再生成可能・design-revision-memory-v2 §1.3) ---
 
 /** data/memory/{activeCharacterId}/index/(逆引き・ベクトル索引の置き場)。 */

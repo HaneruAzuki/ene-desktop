@@ -11,6 +11,8 @@ import { buildCharacterContext } from '../character/context-builder';
 import { checkBirthday } from '../character/birthday-checker';
 import { getUnextractedEntries, clearShortTerm } from '../memory/short-term';
 import { extractFromShortTerm } from '../memory/extraction-trigger';
+import { isForgettingEnabled, requestForgetting } from '../memory/forgetting';
+import { warmEmbedder } from '../memory/embedder';
 import { makeLlmComplete } from '../conversation/client';
 import { openApiKeyDialog } from './api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';
@@ -76,7 +78,8 @@ export async function runStartupSequence(
   // 既に立っていれば再利用、未配置ならテキストのみで続行。立てば後続の speak() が喋れる
   // (bundled voice.json の styleId は実エンジン値と一致するため reconcile を待つ必要はない)。
   // 初回 API キー入力ダイアログやキャラ/記憶ロードと並行して温まる。
-  void ensureVoiceEngine();
+  // 準備完了判定(renderer の「ちょっと待って、」解除)に使うため promise を保持する。
+  const voiceEngineReady = ensureVoiceEngine().catch(() => undefined);
 
   // Step 5: APIキー(無ければダイアログ。キャンセルなら終了)
   let apiKey = await loadAndDecryptApiKey();
@@ -125,6 +128,19 @@ export async function runStartupSequence(
     }
   }
 
+  // Step 8.4: 埋め込みモデルのウォーム(B-14c)。初回想起のモデルロード停止を起動時へ前倒し。
+  // 背景・best-effort(await しない=起動/会話を妨げない。モデル未配置なら何もしない)。
+  // 準備完了判定に含めるため promise を保持する。
+  const embedderReady = warmEmbedder().catch(() => undefined);
+
+  // Step 8.5: 忘却機構(B-13 / §11.6)。**既定オフ**(ENE_FORGETTING=1 のときのみ)。
+  // 起動時に未処理の月次/年次サマリを背景で実行する(await しない=起動/会話を妨げない)。
+  // 破壊的(物理削除)のため、実データでの有効化はレビュー後。
+  if (isForgettingEnabled()) {
+    log.info('forgetting mechanism enabled; running consolidation in background');
+    void requestForgetting(makeLlmComplete(apiKey));
+  }
+
   // Step 9: 誕生日判定
   const today = todayLocalYmd();
   charContext = { ...charContext, birthdayHint: checkBirthday(charContext.identity, active, today) };
@@ -137,6 +153,15 @@ export async function runStartupSequence(
   await saveWindowPosition(position.x, position.y);
   registerIpcHandlers(mainWindow, runtime);
   createTray(mainWindow);
+
+  // 準備完了(音声エンジンのヘルス到達＋埋め込みウォーム)を背景で待ち、整ったら renderer に通知する。
+  // それまで renderer は「ちょっと待って、」を表示する(=まだ話しかけない状況の明示)。
+  // ここは await しない(ウィンドウ表示・挨拶準備をブロックしない)。
+  void Promise.all([voiceEngineReady, embedderReady]).then(() => {
+    runtime.ready = true;
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:app-ready');
+    log.info('app fully ready (voice engine + embedder warmed)');
+  });
 
   // マイク入力方式(設定)を読み込む(task_17 Phase C・既定 push-to-talk)。
   runtime.voiceInputMode = (await loadAppSettings()).voiceInputMode;

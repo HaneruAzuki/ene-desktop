@@ -8,7 +8,8 @@ import { updateSemantic } from './semantic';
 import { extractMemoryFromConversation, type LlmComplete } from './extractor';
 
 // 抽出トリガの統合(設計書 §3.3 / §7.2 / task_15 の2層フロー)。
-// 呼出箇所: 短期記憶 20件超過時(appendShortTerm の onOverflow)、アプリ終了時(task_10)。
+// 呼出箇所: バックグラウンド抽出(extraction-scheduler の requestExtraction・未抽出が閾値以上で発火)、
+//           アプリ終了/孤児回収時(flushExtraction → reason='shutdown'・task_10)。応答経路では呼ばない(B-01)。
 //
 // 2層フロー(task_15「抽出フローの変更」):
 //   (live) 会話時は retriever が旧記憶をプロンプトに載せる(別経路・ここでは扱わない)。

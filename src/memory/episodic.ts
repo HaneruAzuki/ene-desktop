@@ -66,6 +66,14 @@ export async function loadEpisodicById(id: string): Promise<EpisodicMemory | nul
   return raw ? migrateEpisodic(raw) : null;
 }
 
+/**
+ * ID(相対パス)の記録を物理削除する(忘却機構・§11.6 / §6.4 物理削除)。
+ * 存在しなくてもエラーにしない(冪等)。派生索引は呼出側で再生成/掃除する。
+ */
+export async function deleteEpisodicById(id: string): Promise<void> {
+  await fs.rm(resolveEpisodicPath(id), { force: true });
+}
+
 /** ID の記録に patch をマージして上書きする(非破壊更新の実体・存在しなければ何もしない)。 */
 export async function updateEpisodicById(
   id: string,
