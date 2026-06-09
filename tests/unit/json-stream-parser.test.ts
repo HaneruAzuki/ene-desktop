@@ -32,7 +32,7 @@ describe('json-stream-parser (C1)', () => {
     expect(r.command).toBeUndefined();
   });
 
-  it('デルタ分割でも再構成し、ルビは保持したまま文を割る', () => {
+  it('デルタ分割でも再構成し、ルビは保持したまま文を割る(施策A:最初は読点で早期発話)', () => {
     const r = run([
       '{"type":"chat","emo',
       'tion":"neutral","mess',
@@ -40,10 +40,20 @@ describe('json-stream-parser (C1)', () => {
       'ころ》を読んだ。向上心《こうじょうしん》は大切。"}',
     ]);
     expect(r.emotion).toBe('neutral');
+    // 第一声は読点(、)で早期に切り出す。2文目以降は文単位。ルビ《…》は分断されない。
     expect(r.sentences).toEqual([
-      '最近、夏目漱石の心《こころ》を読んだ。',
+      '最近、',
+      '夏目漱石の心《こころ》を読んだ。',
       '向上心《こうじょうしん》は大切。',
     ]);
+  });
+
+  it('施策A:最初のチャンクだけ読点で早期に切り出し、以降は文単位', () => {
+    const r = run([
+      '{"type":"chat","emotion":"anger","message":"ふん、別に来たわけじゃないけど。元気だった?"}',
+    ]);
+    expect(r.emotion).toBe('anger');
+    expect(r.sentences).toEqual(['ふん、', '別に来たわけじゃないけど。', '元気だった?']);
   });
 
   it('emotion を message より前に置けば早期に確定する', () => {

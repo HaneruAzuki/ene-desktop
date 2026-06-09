@@ -1,6 +1,7 @@
 import { EMOTION_LABELS, type EmotionLabel } from '../shared/types/animation';
 import type { OsAction, OsCommand } from '../shared/types/os';
-import { splitSentences } from './sentence-splitter';
+import { splitSentences, splitFirstChunk } from './sentence-splitter';
+import { FIRST_CHUNK_MAX_CHARS } from '../shared/constants';
 import type { VoiceStreamParser, StreamChunk, StreamFinal } from './stream-parser';
 
 // JSON応答のストリーミング解釈(C1・B-06)。`runVoiceChat` が使う VoiceStreamParser を満たす。
@@ -63,6 +64,7 @@ export function createJsonStreamParser(): VoiceStreamParser {
   let inUnicode = false;
   let uniBuf = '';
   let emotionEmitted = false;
+  let firstChunkDone = false; // 第一声(最初のチャンク)を早期発話したか(施策A)
 
   /** message 文字列の 1 文字を処理。閉じ引用符に達したら true(=message 終了)。 */
   function feedChar(c: string): boolean {
@@ -95,8 +97,22 @@ export function createJsonStreamParser(): VoiceStreamParser {
     return false;
   }
 
-  /** sentenceBuf から完成文を取り出す(未完の末尾は残す)。 */
+  /**
+   * sentenceBuf から発話可能なチャンクを取り出す(未完の末尾は残す)。
+   * 第一声(最初のチャンク)だけは施策A=読点/改行/字数でも早期に切り出して声を早める。
+   * それ以降は通常の文単位(splitSentences)。
+   */
   function drain(): string[] {
+    if (!firstChunkDone) {
+      const first = splitFirstChunk(sentenceBuf, FIRST_CHUNK_MAX_CHARS);
+      if (!first) return []; // まだ第一声の境界(句読点/改行/字数上限)に未達
+      firstChunkDone = true;
+      sentenceBuf = first.remainder;
+      // 残りに既に完成文が含まれていれば続けて取り出す。
+      const { complete, remainder } = splitSentences(sentenceBuf);
+      sentenceBuf = remainder;
+      return [first.chunk, ...complete];
+    }
     const { complete, remainder } = splitSentences(sentenceBuf);
     sentenceBuf = remainder;
     return complete;

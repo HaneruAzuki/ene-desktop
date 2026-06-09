@@ -69,6 +69,7 @@ export async function streamVoiceChat(
   const prompt = buildPrompt(charContext, memoryContext, routerResult, userText);
   const streamCall = makeStreamCall(apiKey);
   // 計測:ストリーミングの肝は「第一声までの時間」。最初のチャンク送出を記録する(§6.2: ms のみ)。
+  // 内訳(TTFT/合成)の調査は N-LAT-7 で完了(TTFT 律速=クラウドの床)。ここでは第一声の総時間のみ残す。
   const tStart = performance.now();
   let firstChunkLogged = false;
   const result = await runVoiceChat(streamCall(prompt), {

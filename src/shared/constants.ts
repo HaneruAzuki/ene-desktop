@@ -37,6 +37,12 @@ export const FORGETTING_ENABLED_ENV = 'ENE_FORGETTING';
  */
 export const VOICE_STREAMING_ENABLED_ENV = 'ENE_VOICE_STREAMING';
 
+/**
+ * 第一声短縮(施策A):最初の発話チャンクだけ、文末を待たず読点(、)/改行/この字数で区切る上限。
+ * 「ひと呼吸」程度の長さ。2文目以降は通常の文単位(splitSentences)に戻る。
+ */
+export const FIRST_CHUNK_MAX_CHARS = 20;
+
 /** 想起の内訳を毎ターン記録する診断ログの有効化環境変数(値 "1" で ON)。既定オフ=通常ログを汚さない。 */
 export const RECALL_DEBUG_ENV = 'ENE_DEBUG_RECALL';
 /** 月次サマリ時に物理削除する importance の上限(これ以下を削除・§11.6)。 */
@@ -128,10 +134,11 @@ export const VAD_SILENCE_THRESHOLD = 0.35;
 /**
  * 話し終わり(ターン終了)とみなす無音継続時間(ms)。
  * これは**ハンズフリーの"見えないレイテンシ"**=喋り終わってから処理が始まるまでの死に時間そのもの。
- * 体感改善のため 700→500 に短縮(2026-06-09)。下限は BACKCHANNEL_PAUSE_TRIGGER_MS(400)より大きく保つこと
- * (ターン終了と相槌の言いよどみを区別するため)。短くしすぎると言いよどみを誤確定して食い気味になる。
+ * 体感改善のため 700→500→350 と段階的に短縮(2026-06-09)。下限は BACKCHANNEL_PAUSE_TRIGGER_MS より
+ * 大きく保つこと(ターン終了と相槌の言いよどみを区別するため)=今回 350 化に伴い相槌側も 400→300 へ。
+ * 短くしすぎると言いよどみ(発話途中の息継ぎ)を終話と誤確定し、食い気味に応答するリスク=要・実機判定。
  */
-export const VAD_MIN_SILENCE_MS = 500;
+export const VAD_MIN_SILENCE_MS = 350;
 /** 発話開始の確定に必要な最小発話継続(ms)。単発ノイズでの誤発火を防ぐ。 */
 export const VAD_MIN_SPEECH_MS = 160;
 /** 切り出し時に発話頭へ付ける先読みパディング(ms)。語頭の欠けを防ぐ。 */
@@ -152,9 +159,10 @@ export const BACKCHANNEL_MIN_INTERVAL_MS = 4500;
 /**
  * 言いよどみ(発話中の短い無音)が相槌スロットとみなされる継続(ms)。
  * 必ず VAD_MIN_SILENCE_MS(=ターン終了)より小さくする(ターン終了は相槌でなく応答の入り)。
- * 大きめにして微小な息継ぎに反応しない=落ち着いた相づちにする。
+ * 終話を 350 に短縮したのに合わせ 400→300 へ(順序維持・ギャップ50ms)。
+ * 下げた分わずかに前のめり化しうる=落ち着き具合は実機試聴で再調整(ユーザー判定・task_18)。
  */
-export const BACKCHANNEL_PAUSE_TRIGGER_MS = 400;
+export const BACKCHANNEL_PAUSE_TRIGGER_MS = 300;
 /** 相槌の発話速度倍率(neutral 比)。1未満=少しゆっくり=機械的さを和らげ気持ち長く。 */
 export const BACKCHANNEL_SPEED_SCALE = 0.92;
 /**
