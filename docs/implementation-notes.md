@@ -394,6 +394,7 @@
 - **内容**: 実機ログで `Router fallback used: domain=medium` が毎回。Haiku の往復が 800ms を超えるため、Router は実質的に常に fallback=medium になる。トピック判定が効かず、ドメイン別 few-shot(例: none/unknown_none)が使われない。
 - **緩和されている点**: キャラの知識境界(高校生が知らない領域=パチンコ等で自然に「知らない」)は **buildSystemPrompt(system)に含まれている**ため、medium 扱いでも ENE は「知らない」と返せる(成功基準4は system 側で担保)。診断でも確認済み。
 - **判断/反映(要検討)**: 次のいずれか。(a) タイムアウトを ~2000ms へ引き上げる(総応答が NF-PERF-02 の 3–5s を超えうる)、(b) Router を memory 構築と並列実行してレイテンシ吸収、(c) 現状の best-effort(fallback)を許容し Router を補助的位置づけのままにする。MVP は (c) で動作。**MVP 完成後にブラッシュアップ**(ユーザ方針)。
+- **✅ 解決(2026-06-09・N-LAT-9 / B-15)**: Haiku 往復ごとローカル判別器に置換し、fallback=medium 常態化・few-shot 不発を解消。本ノートは経緯の記録として残す(本番経路は §3.2「ローカル判別器」)。
 
 ### N-09-10 🟡 記憶抽出が毎メッセージ発火(短期20件超過後)→ コスト/レイテンシ増
 - **該当**: 設計書 §3.3「短期記憶の保持と抽出トリガ」/ short-term.ts の overflow
@@ -866,6 +867,15 @@
 - **結論**: 「**寛容ライセンス＋品質＋軽量**」を守る限り **whisper-small が STT の実用的な床**。ストリーミング系は全て(精度/ライセンス/CPU)のいずれかを犠牲にする=採用見送り。将来 GPU 容認 or ライセンス紐付き容認に方針転換した場合のみ再検討(Moonshine が最有力)。
 - **第一声の残レバー総括(N-LAT-7+8)**: TTFT(~1500ms=クラウド床)・STT(~800ms=クリーン制約下の床)・無音(350ms=取りこぼし境界)。**いずれも"柱を緩める"以外に大きな短縮余地なし**。体感 ~3.3s が現構成の実用下限。
 
+### N-LAT-9 🟢 Knowledge Router を Haiku 往復からローカル判別器へ置換(B-15・ネットワーク0往復)
+- **該当**: `src/router/local-classifier.ts`(新規・`classifyTopicLocal`/`classifyByKeyword`/`classifyByEmbedding`/`warmLocalRouter`)/ `constants.ts`(`ROUTER_KEYWORD_MIN_LEN`/`ROUTER_EMBED_MIN_CHARS`/`LOCAL_ROUTER_SIM_THRESHOLD`)/ `ipc.ts`(本番経路を `classifyTopicLocal` に)/ `lifecycle.ts`(`warmLocalRouter` 起動時ウォーム)/ 設計書 §3.2 / backlog B-03・B-15。
+- **背景**: `ROUTER_TIMEOUT_MS` を 0 にして Haiku 往復を critical path から外した結果(N-LAT-2)、Router が常に fallback=medium となり**話題別 behavior/few-shot(tech=得意げ/賭博=困惑/危険=拒否)が不発**だった(B-03 の本体)。ネットワーク往復ごと削れば「速い＋話題判定が効く」を両立できる。
+- **方式(ハイブリッド・完全ローカル0往復)**: ①**キーワード一致**(topics の部分文字列・純粋同期・即時)→ ②**埋め込み類似**(想起と共用のウォーム済 ruri で query 埋め込み→topics ベクトルとのコサインが `LOCAL_ROUTER_SIM_THRESHOLD=0.55` 以上の最良 topic)→ ③**迷ったら medium fallback**。複数 domain 一致は `refuse>none>high>low>medium` 優先(安全・境界→専門→一般)。1文字 topic(車/薬 等)は部分文字列の誤一致(電車/薬局)を避けキーワードから除外し埋め込みに委ねる(`ROUTER_KEYWORD_MIN_LEN`)。短すぎる発話(`ROUTER_EMBED_MIN_CHARS` 未満)は埋め込みをスキップ。
+- **安全側**: 埋め込みモデル未配置・embed 例外はすべて medium fallback に倒し会話を止めない。知識境界は buildSystemPrompt にも含むため二重防御(判別ミス時も Claude 側で破綻しない)。出力は `RouterResult`(Haiku 版と同形=下流無改修)。
+- **配線**: `ipc.ts` は **記憶構築(`buildConversationMemory`)→ `classifyTopicLocal`** の順。発話 query の埋め込みを想起と判別で**キャッシュ共有**し embed 競合を回避。起動時に埋め込みウォーム後 `warmLocalRouter` で topics を document 埋め込み(初回ターンの遅延・競合回避)。Haiku 版 `classifyTopic`(`router.ts`)は **legacy** として温存(本番未使用・将来マルチプロバイダ §11.7/比較用・テスト維持)。
+- **実機検証**: keyword 経路(domain=high / none)、embed 経路(domain=high sim=0.81 等)で話題別 few-shot 復活を確認。**B-03 解消**。
+- **🟡 要反映(済)**: 設計書 §3.2 に本番=ローカル判別器、Haiku=legacy を明記。backlog B-03 ✅解決・B-15(a) ✅実装済へ更新。
+
 ### N-16-2 🟢 キャラ名を ENE→魚川トリミ に改名(B-10)＋STT名前補正＋productName
 - **該当**: `identity.json`(name=魚川トリミ・nameReading=うおかわ とりみ・callsSelf=トリミ・sttAliases)/ `fewshot.json` / `system-prompt-builder.ts` / UI(`InputArea` プレースホルダ・`ApiKeyDialog`・`CharacterDisplay` alt・両 `index.html` title)/ `electron-builder.yml`(productName=魚川トリミ・artifactName=Torimi)/ `index.ts`(app.setName)。
 - **方針**: ユーザー可視の "ENE" を全廃。ENE は**コードネーム/プログラム内コメント/Philosophy/appId/characterId** にのみ残す(`characterId="ene"` 維持=識別子churn回避)。表示名は full=魚川トリミ、カジュアル自称=トリミ。
@@ -887,7 +897,7 @@
 - **検証**: typecheck/lint/**全399テスト緑**(新規 consolidation-policy 8・forgetting 3)。
 - **✅ 実機検証済(2026-06-09・実データをバックアップ→ENE_FORGETTING=1 で実走→検査→復元)**: 完了月5件(2025-09/11・2026-01/03/05)を各1サマリ化(Claude製・`category=summary`/`summaryTier=monthly`/`period`/`valence=0`)、2026-01 で低importance(≤2)1件を物理削除、ベクトル索引は削除IDを prune(19→18)・逆引き再構築。**背景実行で起動非ブロック(約13秒/5ヶ月・初回でも軽量)**、年次は2024以前なしで正しくスキップ。**機構は正しく動作**。
   - **🟡 微調整候補(将来)**: 月の生記録が1件のとき「1→1」サマリ＋生残し(importance≥3)でやや冗長(サマリと生が想起プールで重複しうる)。密データでは正常な圧縮。1件以下の月はサマリ省略 or 生削除の検討余地。
-- **🟡 要反映(設計書 §11.6)**: 「将来拡張」→「**実装済み(月次/年次・既定オフ・物理削除・サマリ=summary カテゴリ EpisodicMemory)**」へ更新。`task_19` を正本参照に追加。
+- **✅ 設計書反映済(2026-06-09)**: §11.6 を「将来拡張」→「**実装済み＋実機検証済(月次/年次・既定オフ・物理削除・サマリ=summary カテゴリ EpisodicMemory)**」へ更新。`task_19` を正本参照に追加。
 
 ### N-RECALL-1 🔴 **重要バグ**: canon(自分の人生)と user 記憶をプロンプトで混同 → 相手の人間関係を自分のものとして発話
 - **該当**: 設計書 §3.4 / `prompt-builder.ts` `formatEpisodic` / task_16 canon(`provenance:'self'`)
@@ -896,7 +906,7 @@
 - **修正**: `formatEpisodic` を2セクションに分離 — `# あなた自身の思い出(あなたが実際に経験したこと)`(`provenance==='self'`)と `# 相手について覚えていること(相手の身に起きたこと・あなたの経験ではない・混同しないこと)`(それ以外)。キャラ名はハードコードせず「あなた」基準(§5.1)。`buildVolatileContext` の旧見出しは撤去。
 - **切り分け診断**: `context-builder.buildConversationMemory` に数値のみの `recall diag`(stage/canonPool/canonPassGate/recalled の provenance 内訳・§6.2準拠)を追加。**既定オフ**=`ENE_DEBUG_RECALL=1` で ON(`RECALL_DEBUG_ENV`)。実機ログで `stage=1 canonPassGate=8 recalled=5(canon=1 level1=美月)` を確認し、葵・玲奈(disclosureLevel 2)は stage1 の開示ゲートで除外=設計通りと確定。
 - **検証**: typecheck 緑・`prompt-builder.test.ts` に provenance 分離の回帰テスト追加(14件緑)・実機で鈴木混同の解消を確認。
-- **⚪ 設計書反映候補**: §3.4 プロンプト構成に「episodic は provenance(self/user)で2セクション分離」を明記(現状は本ノートで代替)。
+- **✅ 設計書反映済(2026-06-09)**: §3.4 プロンプト構成に「episodic は provenance(self/user)で2セクション分離」を明記。
 
 ---
 

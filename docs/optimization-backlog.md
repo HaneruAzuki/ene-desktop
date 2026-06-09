@@ -26,7 +26,7 @@
 
 `handleSendMessage`([src/main/ipc.ts](../src/main/ipc.ts))はほぼ直列。**会話で伸びる要因**=🔴記憶抽出の同期実行(B-01 ✅2026-06-09 背景化で解消)
 / 🟠episodic二重ロード(B-14a ✅解消)/ 🟠毎ターン埋め込み推論(B-14c 残)。**固定費**=🔵Sonnet往復(非ストリーミング・B-06)。
-Router は記憶構築と並列化済(B-03b/B-14d ✅)。
+Router は**ローカル判別器へ置換済**(B-15 ✅・ネットワーク0往復。記憶構築の直後に query 埋め込みを共有して判定)。
 脳=Claude は唯一の不可避な外部往復(BYO-Claude=軽量の柱と整合)。**声/STT/想起は完全ローカルを維持**(外部Web非依存=絶対条件)。
 → 戦略:**総時間でなく「最初の一声までの時間」を縮める**(ストリーミング B-06)＋**周辺ローカル処理を限りなく0に**(B-14)＋**容量を恒久ガバナ**(B-13)。
 
@@ -37,15 +37,16 @@ Router は記憶構築と並列化済(B-03b/B-14d ✅)。
 > ✅ **B-01 / B-02 は 2026-06-09 解消済**(記憶抽出をバックグラウンド化＋直列化ロック＋8件バッチ化し、
 > 応答クリティカルパスから除去)。詳細は `implementation-notes.md` N-LAT-1。本リストから削除した。
 
-### B-03 Router タイムアウトが実 Haiku レイテンシを下回り毎回 fallback
+### B-03 Router タイムアウトが実 Haiku レイテンシを下回り毎回 fallback ✅解決済(2026-06-09)
 - **由来**: N-09-9。
 - **内容**: `ROUTER_TIMEOUT_MS=800` が実 Haiku 往復(約1.5〜2.5s)を下回り、Router が実質常に fallback=medium。トピック別 few-shot が効かない。
 - **緩和済**: 知識境界は system プロンプトに含むため「知らない」応答は成立(成功基準4は担保)。
-- **✅ (b) 2026-06-09 実施**: Router を記憶構築と `Promise.all` で並列実行し、~800ms を critical path から隠した(N-LAT-2)。ただし **fallback=medium になる本体は未解決**(few-shot 不発は残る)。
-- **改善案(残)**: (a) タイムアウトを ~2000ms へ(総応答が NF-PERF-02 の 3〜5s を超えうる)(c) 現状の best-effort を許容 (d) **B-15 でローカル判別器に置換**してネットワーク往復ごと削除。
+- **✅ (b) 2026-06-09 実施**: Router を記憶構築と `Promise.all` で並列実行し、~800ms を critical path から隠した(N-LAT-2)。
+- **✅ (d) 2026-06-09 解決(本体)**: **B-15 でローカル判別器(`local-classifier.ts`)に置換**=ネットワーク往復ごと削除。`ROUTER_TIMEOUT_MS=0` で失われていた**話題別 behavior/few-shot(tech=得意げ/賭博=困惑/危険=拒否)が復活**。実機検証済(N-LAT-9)。fallback=medium 常態化の本体は解消。
+- **採らなかった案**: (a) タイムアウト ~2000ms 化(総応答が NF-PERF-02 の 3〜5s を超えうる)(c) best-effort 据え置き。いずれも (d) で不要に。
 
-### B-13 中期記憶に容量ガバナがない(O(n)で会話が伸びると重くなる)★構造的本丸 ※実装済(既定オフ)
-- **✅ 2026-06-09 実装**: 忘却機構を `task_19` として実装(月次/年次サマリ＋重要度しきい値の物理削除・短期ハード上限(a)同梱)。**ただし破壊的処理のため既定オフ**(`ENE_FORGETTING=1` で有効化)。実データ有効化前にレビュー。詳細 `implementation-notes.md` N-FORGET-1 / `tasks/task_19_forgetting.md`。残=5年サマリ・「忘れて」指示削除・実機有効化レビュー。
+### B-13 中期記憶に容量ガバナがない(O(n)で会話が伸びると重くなる)★構造的本丸 ※実装済＋実機検証済(既定オフ)
+- **✅ 2026-06-09 実装＋実機検証済**: 忘却機構を `task_19` として実装(月次/年次サマリ＋重要度しきい値の物理削除・短期ハード上限(a)同梱)。**ただし破壊的処理のため既定オフ**(`ENE_FORGETTING=1` で有効化)。**実機検証済(2026-06-09)**=実データをバックアップ→`ENE_FORGETTING=1` で実走→検査→復元し、完了月5件の各1サマリ化・低 importance(≤2)の物理削除・ベクトル索引 prune・逆引き再構築・背景実行で起動非ブロック・年次は2024以前なしで正しくスキップ、を確認。詳細 `implementation-notes.md` N-FORGET-1 / `tasks/task_19_forgetting.md`。残=5年サマリ・「忘れて」指示削除。
 - **由来**: 2026-06-08 設計セッション / 設計書 §11.6(忘却機構・既に詳細設計あり)。
 - **症状**: 容量上限は**短期記憶=20件のみ**。中期(episodic)は**上限なし**で青天井に増え、毎ターン**全件ロード**するため想起が O(n) で重くなる(B-01 の抽出ブロックとは別の、もう一つの「会話で伸びる」要因)。
 - **修正案**: 設計書 §11.6 の**忘却機構を実装**=月次/年次再要約＋**重要度≤2を削除**で常時 1000 件以下に収める。容量を恒久的にガバナする。
@@ -86,14 +87,15 @@ Router は記憶構築と並列化済(B-03b/B-14d ✅)。
 - **内容**: `stream-parser.ts`/`sentence-splitter.ts`/`voice-chat.runVoiceChat` は純粋ロジック＋単体テストとして存在するが、実会話は非ストリーミング(完成JSON→文単位合成)。ストリーミング配線で**第一声 3-5s→〜1.5s**の改善余地。
 - **読み方式の決定(2026-06-09・調査 wk3n8tig6 後)**: 文脈依存の同形異音語は静的辞書では解けない(AivisSpeech は pyopenjtalk 静的辞書・BERTは韻律のみ・調査で裏取り)。Path B(1エンジン完結)は該当なし、Fish Speech はNCで失格。→ **Claude振り仮名方式を採用**:Claude が `message` に**青空文庫式ルビ「漢字《よみ》」**を曖昧語だけ付け、パーサが表示用(stripRuby)と音声用(rubyToReading)へ分解。**Claude固有API非依存=自前ルビ書式なので他社/ローカルLLMでも動く**(ユーザ制約「Claude専用にしない」)。`reading` フィールドは廃止。
 - **✅ 読み形式 実装済(2026-06-09)**: `ruby.ts`(strip/解決)＋ response-parser ＋ prompt-builder ＋ 型(N-LAT-3)。
-- **✅ ストリーミング本体 実装済(2026-06-09・既定オフ)**: JSON契約を維持したまま `message` 値を逐次抽出する `json-stream-parser.ts`(VoiceStreamParser 実装)＋ `client.makeStreamCall`(SDK stream)＋ `runVoiceChat` 再利用(ルビ解決＋C2 文単位自称ゲート)＋ `voice-runtime.streamVoiceChat`＋ ipc 配線。**`ENE_VOICE_STREAMING=1` で有効化(既定オフ)・失敗時は非ストリーミングへフォールバック**。全413テスト緑(N-LAT-4)。
-- **残**: **実機検証**(実 Claude streaming＋TTS＋renderer で第一声短縮・文割れ・C2 を確認)→ 既定 ON へ切替。emotion が message より後に来た場合の早期確定漏れ(プロンプトで前置指示済・best-effort)。
+- **✅ ストリーミング本体 実装済＋実機検証済(2026-06-09・既定オフ)**: JSON契約を維持したまま `message` 値を逐次抽出する `json-stream-parser.ts`(VoiceStreamParser 実装)＋ `client.makeStreamCall`(SDK stream)＋ `runVoiceChat` 再利用(ルビ解決＋C2 文単位自称ゲート)＋ `voice-runtime.streamVoiceChat`＋ ipc 配線。**`ENE_VOICE_STREAMING=1` で有効化(既定オフ)・失敗時は非ストリーミングへフォールバック**。全413テスト緑(N-LAT-4)。**実機検証済(2026-06-09・`ENE_VOICE_STREAMING=1`)**=実 Claude streaming＋TTS＋renderer で第一声短縮・文割れ・C2 を確認。第一声の内訳計測で TTFT 律速と判明(N-LAT-7)。
+- **残**: 既定 ON への切替判断。emotion が message より後に来た場合の早期確定漏れ(プロンプトで前置指示済・best-effort)。
 - **任意の上乗せ(将来・プロバイダ非依存の保険)**: ローカル読み基盤=ユーザ辞書(固有名詞)＋ **Yomikata**(BERT・130語・**要ライセンス確認**)＋ marine-plus(Apache-2.0)。LLMが弱い時のフォールバック。調査 wk3n8tig6 の Path D。
 
-### B-15 判別器のローカル化＋二段Claude(雑談=Haiku/難題=Sonnet)
+### B-15 判別器のローカル化 ✅実装済(2026-06-09)／二段Claude(雑談=Haiku/難題=Sonnet)は残
 - **由来**: 2026-06-08 設計セッション(ユーザ「第２の脳」案の現実形)。
-- **方針**: **生成は当面 Claude のまま**(一貫性=成功基準8・軽量100MB柱を死守)。**判別だけローカル化**=「深い思考が必要か」を埋め込み＋ヒューリスティクス(文長/疑問符/entity/Routerドメイン)で判定し、**迷ったら Claude(Sonnet)に倒す保守設計**。
-- **効果**: (a) Haiku Router をローカル判別器に置換しネットワーク1往復削減(B-03 解消)。(b) 雑談=Haiku/難題=Sonnet の二段Claudeで生成を高速化(⚠️キャラ一貫性の試聴判定が要る)。
+- **方針**: **生成は当面 Claude のまま**(一貫性=成功基準8・軽量100MB柱を死守)。**判別だけローカル化**する。
+- **✅ (a) 判別器のローカル化 完了(2026-06-09・N-LAT-9)**: Haiku Router(ネットワーク往復)を**完全ローカルのハイブリッド判別**(`src/router/local-classifier.ts` `classifyTopicLocal`)へ置換し**ネットワーク0往復**。①topics 部分文字列キーワード一致 → ②埋め込み類似(想起と共用のウォーム済 ruri・コサイン閾値 `LOCAL_ROUTER_SIM_THRESHOLD=0.55`)→ ③迷ったら medium fallback。複数一致は refuse>none>high>low>medium 優先。1文字 topic(車/薬)はキーワード除外し埋め込みに委ねる。ipc は memory→classifyTopicLocal の順(query 埋め込みをキャッシュ共有・embed 競合回避)。起動時に `warmLocalRouter` で topics をウォーム。Haiku 版 `classifyTopic` は legacy として温存。**B-03 解消**(話題別 few-shot 復活)。実機検証済(keyword domain=high/none、embed domain=high sim=0.81 等)。
+- **残 (b) 二段Claude(生成側)**: 雑談=Haiku/難題=Sonnet の二段Claudeで生成を高速化(⚠️キャラ一貫性の試聴判定が要る)。**未着手**。
 - **連動**: この「熟考に値する問いか」の判定は **task_18 の思考フィラー「うーん」の発火条件**と共有できる。
 - **保留(条件付き)**: ローカルLLMで**生成**まで担うのは一貫性・軽量性と衝突し、CPUでは TTFT で勝てない可能性が高い。**GPU＋サイズ容認を決めた場合のみ将来研究**(§11.7 LLM抽象化が受け皿)。
 
@@ -121,10 +123,10 @@ Router は記憶構築と並列化済(B-03b/B-14d ✅)。
 
 ## 創作・アセット(コードではない)
 
-### B-10 キャラ資産の改名(ENE → 魚川トリミ)
+### B-10 キャラ資産の改名(ENE → 魚川トリミ)✅完了(2026-06-09)
 - **由来**: N-16-1 / 命名の正本 `01_vision.md` §3 柱2。
-- **値**: `name` = **魚川トリミ**(読み:**うおかわ とりみ**)。読みフィールドの持ち方(`nameReading` 等)は実装時に判断。
-- **内容**: `identity.json` の `name`(＋読み)、`fewshot.json`・挨拶台詞の "ENE" 自称を新名へ。`background.json` を canon(`docs/character-life-memory-canon-plan.md`)へ整合(別添A.2 の注記参照)。`characterId` は当面 `"ene"` のまま(コードネーム ENE はプロジェクト名として残す)。**創作タスク**。
+- **✅ 完了(2026-06-09・N-16-2)**: 表示名 = **魚川トリミ**(読み:**うおかわ とりみ**)。`identity.json`(`name`/`nameReading`/`callsSelf=トリミ`/`sttAliases`)・`fewshot.json`・挨拶台詞の "ENE" 自称を新名へ。**STT 名前補正**(発話全体が名前エイリアスのときだけ callsSelf へ置換=「取り身」等の誤認を補正・`correctNameMishear`)。`productName=魚川トリミ`＋main 冒頭で `app.setName('ene-desktop')` で userData/API キー保存先を ASCII 固定(exe 名は `Torimi-${version}.exe`)。`characterId` は `"ene"` のまま(コードネーム ENE はプロジェクト名/識別子として残す)。詳細 `implementation-notes.md` N-16-2。
+- **残(別判断)**: `background.json` の canon(`docs/character-life-memory-canon-plan.md`)整合・STT プロンプトバイアス(transformers.js アップグレード要承認)は B-12 ほか創作/別タスク側。
 
 ### B-11 未制作スプライト(thinking / sofa / surprise)
 - **由来**: N-13-4 / N-13-8。

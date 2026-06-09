@@ -584,13 +584,55 @@ function checkBirthday(identity, currentDate, history): BirthdayStatus {
 - knowledge_domainsとの照合
 - 結果のキャッシュ
 
+> 📌 **本番経路 = ローカル判別器(B-15・2026-06-09 実装済)**:本番の Knowledge Router は
+> **完全ローカル・ネットワーク0往復**のハイブリッド判別(`src/router/local-classifier.ts`
+> `classifyTopicLocal`)を使う。① topics 部分文字列キーワード一致 → ② 埋め込み類似(想起と
+> 共用のウォーム済 ruri・コサイン閾値 `LOCAL_ROUTER_SIM_THRESHOLD`)→ ③ 迷ったら `medium`
+> fallback、の順。これにより `ROUTER_TIMEOUT_MS=0` で実質失われていた**話題別 behavior/few-shot
+> (tech=得意げ / 賭博=困惑 / 危険=拒否)が復活**した。Haiku 版 `classifyTopic`(下記)は
+> **legacy/任意**として温存(本番未使用・テスト維持)。詳細は下記「ローカル判別器」と
+> `implementation-notes.md` N-LAT-9。
+
 #### 設計方針:ベストエフォート方式
 
 Knowledge Routerは「精度を完璧にする機能」ではなく「会話を自然にする補助」と
-位置づける。タイムアウト超過時は fallback ドメイン(通常 `medium`)を使用し、
-**本会話の進行を絶対に止めない**。
+位置づける。判別に失敗・自信が持てないとき(埋め込みモデル未配置・例外・類似度が閾値未満)は
+fallback ドメイン(通常 `medium`)を使用し、**本会話の進行を絶対に止めない**。
 
-これにより、ネットワークが遅い環境でもユーザ体験が悪化しない。
+これにより、ネットワークが遅い環境でもユーザ体験が悪化しない(ローカル判別器は
+そもそもネットワークを使わないため、この性質はさらに強化される)。
+
+#### ローカル判別器(B-15・本番経路)
+
+```typescript
+// src/router/local-classifier.ts
+export async function classifyTopicLocal(
+  text: string,
+  knowledgeDomains: CharacterKnowledgeDomains,
+  deps?: LocalRouterDeps,
+): Promise<RouterResult>;
+
+// 起動時ウォーム(topics の document 埋め込みを先に温める・best-effort)
+export async function warmLocalRouter(
+  knowledgeDomains: CharacterKnowledgeDomains,
+): Promise<void>;
+```
+
+- **ハイブリッド判別**:
+  1. **キーワード一致**(`classifyByKeyword`・純粋・同期):topics の部分文字列一致。即時・正確。
+     1文字 topic(車/薬 等)は部分文字列の誤一致(電車/薬局)を避けて除外し(`ROUTER_KEYWORD_MIN_LEN`)、
+     埋め込みに委ねる。
+  2. **埋め込み類似**(`classifyByEmbedding`):想起と共用のウォーム済 ruri で query を埋め込み、
+     topics ベクトルとのコサイン類似が `LOCAL_ROUTER_SIM_THRESHOLD`(=0.55)以上の最良 topic を採用。
+     言い換え(キーワードに無い表現)を拾う。短すぎる発話(`ROUTER_EMBED_MIN_CHARS` 未満)はスキップ。
+  3. **fallback**:いずれも当たらなければ `medium`(雑談)に倒す=「迷ったら medium」の保守原則。
+- **複数一致の優先順**:`refuse` > `none` > `high` > `low` > `medium`(安全・境界 → 専門 → 一般)。
+- **ネットワーク0往復**:外部 API を一切呼ばない。埋め込みモデル未配置・embed 例外は `medium`
+  fallback に倒し会話を止めない(知識境界は buildSystemPrompt にも含むため二重防御)。
+- **ipc の順序**:`ipc.ts` は **記憶構築(`buildConversationMemory`)→ `classifyTopicLocal`** の順で呼ぶ。
+  発話の query 埋め込みをキャッシュ共有し、想起と判別の embed 競合を避けるため。
+- **起動時ウォーム**:lifecycle が埋め込みモデルのウォーム後に `warmLocalRouter` で topics を
+  document 埋め込みしておく(初回ターンの遅延・embed 競合回避)。
 
 #### 主要型定義
 
@@ -614,10 +656,13 @@ export interface RouterResult {
 > 📌 **設計判断**:以前は `level: number` を持っていたが、MVPでは使用機会が
 > 無いため削除。将来「数値で段階制御したい」となった時点で再導入する。
 
-#### 実装方針
+#### 実装方針(Haiku 版 `classifyTopic` = legacy・本番未使用)
+
+> 📌 以下は **legacy/任意**。本番は上記ローカル判別器(`classifyTopicLocal`)に置換済(B-15)。
+> Haiku 版は将来のマルチプロバイダ(§11.7)・比較検証用に温存し、テストも維持する(本番経路からは外れた)。
 
 ```typescript
-// src/router/router.ts(実装は classifyTopic)
+// src/router/router.ts(実装は classifyTopic・legacy)
 // N-04-2: テスト/将来のマルチプロバイダ(§11.7)のため LLM 呼び出しは差し替え可能。
 //         任意4番目引数 llmCall(既定=実 Haiku)で DI する。
 // N-04-3: 判定は topics で決まるためキャラ名 {name} は使わず中立表現にする。
@@ -633,8 +678,10 @@ export async function classifyTopic(
 - **Prefill は使わない**(N-09-7):現行 Claude 4.x は assistant メッセージ Prefill 非対応。
   判定 JSON は system 指示 + ロバストパーサで取得する。
 - **タイムアウト**:**800ms**(Haikuの実測レイテンシ中央値+α)。
-  なお実機では Haiku 往復が 800ms を超え実質常に fallback=medium になる(N-09-9・MVP後にブラッシュアップ)。
-  知識境界は buildSystemPrompt 側にも含まれるため、fallback でも「知らない」応答は担保される。
+  なお実機では Haiku 往復が 800ms を超え実質常に fallback=medium になっていた(N-09-9)。
+  この問題は本番経路をローカル判別器へ置換して解消済み(B-15・上記)。Haiku 版は legacy のため
+  本記述は legacy 経路の仕様として残す。知識境界は buildSystemPrompt 側にも含まれるため、
+  どの経路でも fallback 時に「知らない」応答は担保される。
 - **失敗時の挙動**:
   - タイムアウト → `knowledgeDomains.fallback` を使用(本会話は続行)
   - API エラー → `knowledgeDomains.fallback` を使用(本会話は続行)
@@ -1001,6 +1048,14 @@ function isExtraValue(v: unknown): v is ExtraValue {
 - Character Context + Memory Context + ユーザ入力を統合
 - Claude API呼出
 - JSON応答のパース・検証
+
+> 📌 **episodic 記憶の provenance 2セクション分離(N-RECALL-1・2026-06-09)**:プロンプトに
+> episodic 記憶を載せる際は、**`provenance` で2セクションに分けて提示**する。
+> `provenance==='self'`(キャラ自身の人生 canon)を「**あなた自身の思い出(あなたが実際に経験したこと)**」、
+> それ以外(`user`)を「**相手について覚えていること(相手の身に起きたこと・あなたの経験ではない・混同しないこと)**」
+> として別見出しで投入する(`prompt-builder.ts` `formatEpisodic`)。
+> 1つの見出しに混在させると、LLM が**相手の人間関係を自分のものと取り違える**(例:ユーザの知人を
+> 自分の友達として列挙する)バグが起きるため。見出しのキャラ名はハードコードせず「あなた」基準(§5.1)。
 
 #### 主要型定義
 
@@ -2873,13 +2928,24 @@ win:
 ### 11.6 忘却機構(ビジョン§3 柱1由来・最重要拡張)
 
 ビジョン§3 柱1「人間らしい忘却」を実現するための機構。
-MVPでは実装しないが、**スケール想定の表(§3.3)で示した通り、
-中期記憶が増えるにつれ必須となる将来拡張**である。
+**スケール想定の表(§3.3)で示した通り、中期記憶が増えるにつれ必須となる本質機能**であり、
+スケールが小さいうちに先回りで実装した。
 
-> 📌 **MVP 0.3 との関係**:記憶データモデル v2(`docs/archive/design-revision-memory-v2.md`)は、忘却・統合の
+> ✅ **実装済み＋実機検証済(B-13・task_19・2026-06-09)**:月次/年次サマリ＋重要度しきい値の
+> **物理削除**(§6.4)を実装。サマリは専用フォーマットではなく**通常の `EpisodicMemory`**
+> (`category="summary"` ＋ `extra.summaryTier`・月次 importance=4 / 年次=5・`valence=0`=mood 不変)
+> として保存し、既存スキーマ・索引・想起・平文可搬性を流用する。**要約成功→削除**の順で進め、
+> サマリ無しに記憶を失わない。起動時に**背景**で実行し冪等(済み期間はサマリ有無で判定)。
+> **破壊的処理のため既定オフ**(`ENE_FORGETTING=1` で有効化)。canon(`provenance:'self'`)は対象外。
+> 実機検証(2026-06-09・実データをバックアップ→有効化→検査→復元)で、完了月5件の各1サマリ化・
+> 低 importance(≤2)の物理削除・ベクトル索引 prune・逆引き再構築・背景実行で起動非ブロック・
+> 2024以前なしで年次正しくスキップ、を確認済み。詳細は `tasks/task_19_forgetting.md` /
+> `implementation-notes.md` N-FORGET-1。残=5年サマリ・「忘れて」指示削除。
+
+> 📌 **MVP 0.3 との関係(経緯)**:記憶データモデル v2(`docs/archive/design-revision-memory-v2.md`)は、忘却・統合の
 > 受け皿として `RelationshipMemory`(人物gist)・関係ナラティブ(era)層・`importance` を**器として予約済み**。
-> 本機構＋パターン検出・共同想起は、task_14/15 では実装せず
-> **将来タスク(忘却用)**に送る(※ task_16 は別件=「心」。忘却は task_17 以降)。
+> 本機構は task_14/15 では実装せず**忘却用の独立タスクに送り**、その後 **task_19 で実装した**(上記✅)。
+> パターン検出・共同想起は引き続き将来拡張(※ task_16 は別件=「心」)。
 > 研究の裏付けは記憶ノート research-memory-taxonomy-2026 を参照。
 
 **実装する処理**:
