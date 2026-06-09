@@ -6,6 +6,7 @@ export interface CharacterIdentity {
   characterId: string;
   name: string;
   nameReading?: string; // 名前の読み(かな)。固有名詞のTTS/STT・自己紹介の furigana 用(任意・後方互換)
+  sttAliases?: string[]; // STT が名前(callsSelf)を誤認しやすい綴り(例「取り身」)。呼びかけ専用の保守補正に使う(任意)
   ageAppearance: string; // "少女" など抽象表現(具体的な年齢数値は持たない・CLAUDE §5.2)
   gender: string;
   birthday?: {

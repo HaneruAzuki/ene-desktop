@@ -866,6 +866,14 @@
 - **結論**: 「**寛容ライセンス＋品質＋軽量**」を守る限り **whisper-small が STT の実用的な床**。ストリーミング系は全て(精度/ライセンス/CPU)のいずれかを犠牲にする=採用見送り。将来 GPU 容認 or ライセンス紐付き容認に方針転換した場合のみ再検討(Moonshine が最有力)。
 - **第一声の残レバー総括(N-LAT-7+8)**: TTFT(~1500ms=クラウド床)・STT(~800ms=クリーン制約下の床)・無音(350ms=取りこぼし境界)。**いずれも"柱を緩める"以外に大きな短縮余地なし**。体感 ~3.3s が現構成の実用下限。
 
+### N-16-2 🟢 キャラ名を ENE→魚川トリミ に改名(B-10)＋STT名前補正＋productName
+- **該当**: `identity.json`(name=魚川トリミ・nameReading=うおかわ とりみ・callsSelf=トリミ・sttAliases)/ `fewshot.json` / `system-prompt-builder.ts` / UI(`InputArea` プレースホルダ・`ApiKeyDialog`・`CharacterDisplay` alt・両 `index.html` title)/ `electron-builder.yml`(productName=魚川トリミ・artifactName=Torimi)/ `index.ts`(app.setName)。
+- **方針**: ユーザー可視の "ENE" を全廃。ENE は**コードネーム/プログラム内コメント/Philosophy/appId/characterId** にのみ残す(`characterId="ene"` 維持=識別子churn回避)。表示名は full=魚川トリミ、カジュアル自称=トリミ。
+- **STT 名前補正(Part4)**: STT は「トリミ」を「取り身」等に誤認。whisper の `prompt_ids` バイアスは**現 transformers.js では generate() が消費しない**(実装でコメントアウト・`_retrieve_init_tokens` が未使用)=使えない。→ **保守的な後処理**: 発話**全体**が名前エイリアス(identity.sttAliases に外出し)のときだけ callsSelf へ置換(`correctNameMishear`・純粋関数・STT経路のみ・テキスト入力には不適用)。文中の「取り身」(魚の話)は触らない=過補正回避。
+- **productName/userData の分離**: `productName=魚川トリミ` は packaged 版で `app.getName()`→userData(%APPDATA%/<名>)に波及し、API キー保存先が日本語パスへ動く危険。→ `app.setName('ene-desktop')` を main 冒頭で明示し、**表示名と保存先識別子を分離**(§6.3 の ene-desktop 固定に整合)。exe 名は ASCII の `Torimi-${version}.exe`。
+- **残(別判断)**: STT プロンプトバイアスを使うには transformers.js アップグレード(要承認)。それまでは保守補正で対処。
+- **検証**: typecheck/lint/全428テスト緑(name-correction 6 新規)。プロンプトに「『トリミ』と呼ばれたら自分の名前(料理と取り違えない)」を明示=Claude 側の取り違え抑止も併用。
+
 ---
 
 ## 忘却機構(B-13 / 設計書 §11.6・task_19・2026-06-09)

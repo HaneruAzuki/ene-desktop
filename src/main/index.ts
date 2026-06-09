@@ -9,6 +9,12 @@ import type { AppRuntime } from './ipc';
 // Electron main エントリポイント(設計書 §7)。
 // 多重起動防止 → 起動シーケンス(lifecycle)→ 終了時に記憶抽出(shutdown)。
 
+// userData(%APPDATA%/<app名>)を安定した ASCII 識別子に固定する(§6.3)。
+// app.getName() は packaged 版で productName(=「魚川トリミ」)を使うため、固定しないと
+// userData が日本語パスへ動き、API キー(api-key.enc)の保存先が変わってしまう。
+// productName(表示名)と userData(保存先識別子)を分離するための明示設定。
+app.setName('ene-desktop');
+
 const runtime: AppRuntime = {
   charContext: null,
   apiKey: null,

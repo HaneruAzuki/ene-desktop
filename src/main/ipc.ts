@@ -9,6 +9,7 @@ import { buildConversationMemory } from '../memory/context-builder';
 import { requestExtraction, enforceShortTermCap } from '../memory/extraction-scheduler';
 import { classifyTopic } from '../router/router';
 import { chat, makeLlmComplete, warmPromptCache } from '../conversation/client';
+import { correctNameMishear } from '../conversation/name-correction';
 import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
 import { recordBirthdayCelebrated, recordConversationTurn } from '../character/active-character';
@@ -214,7 +215,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // 文字起こしして確定テキストを renderer へ返す(renderer はそれを send-message に流す)。
   // ENE_LISTEN_ONLY=1: 相槌テスト用に応答(Claude/記憶=レイテンシ源)を止め、VAD＋相槌だけ動かす(task_18)。
   const listenOnly = process.env['ENE_LISTEN_ONLY'] === '1';
-  const vad = new VadRuntime(mainWindow, backchannel, listenOnly);
+  // STT 確定テキストの名前誤認補正(発話全体が名前エイリアスのときだけ自称へ・B-10 Part4)。
+  // identity は charContext からその都度読む(エイリアス/自称はキャラ依存値・§4.5)。STT 経路のみ。
+  const correctTranscript = (text: string): string => {
+    const id = runtime.charContext?.identity;
+    return id ? correctNameMishear(text, id.sttAliases ?? [], id.selfRecognition.callsSelf) : text;
+  };
+  const vad = new VadRuntime(mainWindow, backchannel, listenOnly, correctTranscript);
   ipcMain.handle('ene:vad-start', async (): Promise<boolean> => vad.start());
   ipcMain.on('ene:vad-frame', (_event, frame: Float32Array) => {
     void vad.pushFrame(frame instanceof Float32Array ? frame : new Float32Array(frame));

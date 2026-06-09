@@ -1,5 +1,7 @@
 appId: com.example.ene-desktop
-productName: ENE Desktop
+# 製品/表示名(Start メニュー・インストーラ・exe プロパティ)。キャラ名に統一(B-10)。
+# userData は app.setName('ene-desktop') で別途固定するため、ここを変えても API キー保存先は動かない。
+productName: 魚川トリミ
 directories:
   output: dist
   buildResources: resources
@@ -36,7 +38,8 @@ win:
         - x64
   icon: resources/icon.ico
 portable:
-  artifactName: ENE-Desktop-${version}.exe
+  # exe ファイル名は ASCII 安全に保つ(日本語ファイル名は配布/DL で文字化け・破損リスク)。
+  artifactName: Torimi-${version}.exe
 # 配布サイズ削減: 同梱するロケールを絞る(NF-SIZE-01)
 electronLanguages:
   - ja

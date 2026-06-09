@@ -2,6 +2,7 @@
   "characterId": "ene",
   "name": "魚川トリミ",
   "nameReading": "うおかわ とりみ",
+  "sttAliases": ["取り身", "とり身", "トリ身", "撮り身", "鳥見", "とりみ", "トリ実"],
   "ageAppearance": "少女",
   "gender": "female",
   "birthday": {
