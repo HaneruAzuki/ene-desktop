@@ -876,7 +876,9 @@
 - **設計判断**: ①サマリは**通常 EpisodicMemory**(`category="summary"`＋`extra.summaryTier`、importance 月次4/年次5、valence 0=mood 不変)で保存=既存スキーマ/索引/想起を流用・後方互換・平文可搬。②**物理削除**(§6.4)。③**要約成功→削除**の順(サマリ無しで記憶を失わない)。④起動時**背景**実行＋冪等(済み期間はサマリ有無で判定)。⑤**既定オフ**=`ENE_FORGETTING=1` のときだけ `lifecycle` が起動(破壊的のため実データ前にレビュー)。⑥短期ハード上限(採用(a))=`SHORT_TERM_HARD_MAX=80` で同期抽出強制。
 - **段階(§11.6)**: 月次=完了月の生記録を1サマリ化→importance≤2 削除/≥3 残。年次=`currentYear-Y≥2` の年の月次サマリ＋残存詳細を再要約→月次サマリ削除・生 importance≤3 削除/≥4 残。canon(self)は対象外。5年サマリ・「忘れて」指示削除は将来。
 - **索引整合**: 物理削除後 `rebuildInvertedIndex()`＋`pruneVectorIndex()`(派生キャッシュ・真実の源は episodic 本体)。
-- **検証**: typecheck/lint/**全399テスト緑**(新規 consolidation-policy 8・forgetting 3)。**実機での有効化(ENE_FORGETTING=1)での挙動・初回大量統合のレイテンシは未確認**(背景実行だが I/O 量に注意)。
+- **検証**: typecheck/lint/**全399テスト緑**(新規 consolidation-policy 8・forgetting 3)。
+- **✅ 実機検証済(2026-06-09・実データをバックアップ→ENE_FORGETTING=1 で実走→検査→復元)**: 完了月5件(2025-09/11・2026-01/03/05)を各1サマリ化(Claude製・`category=summary`/`summaryTier=monthly`/`period`/`valence=0`)、2026-01 で低importance(≤2)1件を物理削除、ベクトル索引は削除IDを prune(19→18)・逆引き再構築。**背景実行で起動非ブロック(約13秒/5ヶ月・初回でも軽量)**、年次は2024以前なしで正しくスキップ。**機構は正しく動作**。
+  - **🟡 微調整候補(将来)**: 月の生記録が1件のとき「1→1」サマリ＋生残し(importance≥3)でやや冗長(サマリと生が想起プールで重複しうる)。密データでは正常な圧縮。1件以下の月はサマリ省略 or 生削除の検討余地。
 - **🟡 要反映(設計書 §11.6)**: 「将来拡張」→「**実装済み(月次/年次・既定オフ・物理削除・サマリ=summary カテゴリ EpisodicMemory)**」へ更新。`task_19` を正本参照に追加。
 
 ### N-RECALL-1 🔴 **重要バグ**: canon(自分の人生)と user 記憶をプロンプトで混同 → 相手の人間関係を自分のものとして発話

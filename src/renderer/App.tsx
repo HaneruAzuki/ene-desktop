@@ -4,7 +4,7 @@ import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea } from './components/InputArea';
 import { playClick } from './sound';
 import { enqueueAudio, stopPlayback, setPlaybackHandlers } from './audio-player';
-import { playBackchannel } from './backchannel-player';
+import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
@@ -102,6 +102,8 @@ export function App(): React.ReactElement | null {
   useEffect(() => {
     setPlaybackHandlers(
       () => {
+        // 応答が鳴り始めた瞬間=鳴り残った相槌をダッキング(停止)して声の重なりを防ぐ。
+        stopBackchannel();
         if (voiceModeRef.current) window.ene.setVadSpeaking(true);
       },
       () => {
@@ -232,6 +234,7 @@ export function App(): React.ReactElement | null {
   /** barge-in: ENE 発話中にユーザーが話しかけたら、ENE の声を即停止して聞く体勢へ。 */
   function handleBargeIn(): void {
     stopPlayback();
+    stopBackchannel(); // 鳴り残った相槌もダッキング(割り込み時に黙らせる)
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle' } : s));
     window.ene.setVadSpeaking(false);

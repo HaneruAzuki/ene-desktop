@@ -4,8 +4,12 @@
 //
 // ⚠️ エコー: 相槌はユーザ発話中に鳴るためマイクへ回り込みうる。getUserMedia の
 // echoCancellation で抑制する前提(実機で要検証=task_18 Phase D / N-17-9 と同根)。
+//
+// ダッキング(barge-in / 応答開始): 相槌「うん」が鳴り残ったまま ENE が応答を喋り始める/
+// ユーザが割り込むと声が重なる。stopBackchannel() で再生中の相槌を即停止し、重なりを防ぐ。
 
 let ctx: AudioContext | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
 
 function getCtx(): AudioContext {
   ctx ??= new AudioContext();
@@ -21,5 +25,27 @@ export async function playBackchannel(wav: ArrayBuffer): Promise<void> {
   const src = c.createBufferSource();
   src.buffer = buf;
   src.connect(c.destination);
+  // 自然終了で currentSource を解放(stopBackchannel の対象から外す)。
+  src.onended = (): void => {
+    if (currentSource === src) currentSource = null;
+  };
+  currentSource = src;
   src.start();
+}
+
+/**
+ * 再生中の相槌を即停止する(ダッキング・barge-in / 応答開始時)。
+ * ENE が応答を喋り始める/ユーザが割り込んだ瞬間に、鳴り残った相槌「うん」を黙らせ、
+ * ENE の声と相槌が重なるのを防ぐ。再生中でなければ何もしない(no-op)。
+ */
+export function stopBackchannel(): void {
+  if (currentSource) {
+    currentSource.onended = null; // 解放ロジックを呼ばせない
+    try {
+      currentSource.stop();
+    } catch {
+      /* 既に停止済みなら無視 */
+    }
+    currentSource = null;
+  }
 }
