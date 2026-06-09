@@ -46,8 +46,8 @@ export function ApiKeyDialog(): React.ReactElement {
 
   return (
     <div className="dialog">
-      <h1>ENE をはじめる準備</h1>
-      <p>ENE と会話するには、Anthropic の API キーが必要です。</p>
+      <h1>魚川トリミ をはじめる準備</h1>
+      <p>魚川トリミ と会話するには、Anthropic の API キーが必要です。</p>
 
       <button className="link-button" onClick={() => void window.eneApiKey.openAnthropicConsole()}>
         ▶ Anthropic Console を開く

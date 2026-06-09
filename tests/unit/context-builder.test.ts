@@ -25,7 +25,7 @@ afterEach(async () => {
 describe('context-builder (設計書 §3.1)', () => {
   it('完全な CharacterContext を構築する', async () => {
     const ctx = await buildCharacterContext();
-    expect(ctx.identity.name).toBe('ENE');
+    expect(ctx.identity.name).toBe('魚川トリミ');
     expect(ctx.knowledgeDomains.fallback).toBe('medium');
     expect(ctx.fewshot.examples.tech_high.length).toBeGreaterThan(0);
     expect(ctx.portraitPath).toContain('portrait.png');

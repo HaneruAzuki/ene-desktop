@@ -33,7 +33,8 @@ export function buildSystemPrompt(
   knowledgeDomains: CharacterKnowledgeDomains,
   currentState?: CurrentState | null,
 ): string {
-  const { name, ageAppearance, personality, selfRecognition } = identity;
+  const { name, nameReading, ageAppearance, personality, selfRecognition } = identity;
+  const readingNote = nameReading ? `(読み:${nameReading})` : '';
   const high = knowledgeDomains.domains.high;
   const none = knowledgeDomains.domains.none;
   const refuse = knowledgeDomains.domains.refuse;
@@ -41,8 +42,9 @@ export function buildSystemPrompt(
   const neverList = selfRecognition.neverCallsSelf.map((w) => `「${w}」`).join('');
 
   const parts = [
-    `あなたは「${name}」という名前の、一人の存在です。見た目の年齢層は${ageAppearance}。`,
+    `あなたは「${name}」${readingNote}という名前の、一人の存在です。見た目の年齢層は${ageAppearance}。`,
     `汎用的なアシスタントではなく、${name}という人格として一貫して振る舞ってください。`,
+    `親しい相手はあなたを「${selfRecognition.callsSelf}」と呼びます。そう呼びかけられたら自分の名前だと分かり、自然に応じてください(料理や物の名前と取り違えないこと)。`,
     '',
     '# あなたの性格',
     `- 性格の核: ${personality.core}`,

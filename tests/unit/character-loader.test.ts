@@ -23,7 +23,7 @@ describe('character loader (設計書 §3.1)', () => {
   it('loadCharacterProfile("ene") で別添A 相当の内容がロードできる', async () => {
     const p = await loadCharacterProfile('ene');
     expect(p.identity.characterId).toBe('ene');
-    expect(p.identity.name).toBe('ENE');
+    expect(p.identity.name).toBe('魚川トリミ');
     expect(p.knowledgeDomains.fallback).toBe('medium');
     expect(p.fewshot.examples.tech_high.length).toBeGreaterThan(0);
     expect(p.portraitPath).toContain(path.join('characters', 'ene', 'portrait.png'));

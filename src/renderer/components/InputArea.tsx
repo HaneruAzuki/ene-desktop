@@ -41,7 +41,7 @@ export const InputArea = forwardRef<HTMLDivElement, Props>(function InputArea(
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="ENEに話しかける..."
+        placeholder="トリミに話しかける..."
       />
     </div>
   );
