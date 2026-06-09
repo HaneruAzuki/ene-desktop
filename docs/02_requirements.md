@@ -381,7 +381,7 @@ MVPでは Episodic Memory に `importance` を必須化することで、
 | F-VOICE-02 | emotion ラベル→スタイルID/合成パラメータの対応は `characters/{id}/voice.json` に外出しする(コードにハードコードしない・§4.5)。`neutral` を必須フォールバックとする。`pitchScale` は音質劣化のため使わない(声質はモデル選択＋スタイルで決める) |
 | F-VOICE-03 | 応答は読み上げ用ひらがな `reading`(任意)を持てる。TTS は `reading` があればそれを、無ければ表示文 `message` を読む(漢字の誤読対策) |
 | F-VOICE-04 | 確定応答を文単位で合成し、文ごとに音声チャンク(WAV)を renderer へ送って逐次再生する(吹き出しは即時表示・音声は後追いで届く) |
-| F-VOICE-05 | 音声認識(STT)は完全ローカル(main プロセス・`onnxruntime-node`・`whisper-large-v3-turbo`)。録音音声は外部送信せず STT 入力にのみ使う。脳(Claude)へ送るのは確定テキストのみ |
+| F-VOICE-05 | 音声認識(STT)は完全ローカル(main プロセス・`onnxruntime-node`・既定 `whisper-small`・env `ENE_STT_MODEL_DIR` で `whisper-large-v3-turbo` 等に切替可・N-LAT-6)。録音音声は外部送信せず STT 入力にのみ使う。脳(Claude)へ送るのは確定テキストのみ |
 | F-VOICE-06 | マイク取得は renderer の `getUserMedia`(16kHz mono)。STT モデルは別ダウンロードで `data/models/` 配下へ配置する(コア配布物 <100MB を維持・実行時に外部からモデルを取らない) |
 | F-VOICE-07 | ハンズフリー会話では Silero VAD(**v4**・main・`onnxruntime-node`・同梱)で発話区間を検出し、無音継続(既定 700ms)でターン終了とみなして STT→既存 `sendMessage` 経路へ流す |
 | F-VOICE-08 | barge-in:ENE 発話中(実音声の再生中)にユーザ発話を検知したら TTS 再生を即停止する。エコー回り込みでの誤発火対策に `echoCancellation` を有効化する |

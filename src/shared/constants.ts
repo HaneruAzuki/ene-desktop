@@ -89,8 +89,20 @@ export const RRF_K = 60;
 
 // --- 音声入力(STT・task_17 Phase B) ---
 
-/** STT モデル(whisper-large-v3-turbo・ONNX)のディレクトリ名。data/models/ 配下に別DLで配置。 */
-export const STT_MODEL_DIR = 'whisper-large-v3-turbo';
+/**
+ * STT モデル(whisper-small・ONNX)のディレクトリ名。data/models/ 配下に別DLで配置。
+ * 2026-06-09 計測で turbo→small へ既定変更:エンコーダ12層で stt ~3000ms→~800ms(約1/4)、
+ * 日本語精度は turbo と実質同等(通常文は完全一致・固有名詞の誤認は全モデル共通)。N-LAT-6。
+ * より高精度が要るときは ENE_STT_MODEL_DIR=whisper-large-v3-turbo で差し替え可(下記 env)。
+ */
+export const STT_MODEL_DIR = 'whisper-small';
+
+/**
+ * STT モデルディレクトリの env 上書き(A/B 比較・高精度フォールバック用)。値=data/models/ 配下のディレクトリ名。
+ * 例 `ENE_STT_MODEL_DIR=whisper-large-v3-turbo` で高精度モデルへ差し替える。
+ * 既定(未指定)は STT_MODEL_DIR(=whisper-small)。
+ */
+export const STT_MODEL_DIR_ENV = 'ENE_STT_MODEL_DIR';
 
 /** Whisper が前提とするサンプリングレート(16kHz 固定)。マイク取得もこのレートで行う。 */
 export const STT_SAMPLE_RATE = 16000;

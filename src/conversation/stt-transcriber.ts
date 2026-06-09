@@ -2,14 +2,22 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { log } from '../shared/logger';
 import { getModelsDir } from '../storage/paths';
-import { STT_MODEL_DIR, STT_LANGUAGE } from '../shared/constants';
+import { STT_MODEL_DIR, STT_MODEL_DIR_ENV, STT_LANGUAGE } from '../shared/constants';
 
-// ローカル音声認識(whisper-large-v3-turbo・ONNX・task_17 Phase B)。
+/** 使用する STT モデルのディレクトリ名(env 上書き可・A/B 比較用)。既定は STT_MODEL_DIR。 */
+function sttModelDir(): string {
+  return process.env[STT_MODEL_DIR_ENV] || STT_MODEL_DIR;
+}
+
+// ローカル音声認識(whisper-small・ONNX・task_17 Phase B / N-LAT-6)。
+//
+// モデル既定は whisper-small(2026-06-09 計測で turbo→small・stt ~3000ms→~800ms・精度ほぼ同等)。
+// 高精度が要るときは ENE_STT_MODEL_DIR=whisper-large-v3-turbo で差し替え可(sttModelDir())。
 //
 // 重要(§7.1 厳守): アプリ実行時に外部へモデルを取りに行かない。embedder.ts と同方針。
 //   - env.allowRemoteModels = false でローカル限定。
 //   - モデルは別ダウンロード(scripts/download-stt-model.mjs)で
-//     data/models/whisper-large-v3-turbo に配置。
+//     data/models/<dir> に配置(既定 whisper-small)。
 //   - 未配置/ロード失敗時は例外 → 呼び出し側(ipc)がキャラ口調でフォールバック。
 //
 // 実行は main プロセス(onnxruntime-node・CPU)。精度最優先で encoder=fp32。
@@ -40,14 +48,15 @@ async function loadPipeline(): Promise<AsrPipeline> {
   env.localModelPath = getModelsDir();
   // 量子化デコーダ(q8=_quantized)があれば使う。精度はほぼ同等でサイズ/速度が有利。
   // 無ければ fp32 にフォールバック(ダウンロードスクリプトの取得状況に依存しない)。
-  const quantDecoder = join(getModelsDir(), STT_MODEL_DIR, 'onnx', 'decoder_model_merged_quantized.onnx');
+  const modelDir = sttModelDir();
+  const quantDecoder = join(getModelsDir(), modelDir, 'onnx', 'decoder_model_merged_quantized.onnx');
   const decoderDtype: 'fp32' | 'q8' = (await fileExists(quantDecoder)) ? 'q8' : 'fp32';
   const dtype: Record<string, 'fp32' | 'q8'> = {
     encoder_model: 'fp32',
     decoder_model_merged: decoderDtype,
   };
-  log.info(`loading STT model from ${getModelsDir()}/${STT_MODEL_DIR} (decoder=${decoderDtype})`);
-  const asr = await pipeline('automatic-speech-recognition', STT_MODEL_DIR, { dtype });
+  log.info(`loading STT model from ${getModelsDir()}/${modelDir} (decoder=${decoderDtype})`);
+  const asr = await pipeline('automatic-speech-recognition', modelDir, { dtype });
   return asr as unknown as AsrPipeline;
 }
 
@@ -56,7 +65,7 @@ async function loadPipeline(): Promise<AsrPipeline> {
  * 未配置なら呼び出し側は音声入力を無効化し、キャラ口調で「まだ準備できてない」と返す。
  */
 export async function isSttModelAvailable(): Promise<boolean> {
-  return fileExists(join(getModelsDir(), STT_MODEL_DIR, 'config.json'));
+  return fileExists(join(getModelsDir(), sttModelDir(), 'config.json'));
 }
 
 /**

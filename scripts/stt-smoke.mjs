@@ -1,13 +1,16 @@
 // STT スモークテスト(task_17 Phase B・手動検証用)。
 //
-// voice-smoke が生成した「魚川トリミ自身の声」WAV を whisper-large-v3-turbo で書き起こし、
+// voice-smoke が生成した「魚川トリミ自身の声」WAV を STT モデルで書き起こし、
 // 正解テキストと並べて表示する。フル Electron 配線(マイク)の前に、
 // 「ローカルモデル＋onnxruntime-node＋日本語精度」を一発で確認するためのもの。
+// モデル比較(turbo vs small 等)の A/B にも使える(N-LAT-6 はこれで計測した)。
 //
-// 前提: npm run download:stt-model でモデルを data/models/whisper-large-v3-turbo に配置済み、
+// 前提: npm run download:stt-model でモデルを data/models/<dir> に配置済み(既定 whisper-small)、
 //       かつ voice-smoke-out/torimi_0{1,2,3}.wav が存在(npm run voice:smoke で生成)。
 //
 // 使い方:  node scripts/stt-smoke.mjs   (または npm run stt:smoke)
+//   環境変数 ENE_STT_MODEL_DIR=<dir> で対象モデルを切替(A/B 比較)。既定は whisper-small。
+//   例:  ENE_STT_MODEL_DIR=whisper-large-v3-turbo  node scripts/stt-smoke.mjs
 
 import { readFile, access } from 'node:fs/promises';
 import path from 'node:path';
@@ -93,9 +96,10 @@ async function exists(p) {
 }
 
 async function main() {
-  const modelDir = path.join(modelsDir, 'whisper-large-v3-turbo');
+  const modelName = process.env.ENE_STT_MODEL_DIR || 'whisper-small';
+  const modelDir = path.join(modelsDir, modelName);
   if (!(await exists(path.join(modelDir, 'config.json')))) {
-    console.error('✗ モデル未配置です。先に  npm run download:stt-model  を実行してください。');
+    console.error(`✗ モデル未配置です(${modelName})。先に download:stt-model で配置してください。`);
     process.exit(1);
   }
 
@@ -108,10 +112,10 @@ async function main() {
   ))
     ? 'q8'
     : 'fp32';
-  console.log(`model: whisper-large-v3-turbo (encoder=fp32, decoder=${decoderDtype})`);
+  console.log(`model: ${modelName} (encoder=fp32, decoder=${decoderDtype})`);
   console.log('loading pipeline ...');
   const t0 = Date.now();
-  const asr = await pipeline('automatic-speech-recognition', 'whisper-large-v3-turbo', {
+  const asr = await pipeline('automatic-speech-recognition', modelName, {
     dtype: { encoder_model: 'fp32', decoder_model_merged: decoderDtype },
   });
   console.log(`loaded in ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);

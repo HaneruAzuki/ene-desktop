@@ -69,9 +69,11 @@
 
 > 📌 **MVP 0.3 確定(実装・検証済み 2026-06・task_17「声と耳」)**:双方向ローカル音声を追加したが、
 > **新規 npm ライブラリは増やしていない**(本表に追加なし)。内訳:
-> - **STT(音声認識)**:`@huggingface/transformers ^4.x`(上表既出)を再利用。モデルは
->   **`onnx-community/whisper-large-v3-turbo`**(encoder fp32 / decoder q8)を**別ダウンロード**で
->   `data/models/whisper-large-v3-turbo/` に配置(`scripts/download-stt-model.mjs`)。実行時に外部DLしない(§7.1)。
+> - **STT(音声認識)**:`@huggingface/transformers ^4.x`(上表既出)を再利用。モデルは既定
+>   **`onnx-community/whisper-small`**(encoder fp32 / decoder q8)を**別ダウンロード**で
+>   `data/models/whisper-small/` に配置(`scripts/download-stt-model.mjs`)。実行時に外部DLしない(§7.1)。
+>   2026-06-09 計測で turbo→small へ既定変更(stt ~3000ms→~800ms・約1/4・精度ほぼ同等・**N-LAT-6**)。
+>   高精度が要るときは `ENE_STT_MODEL_DIR=whisper-large-v3-turbo` で差し替え可。
 > - **VAD(音声区間検出)**:`onnxruntime-node` を**直接**使用(`@huggingface/transformers` の推移的依存として
 >   既に同梱・externalize 済=新規 npm なし)。モデルは **Silero VAD v4**(`silero_vad.onnx`・約1.8MB・MIT)を
 >   **`resources/` に同梱**(小容量のため別DLでなく配布物同梱)。**⚠️ v5/v5.1 は `onnxruntime-node` が
@@ -180,7 +182,7 @@ ene-desktop/
 │
 ├── scripts/                        ← 開発/セットアップ用(配布物に含めない・task_15/17)
 │   ├── download-model.mjs         ← 埋め込みモデル(ruri)をローカル取得
-│   ├── download-stt-model.mjs     ← STT(whisper-large-v3-turbo)をローカル取得(task_17)
+│   ├── download-stt-model.mjs     ← STT(既定 whisper-small・env で turbo 等に切替)をローカル取得(task_17/N-LAT-6)
 │   ├── download-vad-model.mjs     ← VAD(silero v4)取得(task_17・通常は resources 同梱で不要)
 │   ├── voice-smoke.mjs            ← TTS スモーク(task_17・手動検証)
 │   ├── stt-smoke.mjs              ← STT スモーク(task_17・手動検証)
@@ -349,7 +351,7 @@ ene-desktop/
 │       │           └── vectors.json    ← 意味検索ベクトル(モデル配置時)
 │       ├── models/                ← ローカルモデル(別DL・コア非汚染・task_15/17)
 │       │   ├── ruri-v3-310m/      ← 埋め込み ONNX int8(約316MB)・scripts/download-model.mjs(task_15)
-│       │   └── whisper-large-v3-turbo/ ← STT ONNX・scripts/download-stt-model.mjs(task_17)
+│       │   └── whisper-small/      ← STT ONNX(既定・env で turbo 等に切替)・scripts/download-stt-model.mjs(task_17/N-LAT-6)
 │       ├── voice/                  ← 音声サイドカー資産(別配置・コア非汚染・task_17/N-17-12)
 │       │   └── engine/            ← AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/・約800MB)
 │       │                            起動時に main が spawn(shell:false)→/version ヘルス→終了時 kill

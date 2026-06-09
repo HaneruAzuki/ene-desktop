@@ -1,12 +1,16 @@
-// whisper-large-v3-turbo(ONNX)をローカルへダウンロードするセットアップ用スクリプト(task_17 Phase B)。
+// STT モデル(ONNX)をローカルへダウンロードするセットアップ用スクリプト(task_17 Phase B)。
+// 既定モデルは whisper-small(2026-06-09 計測で turbo→small へ・N-LAT-6)。
 //
 // 位置づけ(download-model.mjs と同じ):
 //   - 「開発・セットアップ時に手動実行」するツール。配布物(exe)には含めない。
 //   - アプリ本体は実行時に外部へモデルを取りに行かない(§7.1)。モデルはこのスクリプトで
-//     事前にローカル配置し、アプリは data/models/whisper-large-v3-turbo/ から読むだけ。
+//     事前にローカル配置し、アプリは data/models/whisper-small/ から読むだけ。
 //
-// 使い方:  node scripts/download-stt-model.mjs
-//   環境変数 ENE_STT_REPO で取得元リポジトリを変更可。
+// 使い方:  node scripts/download-stt-model.mjs   (既定=whisper-small)
+//   環境変数 ENE_STT_REPO で取得元リポジトリを、ENE_STT_DIR で配置先ディレクトリ名を変更可。
+//   例(高精度モデルも併せて取得):
+//     ENE_STT_REPO=onnx-community/whisper-large-v3-turbo ENE_STT_DIR=whisper-large-v3-turbo node scripts/download-stt-model.mjs
+//   アプリ側は ENE_STT_MODEL_DIR=<dir> で読み先を切替える。
 
 import { createWriteStream } from 'node:fs';
 import { mkdir, stat } from 'node:fs/promises';
@@ -14,8 +18,10 @@ import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-const REPO = process.env.ENE_STT_REPO ?? 'onnx-community/whisper-large-v3-turbo';
-const DEST_ROOT = join(process.cwd(), 'data', 'models', 'whisper-large-v3-turbo');
+const REPO = process.env.ENE_STT_REPO ?? 'onnx-community/whisper-small';
+// 配置先ディレクトリ名。未指定ならリポジトリ名の末尾(basename)を使う。
+const DIR = process.env.ENE_STT_DIR ?? REPO.split('/').pop();
+const DEST_ROOT = join(process.cwd(), 'data', 'models', DIR);
 
 // 精度優先: encoder は fp32。decoder は量子化(q8=_quantized)で十分(サイズ/速度が有利)。
 const ENCODER = 'onnx/encoder_model.onnx';
@@ -86,8 +92,8 @@ async function main() {
     await download(REPO, f, DEST_ROOT);
   }
 
-  console.log('\n完了。data/models/whisper-large-v3-turbo/ にモデルを配置しました。');
-  console.log('アプリを起動するとマイク入力(音声認識)が有効になります(未配置時は無効)。');
+  console.log(`\n完了。data/models/${DIR}/ にモデルを配置しました。`);
+  console.log('既定(whisper-large-v3-turbo)以外を試すときは ENE_STT_MODEL_DIR=' + DIR + ' でアプリを起動。');
 }
 
 main().catch((e) => {

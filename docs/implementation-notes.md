@@ -834,7 +834,18 @@
 - **内容**: 初回想起ターンに乗っていたモデル遅延ロード(数百ms〜数秒)を起動時の背景処理へ前倒し(`void warmEmbedder()`・モデル未配置なら no-op)。＋単一クエリ埋め込みを LRU 風キャッシュ(リトライ/連投で再埋め込みを省略・最大32件)。品質劣化ゼロ・低リスク。typecheck/lint/全413テスト緑。
 - **残 B-14b(ワーカー化)**: 効果は要計測(onnxruntime 既に裏スレッド・B-03b で Router 裏)＋統合リスク(worker から electron `app` 不可=パス注入・パッケージ版 native/asar)。**実機計測で main 詰まりが実在した場合のみ着手**。
 
-> **Tier 0 まとめ**: B-01/B-02(抽出背景化)・B-14a(二重ロード)・B-03b/B-14d(並列化)・B-14c(ウォーム/キャッシュ)= **着地済**。残=B-14b(計測条件付き)。実機レイテンシ計測で締める。
+### N-LAT-6 🟢 STT モデルを turbo→small へ既定変更(体感レイテンシの最大レバー)
+- **該当**: `constants.ts`(`STT_MODEL_DIR='whisper-small'`＋`STT_MODEL_DIR_ENV`)/ `stt-transcriber.ts`(`sttModelDir()` env 上書き)/ `scripts/download-stt-model.mjs`・`stt-smoke.mjs`(repo/dir 一般化)/ 設計書 §1.2・要件 F-VOICE-05。
+- **発見**: 喋り終わり→第一声の最大ボトルネックは STT(~3000ms)。Whisper は発話長に関わらず**30秒 padding mel をエンコード**するため、コストは**エンコーダ規模で固定**。`large-v3-turbo`=「大エンコーダ(32層)＋極小デコーダ(4層)」なので時間の大半は大エンコーダ。
+- **A/B(stt-smoke・同一WAV3本・onnxruntime-node CPU)**:
+  - turbo: ~3.0s / medium(Xenova): **~2.9s**(=turbo とほぼ同速。medium はエンコーダ24層で小さいが**デコーダ24層**が相殺)/ small: **~0.9s**(12層エンコーダが効く)。
+  - 精度:通常文は **small=turbo=完全一致**。固有名詞「魚川トリミ」は**全モデルで誤認**(turbo:さかなかわかりみ / medium:魚川くりみ / small:魚かわかりみ)=small 固有の劣化ではない。
+- **実機(whisper-small・ハンズフリー)**: stt **~750〜850ms**(従来 ~3000ms の約1/4)。体感「喋り終わり→第一声」≈ 500(無音)+800(STT)+~2000(ストリーミング第一声)≈ **3.3s**(従来 ~6s から半減)。**ユーザー承認済(精度・体感とも実用)**。
+- **設計**: モデルは `ENE_STT_MODEL_DIR` で差し替え可(高精度が要るときは `whisper-large-v3-turbo`)。DL は `ENE_STT_REPO`/`ENE_STT_DIR` で任意 repo を任意 dir へ。**新規ライブラリ追加なし**(同一 transformers.js)。Whisper=MIT・再配布可。
+- **残レバー(次点)**: 第一声=Claude 生成(~2s)＋無音 500ms。固有名詞誤認は initial-prompt バイアス等で将来改善余地(small 固有ではない)。
+- **検証**: typecheck/lint/全415テスト緑(モデル差し替えはテスト非依存)。
+
+> **Tier 0 まとめ**: B-01/B-02(抽出背景化)・B-14a(二重ロード)・B-03b/B-14d(並列化)・B-14c(ウォーム/キャッシュ)・**N-LAT-6(STT小型化=最大レバー)**= **着地済**。残=B-14b(計測条件付き)。**体感レイテンシは ~6s→~3.3s で目標の半減達成**。
 
 ---
 
