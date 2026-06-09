@@ -15,6 +15,7 @@ import { requestExtraction, enforceShortTermCap } from '../memory/extraction-sch
 import { classifyTopicLocal } from '../router/local-classifier';
 import { chat, makeLlmComplete, warmPromptCache, MODEL_SONNET, MODEL_HAIKU } from '../conversation/client';
 import { chooseModelTier } from '../conversation/model-selector';
+import { shouldPlayThinkingFiller } from '../conversation/thinking-filler';
 import { correctNameMishear } from '../conversation/name-correction';
 import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
@@ -53,6 +54,8 @@ export interface AppRuntime {
   voiceInputMode: VoiceInputMode;
   /** 起動準備(音声エンジンのヘルス到達＋埋め込みウォーム)が整ったか。renderer の「ちょっと待って」解除に使う。 */
   ready: boolean;
+  /** 思考フィラー(「うーん…」)を鳴らす(熟考時・B-15連動)。registerIpcHandlers が backchannel から配線。 */
+  playThinkingFiller?: () => void;
 }
 
 const NOT_READY: ConversationResponse = {
@@ -133,6 +136,10 @@ async function handleSendMessage(
   const twoTier = process.env[TWO_TIER_ENABLED_ENV] === '1';
   const tier = twoTier ? chooseModelTier(routerResult, text) : 'sonnet';
   const model = tier === 'haiku' ? MODEL_HAIKU : MODEL_SONNET;
+
+  // 3c. 思考フィラー(task_18 Phase C・B-15連動・設計憲法): **考え込む問い**なら生成前に「うーん…」を鳴らす。
+  //     問いの性質だけで判定(遅延では決めない)。応答の第一声が来たら既存ダッキングで自動停止する。
+  if (shouldPlayThinkingFiller(routerResult, text)) runtime.playThinkingFiller?.();
 
   // 4. 本会話。音声有効＋ストリーミング ON(ENE_VOICE_STREAMING=1)なら、文ができた端から合成して
     //    **第一声を早める**(B-06)。それ以外は従来の非ストリーミング(4層防御込み)。
@@ -222,6 +229,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     },
     rng: Math.random,
   });
+  // 思考フィラーを runtime 経由で handleSendMessage から呼べるよう配線(B-15連動)。
+  // テキスト入力でも鳴らせるよう事前合成を先に試みる(best-effort・TTS 起動後に整う)。
+  runtime.playThinkingFiller = () => backchannel.playThinkingFiller();
+  void backchannel.prepare();
 
   // ハンズフリー VAD(task_17 Phase C)。renderer から連続フレームを受け、発話区間を
   // 文字起こしして確定テキストを renderer へ返す(renderer はそれを send-message に流す)。

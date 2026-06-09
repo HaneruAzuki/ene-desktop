@@ -40,6 +40,7 @@ export class BackchannelController {
   private synth: Map<string, ArrayBuffer> | null = null;
   private preparing: Promise<void> | null = null;
   private lastPhrase: string | undefined;
+  private lastFiller: string | undefined; // 思考フィラーの反復回避
   /** 学習値(音響キャリブレーション)を一度だけ復元する(永続化・Lv2b)。 */
   private calibrated = false;
   /** 相槌の累計回数(学習値の間引き保存用)。 */
@@ -112,6 +113,31 @@ export class BackchannelController {
     if (this.fireCount % CALIBRATION_SAVE_EVERY === 0) void this.save();
   }
 
+  /**
+   * 思考フィラー(「うーん…」等)を1つ再生する(答える入り・熟考時・Phase C / B-15連動)。
+   * 相槌と同じ `send`(=`ene:backchannel` 経路)で送るので、再生は backchannel-player、
+   * 応答の第一声が来たら既存のダッキング(stopBackchannel)で自動停止する。
+   * pool 未ロード/語なしなら何もしない。音声未準備(synth なし)なら null=うなずきのみ。best-effort。
+   * **設計憲法**: 呼ぶか否かは呼び出し側(ipc)が「問いの性質」で決める(遅延では決めない)。
+   */
+  playThinkingFiller(): void {
+    const fillers = this.pool?.thinkingFiller;
+    if (!fillers || fillers.length === 0) {
+      void this.prepare(); // pool 未ロード(テキスト入力で未準備等)なら準備を試みる=次回に間に合わせる
+      return;
+    }
+    // 反復回避で1つ選ぶ(直前と同じは避ける)。
+    const avail = fillers.length > 1 ? fillers.filter((w) => w !== this.lastFiller) : fillers;
+    const list = avail.length > 0 ? avail : fillers;
+    const phrase = list[Math.min(list.length - 1, Math.floor(this.deps.rng() * list.length))];
+    if (!phrase) return;
+    this.lastFiller = phrase;
+    const wav = this.synth?.get(phrase) ?? null; // 音声未準備なら null=うなずきのみ
+    if (!wav) void this.prepare(); // 音声がまだなら合成を試みる(次回に向けて)
+    log.info('thinking filler played'); // §6.2: 本文は出さない
+    this.deps.send(wav);
+  }
+
   /** 学習値(音響キャリブレーション)をディスクへ保存する(best-effort・Lv2b)。 */
   async save(): Promise<void> {
     if (!this.calibrated) return; // 何も復元/学習していなければ書かない
@@ -129,6 +155,8 @@ async function prewarm(
   for (const words of Object.values(pool.cues)) {
     for (const w of words ?? []) phrases.add(w);
   }
+  // 思考フィラー(「うーん」等・Phase C)も同じ neutral スタイルで事前合成する。
+  for (const w of pool.thinkingFiller ?? []) phrases.add(w);
   // 相槌は neutral を少しゆっくり(機械的さを和らげる・前のめり感の緩和)。
   const base = resolveStyle(voiceConfig, 'neutral');
   const opts = { ...base, speedScale: (base.speedScale ?? 1) * BACKCHANNEL_SPEED_SCALE };

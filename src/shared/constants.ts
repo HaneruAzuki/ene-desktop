@@ -135,6 +135,14 @@ export const TWO_TIER_ENABLED_ENV = 'ENE_TWO_TIER';
 /** これより長い発話は「複雑」とみなし Sonnet 生成へ(短い雑談のみ Haiku に回す)。 */
 export const GENERATION_LONG_UTTERANCE_CHARS = 40;
 
+// --- 思考フィラー(task_18 Phase C・B-15連動・「うーん…」) ---
+
+/**
+ * 思考フィラーを出す発話の最小文字数。これ以上の medium/low の問い、または相談・意見系で「うーん…」を挟む。
+ * 設計憲法:**問いの性質で決め、遅延では決めない**(得意分野=即答/ごく短い雑談=軽い、では出さない)。
+ */
+export const FILLER_MIN_CHARS = 16;
+
 // --- 音声区間検出(VAD・ハンズフリー・task_17 Phase C) ---
 // Silero VAD v4(resources/silero_vad.onnx・onnxruntime-node)。
 // ★ v5 は onnxruntime-node で誤計算するため v4 を採用(N-17-9)。
