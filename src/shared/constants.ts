@@ -125,6 +125,16 @@ export const ROUTER_EMBED_MIN_CHARS = 4;
 /** 埋め込み類似(コサイン)で domain を採用する閾値。未満は medium に倒す(保守・「迷ったら medium」)。実機で要調整。 */
 export const LOCAL_ROUTER_SIM_THRESHOLD = 0.55;
 
+// --- 二段生成(B-15b・雑談=Haiku/難題=Sonnet) ---
+
+/**
+ * 二段生成を有効化する環境変数名(値 "1" で ON)。**既定オフ**=従来どおり全て Sonnet 生成。
+ * キャラ一貫性(成功基準8)の試聴判定が要るため、検証用に env で切替える(承認後に既定 ON 判断)。
+ */
+export const TWO_TIER_ENABLED_ENV = 'ENE_TWO_TIER';
+/** これより長い発話は「複雑」とみなし Sonnet 生成へ(短い雑談のみ Haiku に回す)。 */
+export const GENERATION_LONG_UTTERANCE_CHARS = 40;
+
 // --- 音声区間検出(VAD・ハンズフリー・task_17 Phase C) ---
 // Silero VAD v4(resources/silero_vad.onnx・onnxruntime-node)。
 // ★ v5 は onnxruntime-node で誤計算するため v4 を採用(N-17-9)。

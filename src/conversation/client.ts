@@ -15,7 +15,11 @@ import type { LlmComplete } from '../memory/extractor';
 // 本会話処理(設計書 §3.4「Conversation Layer の統合フロー」)。
 // AI自称防止の4層防御を統合する。Sonnet 呼び出し・トークン計測は DI 可能(テスト容易化)。
 
-const CONVERSATION_MODEL = 'claude-sonnet-4-6';
+/** 生成モデル(B-15b 二段生成)。既定=Sonnet(品質・一貫性=成功基準8)。雑談は Haiku に振り分け可。 */
+export const MODEL_SONNET = 'claude-sonnet-4-6';
+export const MODEL_HAIKU = 'claude-haiku-4-5';
+/** 既定の生成モデル(抽出・要約・ウォーム・二段オフ時)。 */
+const CONVERSATION_MODEL = MODEL_SONNET;
 const MAX_TOKENS = 1024;
 const TEMPERATURE = 0.7; // キャラの自然さと JSON 安定性のバランス(設計書 §3.4)
 
@@ -59,13 +63,13 @@ function toMessagesParam(messages: BuiltPrompt['messages']): Anthropic.Beta.Prom
   );
 }
 
-function makeDefaultDeps(apiKey: string): ChatDeps {
+function makeDefaultDeps(apiKey: string, model: string = CONVERSATION_MODEL): ChatDeps {
   const client = new Anthropic({ apiKey });
   return {
     callModel: async ({ system, messages }) => {
       // 0.30.1 のプロンプトキャッシュはベータ名前空間(N-14)。Tier0 を固定プレフィックスとして使い回す。
       const resp = await client.beta.promptCaching.messages.create({
-        model: CONVERSATION_MODEL,
+        model, // 二段生成(B-15b): Haiku/Sonnet をターンごとに切替可。既定=Sonnet。
         max_tokens: MAX_TOKENS,
         temperature: TEMPERATURE,
         system: toSystemParam(system),
@@ -106,11 +110,11 @@ export function makeLlmComplete(apiKey: string): LlmComplete {
  * runVoiceChat が消費し、文単位で「自称検知 → 合成 → 再生」して第一声を早める。
  * プロンプトは非ストリーミングと同一(JSON＋ルビ)。emotion を message より前に置く前提で早期確定する。
  */
-export function makeStreamCall(apiKey: string): ModelStreamCall {
+export function makeStreamCall(apiKey: string, model: string = CONVERSATION_MODEL): ModelStreamCall {
   const client = new Anthropic({ apiKey });
   return async function* stream({ system, messages }): AsyncGenerator<string> {
     const events = await client.beta.promptCaching.messages.create({
-      model: CONVERSATION_MODEL,
+      model, // 二段生成(B-15b)。既定=Sonnet。
       max_tokens: MAX_TOKENS,
       temperature: TEMPERATURE,
       system: toSystemParam(system),
@@ -162,9 +166,13 @@ export async function warmPromptCache(
 
 const skipTokenCheck: TokenChecker = async () => ({ ok: true, tokens: 0 });
 
-function resolveDeps(apiKey: string, deps?: Partial<ChatDeps>): ChatDeps {
+function resolveDeps(
+  apiKey: string,
+  deps?: Partial<ChatDeps>,
+  model: string = CONVERSATION_MODEL,
+): ChatDeps {
   const hasCustomModel = Boolean(deps?.callModel);
-  const base = hasCustomModel ? null : makeDefaultDeps(apiKey);
+  const base = hasCustomModel ? null : makeDefaultDeps(apiKey, model);
   return {
     callModel: deps?.callModel ?? (base as ChatDeps).callModel,
     checkTokens: deps?.checkTokens ?? (hasCustomModel ? skipTokenCheck : (base as ChatDeps).checkTokens),
@@ -179,8 +187,9 @@ export async function chat(
   routerResult: RouterResult,
   apiKey: string,
   deps?: Partial<ChatDeps>,
+  model: string = CONVERSATION_MODEL, // 二段生成(B-15b)。既定=Sonnet。
 ): Promise<ConversationResponse> {
-  const { callModel, checkTokens, onAuthError } = resolveDeps(apiKey, deps);
+  const { callModel, checkTokens, onAuthError } = resolveDeps(apiKey, deps, model);
   const neverCallsSelf = charContext.identity.selfRecognition.neverCallsSelf;
 
   // 第1防御: プロンプトに neverCallsSelf を明示(buildPrompt 内)

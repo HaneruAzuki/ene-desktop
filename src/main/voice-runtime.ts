@@ -62,12 +62,13 @@ export async function streamVoiceChat(
   memoryContext: MemoryContext,
   routerResult: RouterResult,
   apiKey: string,
+  model: string, // 二段生成(B-15b): Haiku/Sonnet。
   tts: TtsEngine,
   voiceConfig: VoiceConfig,
   mainWindow: BrowserWindow,
 ): Promise<ConversationResponse> {
   const prompt = buildPrompt(charContext, memoryContext, routerResult, userText);
-  const streamCall = makeStreamCall(apiKey);
+  const streamCall = makeStreamCall(apiKey, model);
   // 計測:ストリーミングの肝は「第一声までの時間」。最初のチャンク送出を記録する(§6.2: ms のみ)。
   // 内訳(TTFT/合成)の調査は N-LAT-7 で完了(TTFT 律速=クラウドの床)。ここでは第一声の総時間のみ残す。
   const tStart = performance.now();

@@ -3,12 +3,18 @@ import { promises as fs } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
 import { log } from '../shared/logger';
-import { WINDOW_WIDTH, WINDOW_HEIGHT, VOICE_STREAMING_ENABLED_ENV } from '../shared/constants';
+import {
+  WINDOW_WIDTH,
+  WINDOW_HEIGHT,
+  VOICE_STREAMING_ENABLED_ENV,
+  TWO_TIER_ENABLED_ENV,
+} from '../shared/constants';
 import { appendShortTerm } from '../memory/short-term';
 import { buildConversationMemory } from '../memory/context-builder';
 import { requestExtraction, enforceShortTermCap } from '../memory/extraction-scheduler';
 import { classifyTopicLocal } from '../router/local-classifier';
-import { chat, makeLlmComplete, warmPromptCache } from '../conversation/client';
+import { chat, makeLlmComplete, warmPromptCache, MODEL_SONNET, MODEL_HAIKU } from '../conversation/client';
+import { chooseModelTier } from '../conversation/model-selector';
 import { correctNameMishear } from '../conversation/name-correction';
 import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
@@ -122,6 +128,12 @@ async function handleSendMessage(
   const routerResult = await classifyTopicLocal(text, charContext.knowledgeDomains);
   const tMem1 = performance.now();
 
+  // 3b. 二段生成(B-15b・既定オフ ENE_TWO_TIER=1): 雑談=Haiku/難題=Sonnet。迷ったら Sonnet。
+  //     一貫性(成功基準8)の試聴判定が要るため検証用にゲート。オフ時は従来どおり全て Sonnet。
+  const twoTier = process.env[TWO_TIER_ENABLED_ENV] === '1';
+  const tier = twoTier ? chooseModelTier(routerResult, text) : 'sonnet';
+  const model = tier === 'haiku' ? MODEL_HAIKU : MODEL_SONNET;
+
   // 4. 本会話。音声有効＋ストリーミング ON(ENE_VOICE_STREAMING=1)なら、文ができた端から合成して
     //    **第一声を早める**(B-06)。それ以外は従来の非ストリーミング(4層防御込み)。
     //    ストリーミングは破壊的でないが未実機検証のため、失敗時は非ストリーミングへ確実にフォールバックする。
@@ -133,15 +145,15 @@ async function handleSendMessage(
   if (streamingOn && tts && voiceConfig) {
     try {
       response = await streamVoiceChat(
-        text, charContext, memoryContext, routerResult, apiKey, tts, voiceConfig, mainWindow,
+        text, charContext, memoryContext, routerResult, apiKey, model, tts, voiceConfig, mainWindow,
       );
       audioStreamed = true; // ストリーミング中に音声は送出済み
     } catch (e) {
       log.warn('voice streaming failed; falling back to non-streaming', { name: (e as Error).name });
-      response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError });
+      response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model);
     }
   } else {
-    response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError });
+    response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model);
   }
 
   // 計測ログ:応答確定までの内訳(ms のみ)。記憶抽出は背景化済みなので total に乗らない(B-01)。
@@ -151,7 +163,8 @@ async function handleSendMessage(
   log.info(
     `turn latency: total=${Math.round(performance.now() - t0)}ms ` +
       `mem+router=${Math.round(tMem1 - tMem0)}ms response=${Math.round(performance.now() - tMem1)}ms` +
-      (streamingOn ? ' (streaming)' : ''),
+      (streamingOn ? ' (streaming)' : '') +
+      (twoTier ? ` model=${tier}` : ''),
   );
 
   // 5. assistant を短期記憶へ
