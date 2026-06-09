@@ -116,6 +116,15 @@ export const STT_SAMPLE_RATE = 16000;
 /** 認識言語(日本語固定)。短い発話での言語自動判定のブレを防ぐ。 */
 export const STT_LANGUAGE = 'japanese';
 
+// --- ローカル判別器(B-15・Haiku Router をネットワーク0往復のローカル判定へ置換) ---
+
+/** キーワード一致に使う topics の最小文字数。1文字 topic(車/薬 等)の部分文字列誤一致(電車/薬局)を避け、埋め込みに委ねる。 */
+export const ROUTER_KEYWORD_MIN_LEN = 2;
+/** 埋め込み判別を試す発話の最小文字数。これ未満(短い挨拶)は topic 無し=medium(雑談)に倒す。 */
+export const ROUTER_EMBED_MIN_CHARS = 4;
+/** 埋め込み類似(コサイン)で domain を採用する閾値。未満は medium に倒す(保守・「迷ったら medium」)。実機で要調整。 */
+export const LOCAL_ROUTER_SIM_THRESHOLD = 0.55;
+
 // --- 音声区間検出(VAD・ハンズフリー・task_17 Phase C) ---
 // Silero VAD v4(resources/silero_vad.onnx・onnxruntime-node)。
 // ★ v5 は onnxruntime-node で誤計算するため v4 を採用(N-17-9)。

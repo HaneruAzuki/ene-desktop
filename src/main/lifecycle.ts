@@ -13,6 +13,7 @@ import { getUnextractedEntries, clearShortTerm } from '../memory/short-term';
 import { extractFromShortTerm } from '../memory/extraction-trigger';
 import { isForgettingEnabled, requestForgetting } from '../memory/forgetting';
 import { warmEmbedder } from '../memory/embedder';
+import { warmLocalRouter } from '../router/local-classifier';
 import { makeLlmComplete } from '../conversation/client';
 import { openApiKeyDialog } from './api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';
@@ -132,6 +133,9 @@ export async function runStartupSequence(
   // 背景・best-effort(await しない=起動/会話を妨げない。モデル未配置なら何もしない)。
   // 準備完了判定に含めるため promise を保持する。
   const embedderReady = warmEmbedder().catch(() => undefined);
+  // Step 8.4b: ローカル判別器(B-15)の topics 埋め込みをウォーム。
+  // embedder ウォーム完了後に実行=同一 onnx セッションへの embed 競合を避ける。best-effort。
+  void embedderReady.then(() => warmLocalRouter(charContext.knowledgeDomains));
 
   // Step 8.5: 忘却機構(B-13 / §11.6)。**既定オフ**(ENE_FORGETTING=1 のときのみ)。
   // 起動時に未処理の月次/年次サマリを背景で実行する(await しない=起動/会話を妨げない)。

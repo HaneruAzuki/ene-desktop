@@ -7,7 +7,7 @@ import { WINDOW_WIDTH, WINDOW_HEIGHT, VOICE_STREAMING_ENABLED_ENV } from '../sha
 import { appendShortTerm } from '../memory/short-term';
 import { buildConversationMemory } from '../memory/context-builder';
 import { requestExtraction, enforceShortTermCap } from '../memory/extraction-scheduler';
-import { classifyTopic } from '../router/router';
+import { classifyTopicLocal } from '../router/local-classifier';
 import { chat, makeLlmComplete, warmPromptCache } from '../conversation/client';
 import { correctNameMishear } from '../conversation/name-correction';
 import { getSemantic } from '../memory/semantic';
@@ -113,14 +113,13 @@ async function handleSendMessage(
   await recordConversationTurn();
   const tMem0 = performance.now();
 
-  // 2+3. Router と記憶コンテキスト構築は互いに独立 → 並列実行(B-03b)。
-  //   - Router: トピック判定(失敗しても fallback で続行)。
-  //   - 記憶: 全件横断想起・Router 非依存・心/開示バイアス注入(task_15/16)。
-  //           episodic を1回だけロードして心の導出と想起で使い回す(B-14a: 二重ロード解消)。
-  const [routerResult, memoryContext] = await Promise.all([
-    classifyTopic(text, charContext.knowledgeDomains, apiKey),
-    buildConversationMemory({ text, limit: 5 }),
-  ]);
+  // 2. 記憶コンテキスト構築(全件横断想起・心/開示バイアス・task_15/16)。
+  //    episodic を1回だけロードして心の導出と想起で使い回す(B-14a)。
+  //    ここで発話の query 埋め込みを実施 → 直後のローカル判別と**キャッシュ共有**(embed 競合回避)。
+  const memoryContext = await buildConversationMemory({ text, limit: 5 });
+  // 3. ローカル判別(B-15): Haiku 往復を置換し**ネットワーク0往復**でトピック判定。
+  //    キーワード→埋め込み(ウォーム済 ruri 共用)→fallback。失敗は medium に倒し会話を止めない。
+  const routerResult = await classifyTopicLocal(text, charContext.knowledgeDomains);
   const tMem1 = performance.now();
 
   // 4. 本会話。音声有効＋ストリーミング ON(ENE_VOICE_STREAMING=1)なら、文ができた端から合成して
