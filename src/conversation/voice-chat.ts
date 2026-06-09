@@ -15,6 +15,13 @@ import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 /** モデルのテキストデルタを順次 yield するストリーム(実装は Claude streaming を注入)。 */
 export type ModelStream = AsyncIterable<string>;
 
+/** 中断(投機キャンセル)を表す例外を投げる。呼び出し側(coordinator)は signal.aborted で破棄と判断する。 */
+function throwAborted(): never {
+  const e = new Error('aborted');
+  e.name = 'AbortError';
+  throw e;
+}
+
 export interface VoiceChatDeps {
   tts: TtsEngine;
   voiceConfig: VoiceConfig;
@@ -26,6 +33,8 @@ export interface VoiceChatDeps {
   onEmotion?: (emotion: EmotionLabel) => void;
   /** ストリーム書式パーサの生成(既定=bracket 形式。JSON ストリーミングは createJsonStreamParser を渡す)。 */
   makeParser?: () => VoiceStreamParser;
+  /** 中断シグナル(コアレッシングの投機キャンセル)。abort されたら**それ以上音声を出さず**打ち切る。 */
+  signal?: AbortSignal;
 }
 
 export interface VoiceChatResult {
@@ -59,7 +68,10 @@ export async function runVoiceChat(
       blocked = true;
       return false;
     }
+    // 中断(投機キャンセル)済みなら、この文は合成も発話もしない(音声を漏らさない)。
+    if (deps.signal?.aborted) throwAborted();
     const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion));
+    if (deps.signal?.aborted) throwAborted(); // 合成中に中断されたら発話しない
     deps.onAudio(wav);
     spoken.push(display);
     return true;

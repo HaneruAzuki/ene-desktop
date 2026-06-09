@@ -110,17 +110,24 @@ export function makeLlmComplete(apiKey: string): LlmComplete {
  * runVoiceChat が消費し、文単位で「自称検知 → 合成 → 再生」して第一声を早める。
  * プロンプトは非ストリーミングと同一(JSON＋ルビ)。emotion を message より前に置く前提で早期確定する。
  */
-export function makeStreamCall(apiKey: string, model: string = CONVERSATION_MODEL): ModelStreamCall {
+export function makeStreamCall(
+  apiKey: string,
+  model: string = CONVERSATION_MODEL,
+  signal?: AbortSignal, // コアレッシングの中断(投機生成のキャンセル)。abort で HTTP も止めトークンを節約する。
+): ModelStreamCall {
   const client = new Anthropic({ apiKey });
   return async function* stream({ system, messages }): AsyncGenerator<string> {
-    const events = await client.beta.promptCaching.messages.create({
-      model, // 二段生成(B-15b)。既定=Sonnet。
-      max_tokens: MAX_TOKENS,
-      temperature: TEMPERATURE,
-      system: toSystemParam(system),
-      messages: toMessagesParam(messages),
-      stream: true,
-    });
+    const events = await client.beta.promptCaching.messages.create(
+      {
+        model, // 二段生成(B-15b)。既定=Sonnet。
+        max_tokens: MAX_TOKENS,
+        temperature: TEMPERATURE,
+        system: toSystemParam(system),
+        messages: toMessagesParam(messages),
+        stream: true,
+      },
+      signal ? { signal } : undefined,
+    );
     for await (const event of events) {
       if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         yield event.delta.text;

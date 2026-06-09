@@ -12,6 +12,7 @@ import { STT_SAMPLE_RATE } from '../shared/constants';
 import type { CharacterInfo } from '../shared/types/ipc';
 import type { CharacterState } from '../shared/types/animation';
 import type { VoiceInputMode } from '../shared/types/settings';
+import type { ConversationResponse } from '../shared/types/conversation';
 
 // トップコンポーネント(設計書 §8 / task_13)。
 // キャラ表示・吹き出し・入力欄・統合マイクボタンを束ねる。
@@ -98,6 +99,12 @@ export function App(): React.ReactElement | null {
     });
   }, []);
 
+  // 思考フィラー(熟考の入り・Phase C): 吹き出しに「考えている」文字列を一時表示。
+  // 応答が来たら setBubble(response.message) で上書きされる(=一瞬の"間"の見える化)。
+  useEffect(() => {
+    window.ene.onThinkingFiller((text) => setBubble(text));
+  }, []);
+
   // 実際の再生開始/終了に「ENE 発話中」フラグを連動(task_17 Phase C・barge-in)。
   useEffect(() => {
     setPlaybackHandlers(
@@ -125,6 +132,9 @@ export function App(): React.ReactElement | null {
       // 'recording'(ユーザー発話中)は何もしない=キャラは neutral のまま。
     });
     window.ene.onVoiceTranscript((text) => void respond(text));
+    // コアレッシング(ENE_COALESCE)時は main で生成が完結し、確定応答だけが届く(投機キャンセルは届かない)。
+    // 既に「考え中(transcribing)」は onVoiceState で表示済み・音声は ene:voice-chunk で再生済み。
+    window.ene.onVoiceResponse((response) => applyResponseUI(response));
     window.ene.onVoiceBargeIn(() => handleBargeIn());
   }, []);
 
@@ -212,7 +222,18 @@ export function App(): React.ReactElement | null {
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' }));
     const response = await window.ene.sendMessage(text);
+    applyResponseUI(response);
+  }
+
+  /**
+   * 確定応答を UI(吹き出し/表情/口パク)へ反映する。
+   * テキスト/非コアレッシング音声は respond() から、コアレッシング音声は onVoiceResponse から呼ぶ
+   * (生成は main 側で完結し、ここは表示だけ)。
+   */
+  function applyResponseUI(response: ConversationResponse): void {
+    interactedRef.current = true;
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
+    if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
     setBubble(response.message);
 

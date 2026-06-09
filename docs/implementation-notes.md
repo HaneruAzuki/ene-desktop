@@ -779,6 +779,13 @@
 - **⚠️ 要実機検証(N-17-9 と同根)**: 相槌はユーザ発話中に鳴る→マイク回り込みで(a)録音(Whisper入力)汚染 (b)VAD 誤発火 のリスク。`echoCancellation` 前提。**問題が出たら nod-only(audio 無効)へ縮退可能**(タイミング/うなずきはそのまま)。
 - **残(実機/人間判定=ユーザ)**: タイミングの自然さ・「聞いてもらえている」感・打ちすぎ/早すぎ・エコーの実害。次の実装=韻律型選択 → Phase C 思考フィラー → Phase D 評価ループ。
 
+### N-18-3 🟢 相槌の韻律トーン判定(Lv2/Lv2b)を撤去(2026-06-10・ユーザ承認)
+- **背景**: クール路線(魚川トリミ)で相槌語彙を **continuer に統一**(surprise 等を削除)した結果、エンジンが `cue=surprise` と判定しても `selectBackchannel` が continuer にフォールバック=**出力に効かない死蔵コード**になっていた(実機ログの `cue=surprise` がそれ)。毎フレームの `frameF0`(自己相関=聞き取りループ最重量)も無駄に回っていた。
+- **撤去範囲**: `backchannel-engine.ts`(F0/peak/baseline/比/`adaptiveThreshold`/`updateProsody`/`updateRatioStats`/`getCalibration`/`loadCalibration`)→タイミング判定＋`frameRms`(VAD診断で使用)のみに(約360→約140行)。`backchannel-controller.ts`(calibration 復元/保存)。`vad-runtime.ts`(`onFrame(prob)` のみ・`frameF0` import と `save()` 呼び出し削除)。`storage/backchannel-calibration.ts` 削除＋`paths.getBackchannelCalibrationPath` 削除。`shared/types/backchannel.ts`(`BackchannelCalibration`・`BackchannelDecision` の韻律フィールド削除)。`constants.ts`(`BACKCHANNEL_EMPHASIS_RATIO`/`BACKCHANNEL_PITCH_RATIO` 削除)。関連テスト整理(448→432)。
+- **温存**: `backchannels.json` の `cues.continuer` スキーマ・`selectBackchannel` シグネチャ・`BackchannelCue` 型は将来の多型相槌復活に備えて残置。
+- **アーカイブ**: 設計・仕組み・復活手順は `docs/archive/design-revision-backchannel-prosody-lv2.md` に保存(archive/README に登録済)。
+- **検証**: typecheck/lint/**432テスト緑**。挙動不変(continuer＋うなずき交互・B-17 fire-on-resume はそのまま)。
+
 ### N-17-12 🟢 音声エンジンのライフサイクル化(起動時 auto-spawn・終了時 kill)(2026-06-09・ユーザ要望)
 - **背景(不具合)**: exe を起動しても AivisSpeech が立ち上がらず声が出ない。原因は**エンジンを起動するコードが存在しない**こと。`voice-runtime.ts` は `http://127.0.0.1:10101` へ**接続を試みるだけ**で、`voice-provisioner.ts` の `ProvisionEnv`(`startEngine`/`waitHealthy` を定義)を実装する**副作用アダプタが未実装・未配線**だった(メモリの積み残し「プロビジョナ副作用アダプタ」)。
 - **配布方針(ユーザ合意)**: エンジンは 818MB(+BERT 623MB+声モデル 238MB ≒ 初回 1.7GB)で **100MB上限(§4.3)に同梱不可**。過去の承認 N-17-6 どおり **方針A=初回サイレント自動DL**(exe<100MB維持・「DLしますか?」と聞かない)を採用。**BERT と既定モデルはエンジン自身が初回起動時に HF から自動取得**するため、アプリは「起動して待つ」だけでよい(取得を肩代わりしない)。エンジン配置先=**`data/voice/engine/`**(ポータブル)。

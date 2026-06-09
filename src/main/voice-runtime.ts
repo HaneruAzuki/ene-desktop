@@ -66,9 +66,11 @@ export async function streamVoiceChat(
   tts: TtsEngine,
   voiceConfig: VoiceConfig,
   mainWindow: BrowserWindow,
+  signal?: AbortSignal, // コアレッシングの中断(投機キャンセル)。
+  onFirstAudio?: () => void, // 第一声(=コミット点)の通知(コアレッシング)。
 ): Promise<ConversationResponse> {
   const prompt = buildPrompt(charContext, memoryContext, routerResult, userText);
-  const streamCall = makeStreamCall(apiKey, model);
+  const streamCall = makeStreamCall(apiKey, model, signal);
   // 計測:ストリーミングの肝は「第一声までの時間」。最初のチャンク送出を記録する(§6.2: ms のみ)。
   // 内訳(TTFT/合成)の調査は N-LAT-7 で完了(TTFT 律速=クラウドの床)。ここでは第一声の総時間のみ残す。
   const tStart = performance.now();
@@ -78,9 +80,11 @@ export async function streamVoiceChat(
     voiceConfig,
     neverCallsSelf: charContext.identity.selfRecognition.neverCallsSelf,
     makeParser: createJsonStreamParser,
+    signal,
     onAudio: (wav) => {
       if (!firstChunkLogged) {
         firstChunkLogged = true;
+        onFirstAudio?.(); // 第一声=コミット(これ以降の再開は静かなキャンセルにしない)
         log.info(`first voice chunk at ${Math.round(performance.now() - tStart)}ms (streaming)`);
       }
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-chunk', wav);

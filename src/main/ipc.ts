@@ -8,6 +8,8 @@ import {
   WINDOW_HEIGHT,
   VOICE_STREAMING_ENABLED_ENV,
   TWO_TIER_ENABLED_ENV,
+  COALESCE_ENABLED_ENV,
+  VAD_PROVISIONAL_SILENCE_MS,
 } from '../shared/constants';
 import { appendShortTerm } from '../memory/short-term';
 import { buildConversationMemory } from '../memory/context-builder';
@@ -26,7 +28,8 @@ import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
 import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse, streamVoiceChat } from './voice-runtime';
-import { VadRuntime } from './vad-runtime';
+import { VadRuntime, type CoalesceHooks } from './vad-runtime';
+import { VoiceTurnCoordinator } from './voice-turn-coordinator';
 import { BackchannelController } from './backchannel-controller';
 import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
 import type { CharacterContext } from '../shared/types/character';
@@ -88,62 +91,50 @@ const ERROR_RESPONSE: ConversationResponse = {
   message: '…ごめん、なんか調子悪いみたい。もう一回試してみて?',
 };
 
-// send-message の統合フロー(設計書 §4.2 / task_07 §7)。
-async function handleSendMessage(
+/** テキスト経路など「中断しない」呼び出し用の never-abort シグナル。 */
+const NEVER_ABORT = new AbortController();
+const NOOP = (): void => {};
+
+/**
+ * 応答を**生成**する(副作用なし=投機実行・中断に耐える)。記憶構築・ローカル判別・モデル選択・生成のみ。
+ * 記憶書き込み等の副作用は commitTurn(生成完了かつ非キャンセル時)で行う=投機が捨てられても短期記憶を汚さない。
+ *  - signal: 中断(コアレッシングの投機キャンセル)。abort されたら例外を投げて上位に破棄させる。
+ *  - onFirstAudio: 第一声(=コミット点)の通知。
+ *  - opts.playFiller: 思考フィラーを鳴らすか(投機経路では false=コミット前のちらつき回避)。
+ */
+async function generateResponse(
   text: string,
   runtime: AppRuntime,
   mainWindow: BrowserWindow,
-): Promise<ConversationResponse> {
+  signal: AbortSignal,
+  onFirstAudio: () => void,
+  opts: { playFiller: boolean },
+): Promise<{ response: ConversationResponse; audioStreamed: boolean } | null> {
   const { charContext, apiKey } = runtime;
-  if (!charContext || !apiKey) {
-    return NOT_READY;
-  }
+  if (!charContext || !apiKey) return null;
 
-  // 確定テキストを喋らせる(音声有効時のみ・best-effort・非ストリーミング合成)。
-  // 非ストリーミング経路の最終発話、および OS コマンド失敗時のエラー発話に使う。
-  const speakOut = (spokenText: string, emo: EmotionLabel): void => {
-    const { tts, voiceConfig } = runtime;
-    if (tts && voiceConfig) void speakResponse(spokenText, emo, tts, voiceConfig, mainWindow);
-  };
-
-  // 認証失効(401/402/429)を検知したら APIキーダイアログを再表示し、保存後は runtime を更新。
   const onAuthError = (error: unknown): void => {
     void handleApiAuthError(error, mainWindow, (key) => {
       runtime.apiKey = key;
     });
   };
 
-  // 計測(レイテンシ・§6.2 厳守=会話内容は載せず ms のみ)。応答確定までの体感経路を測る。
   const t0 = performance.now();
-
-  // 1. user を短期記憶へ ＋ 関係の事実を記録(開示ゲーティングの素・task_16)
-  //    recordConversationTurn は active-character.json を書くため、それを読む記憶構築より先に確定する。
-  await appendShortTerm({ role: 'user', text, timestamp: nowLocalIso(), extracted: false });
-  await recordConversationTurn();
-  const tMem0 = performance.now();
-
-  // 2. 記憶コンテキスト構築(全件横断想起・心/開示バイアス・task_15/16)。
-  //    episodic を1回だけロードして心の導出と想起で使い回す(B-14a)。
-  //    ここで発話の query 埋め込みを実施 → 直後のローカル判別と**キャッシュ共有**(embed 競合回避)。
+  // 記憶コンテキスト構築(全件横断想起・心/開示バイアス)＋ローカル判別(B-15・ネットワーク0往復)。
+  //   query 埋め込みは直後の判別と共有(B-14a)。失敗は medium に倒し会話を止めない。
   const memoryContext = await buildConversationMemory({ text, limit: 5 });
-  // 3. ローカル判別(B-15): Haiku 往復を置換し**ネットワーク0往復**でトピック判定。
-  //    キーワード→埋め込み(ウォーム済 ruri 共用)→fallback。失敗は medium に倒し会話を止めない。
   const routerResult = await classifyTopicLocal(text, charContext.knowledgeDomains);
   const tMem1 = performance.now();
 
-  // 3b. 二段生成(B-15b・既定オフ ENE_TWO_TIER=1): 雑談=Haiku/難題=Sonnet。迷ったら Sonnet。
-  //     一貫性(成功基準8)の試聴判定が要るため検証用にゲート。オフ時は従来どおり全て Sonnet。
+  // 二段生成(B-15b・既定オフ ENE_TWO_TIER=1): 雑談=Haiku/難題=Sonnet。迷ったら Sonnet。
   const twoTier = process.env[TWO_TIER_ENABLED_ENV] === '1';
   const tier = twoTier ? chooseModelTier(routerResult, text) : 'sonnet';
   const model = tier === 'haiku' ? MODEL_HAIKU : MODEL_SONNET;
 
-  // 3c. 思考フィラー(task_18 Phase C・B-15連動・設計憲法): **考え込む問い**なら生成前に「うーん…」を鳴らす。
-  //     問いの性質だけで判定(遅延では決めない)。応答の第一声が来たら既存ダッキングで自動停止する。
-  if (shouldPlayThinkingFiller(routerResult, text)) runtime.playThinkingFiller?.();
+  // 思考フィラー(設計憲法・問いの性質で判定)。投機経路では出さない(コミット前のちらつき回避・opts.playFiller)。
+  if (opts.playFiller && shouldPlayThinkingFiller(routerResult, text)) runtime.playThinkingFiller?.();
 
-  // 4. 本会話。音声有効＋ストリーミング ON(ENE_VOICE_STREAMING=1)なら、文ができた端から合成して
-    //    **第一声を早める**(B-06)。それ以外は従来の非ストリーミング(4層防御込み)。
-    //    ストリーミングは破壊的でないが未実機検証のため、失敗時は非ストリーミングへ確実にフォールバックする。
+  // 本会話。音声＋ストリーミング ON(ENE_VOICE_STREAMING=1)なら文単位で第一声を早める(B-06)。失敗時は非ストリーミングへ。
   const { tts, voiceConfig } = runtime;
   const streamingOn =
     Boolean(tts && voiceConfig) && process.env[VOICE_STREAMING_ENABLED_ENV] === '1';
@@ -153,9 +144,11 @@ async function handleSendMessage(
     try {
       response = await streamVoiceChat(
         text, charContext, memoryContext, routerResult, apiKey, model, tts, voiceConfig, mainWindow,
+        signal, onFirstAudio,
       );
       audioStreamed = true; // ストリーミング中に音声は送出済み
     } catch (e) {
+      if (signal.aborted) throw e; // 中断は破棄のため上位(coordinator)へ伝える(フォールバックしない)
       log.warn('voice streaming failed; falling back to non-streaming', { name: (e as Error).name });
       response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model);
     }
@@ -163,35 +156,47 @@ async function handleSendMessage(
     response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model);
   }
 
-  // 計測ログ:応答確定までの内訳(ms のみ)。記憶抽出は背景化済みなので total に乗らない(B-01)。
-  //   total      = STT後〜応答確定(体感の本体)
-  //   mem+router = 記憶構築＋Router(並列・B-03b/B-14a の効果が出る所)
-  //   response   = Claude 往復(固定費。ストリーミング時は第一声が早い)
+  // 計測ログ(ms のみ・§6.2)。total=生成全体 / mem+router=記憶＋判別 / response=Claude 往復。
   log.info(
     `turn latency: total=${Math.round(performance.now() - t0)}ms ` +
-      `mem+router=${Math.round(tMem1 - tMem0)}ms response=${Math.round(performance.now() - tMem1)}ms` +
+      `mem+router=${Math.round(tMem1 - t0)}ms response=${Math.round(performance.now() - tMem1)}ms` +
       (streamingOn ? ' (streaming)' : '') +
       (twoTier ? ` model=${tier}` : ''),
   );
+  return { response, audioStreamed };
+}
+
+/**
+ * 確定(コミット)。副作用=記憶書き込み/OSコマンド実行/誕生日記録/非ストリーミング発話。
+ * **生成完了かつ非キャンセル時のみ**呼ぶ(投機が捨てられたら呼ばない=短期記憶を汚さない)。
+ */
+async function commitTurn(
+  text: string,
+  response: ConversationResponse,
+  audioStreamed: boolean,
+  runtime: AppRuntime,
+  mainWindow: BrowserWindow,
+): Promise<ConversationResponse> {
+  const speakOut = (spokenText: string, emo: EmotionLabel): void => {
+    const { tts, voiceConfig } = runtime;
+    if (tts && voiceConfig) void speakResponse(spokenText, emo, tts, voiceConfig, mainWindow);
+  };
+
+  // 1. user を短期記憶へ ＋ 関係の事実を記録(ターンが確定したら=コミット時・task_16)。
+  await appendShortTerm({ role: 'user', text, timestamp: nowLocalIso(), extracted: false });
+  await recordConversationTurn();
 
   // 5. assistant を短期記憶へ
-  await appendShortTerm({
-    role: 'assistant',
-    text: response.message,
-    timestamp: nowLocalIso(),
-    extracted: false,
-  });
+  await appendShortTerm({ role: 'assistant', text: response.message, timestamp: nowLocalIso(), extracted: false });
 
-  // 5b. 短期記憶のハード上限を死守(採用(a))。通常は未到達(早期 return)。
-  //     超過時=抽出が大幅遅延/失敗している異常時のみ、ここで同期抽出を1回払って上限を守る。
-  await enforceShortTermCap(makeLlmComplete(apiKey));
+  // 5b/5c. 短期上限の死守＋記憶抽出(背景・await しない)。apiKey はコミット時点で存在する。
+  const { apiKey } = runtime;
+  if (apiKey) {
+    await enforceShortTermCap(makeLlmComplete(apiKey));
+    requestExtraction(makeLlmComplete(apiKey));
+  }
 
-  // 5c. 通常の記憶抽出は**バックグラウンド**へ(応答クリティカルパスから外す・B-01/B-02)。
-  //     未抽出が閾値以上たまった時だけ発火し、直列化ロックで多重実行を防ぐ。await しない。
-  requestExtraction(makeLlmComplete(apiKey));
-
-  // 6. OS コマンドなら実行(失敗時はキャラ口調フォールバックに差し替え)。
-  //    エラー文は短いので非ストリーミングで喋る(本文ストリーミングの有無に関わらず)。
+  // 6. OS コマンドなら実行(失敗時はキャラ口調フォールバックに差し替え＋エラー発話)。
   if (response.type === 'os_command') {
     const osResult = await executeOsCommand(response.command);
     if (!osResult.ok && osResult.message) {
@@ -200,21 +205,33 @@ async function handleSendMessage(
     }
   }
 
-  // 7. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)
-  if (charContext.birthdayHint === 'today') {
+  // 7. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)。
+  if (runtime.charContext?.birthdayHint === 'today') {
     const congrats = ['誕生日', 'おめでとう', 'ハッピーバースデー', 'Happy Birthday', 'バースデー'];
     if (congrats.some((w) => text.includes(w))) {
       await recordBirthdayCelebrated(todayLocalYmd().year);
     }
   }
 
-  // 8. 音声:ストリーミングで既に送出済みなら何もしない。非ストリーミング経路のみ、ここで確定応答を喋る。
-  //    読み(reading)はルビ解決済の音声用テキスト(無ければ表示文)。
+  // 8. 非ストリーミング経路のみ、ここで確定応答を喋る(ストリーミングは送出済み・読みはルビ解決済)。
   if (!audioStreamed) {
     const emo: EmotionLabel = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     speakOut(response.reading ?? response.message, emo);
   }
   return response;
+}
+
+// send-message の統合フロー(テキスト入力／非コアレッシングの音声経路・設計書 §4.2 / task_07 §7)。
+// 生成→コミットを直列に行う(中断なし)。コアレッシング音声経路は VoiceTurnCoordinator が別途駆動する。
+async function handleSendMessage(
+  text: string,
+  runtime: AppRuntime,
+  mainWindow: BrowserWindow,
+): Promise<ConversationResponse> {
+  if (!runtime.charContext || !runtime.apiKey) return NOT_READY;
+  const gen = await generateResponse(text, runtime, mainWindow, NEVER_ABORT.signal, NOOP, { playFiller: true });
+  if (!gen) return NOT_READY;
+  return commitTurn(text, gen.response, gen.audioStreamed, runtime, mainWindow);
 }
 
 export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRuntime): void {
@@ -226,6 +243,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     getVoiceConfig: () => runtime.voiceConfig,
     send: (wav) => {
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:backchannel', wav);
+    },
+    sendFillerText: (text) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:thinking-filler', text);
     },
     rng: Math.random,
   });
@@ -244,7 +264,52 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     const id = runtime.charContext?.identity;
     return id ? correctNameMishear(text, id.sttAliases ?? [], id.selfRecognition.callsSelf) : text;
   };
-  const vad = new VadRuntime(mainWindow, backchannel, listenOnly, correctTranscript);
+
+  // コアレッシング(段階①・ENE_COALESCE=1): 投機生成＋連結。既定オフ=従来の renderer 駆動経路。
+  //   暫定ターン終了(短い無音)で generateResponse を投機実行し、発話再開で静かにキャンセル＋連結。
+  //   第一声(コミット点)で committed=true、生成完了で commitTurn(副作用)＋確定応答を renderer へ。
+  const coalesceOn = process.env[COALESCE_ENABLED_ENV] === '1';
+  let lastAudioStreamed = false;
+  // 適応(段階②)の窓更新を VadRuntime へ橋渡し。vad は後で生成するので前方参照ホルダ経由。
+  let applySilenceWindow: (ms: number) => void = () => {};
+  const coordinator = coalesceOn
+    ? new VoiceTurnCoordinator({
+        generate: async (text, signal, onFirstAudio) => {
+          const gen = await generateResponse(text, runtime, mainWindow, signal, onFirstAudio, {
+            playFiller: false, // 投機中は出さない(コミット前のちらつき回避)
+          });
+          if (!gen) throw new Error('not ready');
+          lastAudioStreamed = gen.audioStreamed;
+          return gen.response;
+        },
+        commit: async (text, response) => {
+          await commitTurn(text, response, lastAudioStreamed, runtime, mainWindow);
+        },
+        emitResponse: (response) => {
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-response', response);
+        },
+        setSilenceWindow: (ms) => applySilenceWindow(ms),
+      })
+    : null;
+  const coalesce: CoalesceHooks | undefined = coordinator
+    ? {
+        onSpeechStart: () => coordinator.onSpeechStart(),
+        onSpeechEnd: () => coordinator.onSpeechEnd(),
+        onProvisionalEnd: (text) => coordinator.onProvisionalEnd(text),
+        reset: () => coordinator.reset(),
+        minSilenceMs: VAD_PROVISIONAL_SILENCE_MS,
+      }
+    : undefined;
+  if (coalesceOn) log.info('coalescing ON (speculative generation; provisional turn-end)');
+
+  const vad = new VadRuntime(mainWindow, backchannel, listenOnly, correctTranscript, coalesce);
+  // 適応(段階②): coordinator が算出した無音窓を segmenter へ反映(§6.2: ms のみ・本文なし)。
+  if (coalesceOn) {
+    applySilenceWindow = (ms: number): void => {
+      vad.setSilenceWindow(ms);
+      log.info(`coalesce window → ${ms}ms (adaptive)`);
+    };
+  }
   ipcMain.handle('ene:vad-start', async (): Promise<boolean> => vad.start());
   ipcMain.on('ene:vad-frame', (_event, frame: Float32Array) => {
     void vad.pushFrame(frame instanceof Float32Array ? frame : new Float32Array(frame));

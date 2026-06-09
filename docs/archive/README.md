@@ -17,6 +17,7 @@
 | `design-revision-character-heart.md` | 単一固定キャラ・人生記憶・心 の設計詳細たたき台 | `03_design.md` §3.1 / §3.3 / §5(マージ済み) |
 | `design-revision-voice.md` | 双方向ローカル音声(task_17)の Phase 0 設計案 | `03_design.md` §1.2 / §2 / §3.4 / §4.2、`02_requirements.md` §2.14。**⚠️ 本書 Phase 0 案(sherpa-onnx・renderer VAD 等)は実装で不採用**。確定は正本側(N-17-8/9/10/11) |
 | `character-life-memory-draft.md` | 人生記憶 canon の本文ドラフト(約41記憶) | `characters/ene/life-memory.json`(JSON 化済み)。内容計画は `docs/character-life-memory-canon-plan.md` |
+| `design-revision-backchannel-prosody-lv2.md` | 相槌の韻律トーン判定(Lv2/Lv2b・surprise 打ち分け＋自己キャリブレーション＋永続化) | **撤去済み(2026-06-10)**。語彙を continuer に統一したため死蔵化し撤去。現行は `backchannel-engine.ts` のタイミング判定のみ。経緯は `implementation-notes.md` N-18-x |
 
 ## 移動の経緯
 

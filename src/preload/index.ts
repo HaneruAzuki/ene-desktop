@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { EneAPI } from '../shared/types/ipc';
+import type { ConversationResponse } from '../shared/types/conversation';
 
 // Renderer 向けの安全な API 公開(設計書 §4.3)。
 // contextIsolation: true / sandbox: true 前提。Renderer から FS や Node へ直接触らせない。
@@ -31,6 +32,10 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:voice-transcript');
     ipcRenderer.on('ene:voice-transcript', (_event, text: string) => cb(text));
   },
+  onVoiceResponse: (cb) => {
+    ipcRenderer.removeAllListeners('ene:voice-response');
+    ipcRenderer.on('ene:voice-response', (_event, response: ConversationResponse) => cb(response));
+  },
   onVoiceBargeIn: (cb) => {
     ipcRenderer.removeAllListeners('ene:voice-barge-in');
     ipcRenderer.on('ene:voice-barge-in', () => cb());
@@ -52,6 +57,11 @@ const eneAPI: EneAPI = {
     // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
     ipcRenderer.removeAllListeners('ene:backchannel');
     ipcRenderer.on('ene:backchannel', (_event, wav: ArrayBuffer | null) => cb(wav));
+  },
+  onThinkingFiller: (cb) => {
+    // 思考フィラーの表示文字列(「そうね」等)。吹き出しに一時表示=応答で上書きされる。
+    ipcRenderer.removeAllListeners('ene:thinking-filler');
+    ipcRenderer.on('ene:thinking-filler', (_event, text: string) => cb(text));
   },
   onAppReady: (cb) => {
     // 二重登録防止(dev StrictMode で effect が2回走る対策)=常に単一リスナーへ張り替える。

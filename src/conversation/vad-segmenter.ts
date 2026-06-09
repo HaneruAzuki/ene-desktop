@@ -41,13 +41,21 @@ export class VadSegmenter {
   private speechFrames = 0; // 連続発話フレーム(開始デバウンス)
   private silenceFrames = 0; // 連続無音フレーム(終了判定)
   private readonly frameMs: number;
-  private readonly minSilenceFrames: number;
+  private minSilenceFrames: number; // ターン終了の無音フレーム数(コアレッシング適応で実行時に変わる)
   private minSpeechFrames: number;
 
   constructor(private readonly cfg: VadSegmenterConfig = DEFAULT_VAD_CONFIG) {
     this.frameMs = (cfg.frameSize / cfg.sampleRate) * 1000;
     this.minSilenceFrames = Math.max(1, Math.round(cfg.minSilenceMs / this.frameMs));
     this.minSpeechFrames = Math.max(1, Math.round(cfg.minSpeechMs / this.frameMs));
+  }
+
+  /**
+   * ターン終了とみなす無音(ms)を実行時に更新する(コアレッシングの適応・段階②)。
+   * 現在の発話/無音カウントは保持する(進行中のターン判定を壊さない)。
+   */
+  setMinSilenceMs(ms: number): void {
+    this.minSilenceFrames = Math.max(1, Math.round(ms / this.frameMs));
   }
 
   /**

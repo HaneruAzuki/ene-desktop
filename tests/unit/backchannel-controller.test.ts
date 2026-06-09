@@ -8,12 +8,6 @@ vi.mock('../../src/character/backchannel-loader', () => ({
     cues: { continuer: ['うん', 'うんうん'] },
   })),
 }));
-// 永続化(Lv2b)は実ファイルI/Oなのでモック(テストを hermetic に保つ)。
-vi.mock('../../src/storage/backchannel-calibration', () => ({
-  loadBackchannelCalibration: vi.fn(async () => null),
-  saveBackchannelCalibration: vi.fn(async () => {}),
-}));
-
 import { BackchannelController } from '../../src/main/backchannel-controller';
 import type { TtsEngine, VoiceConfig } from '../../src/shared/types/voice';
 
@@ -55,7 +49,8 @@ describe('BackchannelController (task_18 Phase B)', () => {
     const c = makeController(() => fakeTts(), sent);
     await c.prepare();
     feed(c, 0.9, 80); // 持続発話(> minSpeech 2000ms)
-    feed(c, 0.0, 16); // 言いよどみ(> pauseTrigger 400ms) → 発火
+    feed(c, 0.0, 10); // 言いよどみ 320ms(arm 窓 [pauseTrigger 300, turnEnd 350))→ arm
+    c.onFrame(0.9); // 発話再開 → 発火(B-17 fire-on-resume)
     expect(sent.length).toBeGreaterThanOrEqual(1);
     const first = sent[0];
     expect(first && new TextDecoder().decode(new Uint8Array(first))).toBe('wav:うん');
@@ -66,7 +61,8 @@ describe('BackchannelController (task_18 Phase B)', () => {
     const c = makeController(() => null, sent);
     await c.prepare();
     feed(c, 0.9, 80);
-    feed(c, 0.0, 16);
+    feed(c, 0.0, 10); // arm 窓 320ms
+    c.onFrame(0.9); // 発話再開 → 発火(B-17)
     expect(sent.length).toBeGreaterThanOrEqual(1); // うなずきのために発火はする
     expect(sent[0]).toBeNull(); // ただし音声は無し
   });

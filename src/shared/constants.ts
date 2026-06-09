@@ -161,11 +161,39 @@ export const VAD_SILENCE_THRESHOLD = 0.35;
 /**
  * 話し終わり(ターン終了)とみなす無音継続時間(ms)。
  * これは**ハンズフリーの"見えないレイテンシ"**=喋り終わってから処理が始まるまでの死に時間そのもの。
- * 体感改善のため 700→500→350 と段階的に短縮(2026-06-09)。下限は BACKCHANNEL_PAUSE_TRIGGER_MS より
- * 大きく保つこと(ターン終了と相槌の言いよどみを区別するため)=今回 350 化に伴い相槌側も 400→300 へ。
- * 短くしすぎると言いよどみ(発話途中の息継ぎ)を終話と誤確定し、食い気味に応答するリスク=要・実機判定。
+ * 体感改善のため 700→500→350 と短縮したが、**文中の間(言いよどみ・息継ぎ)を終話と誤確定し、
+ * 途中応答が溜まって最後に連発する**問題が実機で顕在化(2026-06-10 ユーザー報告)。いったん 800 へ戻す。
+ * 固定しきい値は「人により間の長さが違う」問題を本質的に解けないため、別途 transcript 末尾の
+ * 意味的エンドポイント判定(日本語の接続助詞=継続シグナル)＋応答コアレッシングで補う方針(検討中)。
+ * 下限は BACKCHANNEL_PAUSE_TRIGGER_MS より大きく保つこと(ターン終了と相槌の言いよどみを区別するため)。
  */
-export const VAD_MIN_SILENCE_MS = 350;
+export const VAD_MIN_SILENCE_MS = 800;
+/**
+ * コアレッシング(投機生成＋連結)を有効化する env(値 "1" で ON)。既定オフ=現状の経路(無音800ms・renderer 駆動)。
+ * ON 時はハンズフリーの話終わりを**暫定**扱いにし、短い無音で投機生成を開始、発話再開で静かにキャンセル＋連結する。
+ */
+export const COALESCE_ENABLED_ENV = 'ENE_COALESCE';
+/**
+ * コアレッシング時の**暫定**ターン終了とみなす無音(ms)。短くして投機生成を早く始める
+ * (どのみち Claude の応答に時間がかかる=その死に時間が「発話再開を待つ窓」になる)。
+ * 第一声(コミット)が出る前にユーザが再開すれば静かにキャンセルして連結し直す。
+ */
+export const VAD_PROVISIONAL_SILENCE_MS = 500;
+
+// --- コアレッシングの適応(段階②・サイレントキャンセル率で無音窓を自動伸縮・メモリのみ) ---
+// 信号は**サイレントキャンセル率**(第一声=コミットの前にユーザが再開して投機生成が捨てられた回数)。
+// = 「窓が短すぎて、まだ喋り終わっていないのに生成を始めた」だけを測る(barge-in=トリミ発話中の割り込みは
+//   使わない=割り込みグセのある人の窓を不当に広げないため・ユーザー指摘)。昼夜の間の長さ差にも追従する。
+/** 無音窓の下限(ms・これ未満は流暢な人でも食い気味になる)。 */
+export const COALESCE_WINDOW_MIN_MS = 400;
+/** 無音窓の上限(ms・これ超は無反応に感じる)。 */
+export const COALESCE_WINDOW_MAX_MS = 1200;
+/** 窓 = BASE + GAIN×cancelEma の基準(ms・キャンセル皆無のとき)。 */
+export const COALESCE_WINDOW_BASE_MS = 450;
+/** 窓 = BASE + GAIN×cancelEma の感度(ms・cancelEma 1 ごとに広げる量)。 */
+export const COALESCE_WINDOW_GAIN_MS = 250;
+/** ターンごとのサイレントキャンセル数を均す EMA 係数(大きいほど速く適応)。 */
+export const COALESCE_CANCEL_EMA_ALPHA = 0.3;
 /** 発話開始の確定に必要な最小発話継続(ms)。単発ノイズでの誤発火を防ぐ。 */
 export const VAD_MIN_SPEECH_MS = 160;
 /** 切り出し時に発話頭へ付ける先読みパディング(ms)。語頭の欠けを防ぐ。 */
@@ -184,28 +212,24 @@ export const BACKCHANNEL_MIN_SPEECH_MS = 2000;
 /** 相槌の最小間隔(ms・頻度ガバナ)。広めにして打ちすぎ(うるさい・機械的)を防ぐ。 */
 export const BACKCHANNEL_MIN_INTERVAL_MS = 4500;
 /**
- * 言いよどみ(発話中の短い無音)が相槌スロットとみなされる継続(ms)。
- * 必ず VAD_MIN_SILENCE_MS(=ターン終了)より小さくする(ターン終了は相槌でなく応答の入り)。
- * 終話を 350 に短縮したのに合わせ 400→300 へ(順序維持・ギャップ50ms)。
- * 下げた分わずかに前のめり化しうる=落ち着き具合は実機試聴で再調整(ユーザー判定・task_18)。
+ * 言いよどみ(発話中の短い無音)が相槌の「資格あり(arm)」になる継続(ms)。
+ * 必ず VAD_MIN_SILENCE_MS(=ターン終了)より小さくする。**B-17(fire-on-resume)では arm 窓
+ * [pauseTrigger, turnEnd) で武装し、発話が再開した時に打つ**ため、窓が狭いと実際に発火しない。
+ * turnEnd=350 に対し 300 だと窓 50ms(≈1フレーム)で狭すぎたため 200 へ(窓 150ms・自然な言いよどみを拾う)。
  */
-export const BACKCHANNEL_PAUSE_TRIGGER_MS = 300;
-/** 相槌の発話速度倍率(neutral 比)。1未満=少しゆっくり=機械的さを和らげ気持ち長く。 */
-export const BACKCHANNEL_SPEED_SCALE = 0.92;
+export const BACKCHANNEL_PAUSE_TRIGGER_MS = 200;
+/** 相槌/フィラーの発話速度倍率(neutral 比)。1未満=ゆっくり=落ち着き。0.92→0.85(ユーザー試聴・2026-06-10)。 */
+export const BACKCHANNEL_SPEED_SCALE = 0.85;
+/** 相槌/フィラーの音量倍率(neutral 比)。控えめにして「うるさい」を抑える(ユーザー要望・2026-06-10)。 */
+export const BACKCHANNEL_VOLUME_SCALE = 0.6;
 /**
- * 相槌の型を韻律(声の勢い)で出し分ける閾値(task_18 Lv2)。
- * いまの発話ピーク / 典型的な発話ピーク(文単位の長期平均) がこれ以上=強調・興奮 → surprise(へえ/えっ)。
- * 未満 → continuer(うん)。同レベルなら≈1.0、実機ログで興奮時の絶対ピークは平常の≈1.6倍。
- * **実機ログ(ratio=…)で平坦/興奮の実値の間に調律する**。
+ * 相槌で**実際に声を出す**確率(0..1)。残りは「うなずき(無音)」のみ=毎回声が出てうっとおしいのを防ぐ
+ * (ユーザー要望: からだのうなずきと音声をだいたい交互に)。フィラーは別(常に声を出す)。
  */
-export const BACKCHANNEL_EMPHASIS_RATIO = 1.4;
-/**
- * 相槌の型をピッチ(声の高さ)で出し分ける閾値(task_18 Lv2・主信号)。
- * いまの発話ピッチ山 / 典型的な発話ピッチ山(文単位の長期平均) がこれ以上=興奮 → surprise。
- * 興奮で声が高くなる(大きさより安定した信号)。emphasisRatio(エネルギー)との OR で判定。
- * **実機ログ(pRatio=…)で平常/興奮の実値の間に調律する**。
- */
-export const BACKCHANNEL_PITCH_RATIO = 1.2;
+export const BACKCHANNEL_VOICE_RATIO = 0.5;
+// 韻律トーン判定 Lv2 の閾値(BACKCHANNEL_EMPHASIS_RATIO / BACKCHANNEL_PITCH_RATIO)は
+// 2026-06-10 に撤去した(語彙を continuer に統一して死蔵化したため)。
+// 設計は docs/archive/design-revision-backchannel-prosody-lv2.md。
 
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 

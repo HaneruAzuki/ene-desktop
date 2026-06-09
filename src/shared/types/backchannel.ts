@@ -5,8 +5,9 @@
 // リアルタイム判定は完全ローカル・純粋ロジック(Claude/ネットワークを置かない・task_18 設計の憲法)。
 
 /**
- * 相槌の型(韻律・文脈に応じて打ち分ける)。
- * Phase A は continuer 既定。韻律(RMS)による型選択は Phase B 以降。
+ * 相槌の型。**現行は continuer のみ出力する**(韻律トーン判定 Lv2=surprise 等の打ち分けは
+ * 2026-06-10 に撤去。docs/archive/design-revision-backchannel-prosody-lv2.md)。
+ * 型の他値・cues スキーマは将来の多型相槌復活に備えて温存している。
  */
 export type BackchannelCue = 'continuer' | 'understanding' | 'surprise' | 'empathy';
 
@@ -15,46 +16,18 @@ export interface BackchannelPoolData {
   version: number;
   /** 型→相槌語の候補。continuer を必須フォールバックとする。 */
   cues: Partial<Record<BackchannelCue, string[]>>;
-  /** 答える入りの思考フィラー(「うーん」等・Phase C)。 */
+  /** 答える入りの思考フィラー(「そうね」等・Phase C)。 */
   thinkingFiller?: string[];
-}
-
-/**
- * 自己キャリブレーションの学習値(task_18 Lv2b・永続化対象)。
- * その人の声の「平常の大きさ/高さ」と「比の分布」=音響キャリブレーションであり、
- * 感情・好感度などの状態ではない(§5.3 非抵触)。data/config/ に平文JSONで保存し継続利用で賢くする。
- */
-export interface BackchannelCalibration {
-  baselinePeak: number;
-  baselinePitch: number;
-  pRatioMean: number;
-  pRatioVar: number;
-  eRatioMean: number;
-  eRatioVar: number;
-  ratioCount: number;
+  /** 語ごとのアクセント下げ位置の上書き(text→accent)。例「そうね」=1 で平板→頭高下降。合成時に audio_query へ反映。 */
+  accents?: Record<string, number>;
 }
 
 /**
  * リアルタイム・エンジンが「今うつ」と判断したときの出力(聞くターンの相槌)。
  * 実際の語の選択は selectBackchannel(語プール)で行う。
+ * 韻律(F0/エネルギー比)の調律フィールドは Lv2 撤去に伴い削除した(2026-06-10)。
  */
 export interface BackchannelDecision {
   kind: 'backchannel';
   cue: BackchannelCue;
-  /** デバッグ/調律用: 直近ピーク/平常 のエネルギー比(Lv2・韻律による型選択)。 */
-  energyRatio?: number;
-  /** デバッグ/調律用: 直近の発話ピーク(絶対RMS)。 */
-  energyPeak?: number;
-  /** デバッグ/調律用: 平常エネルギー(絶対RMS・長期平均)。 */
-  energyBaseline?: number;
-  /** デバッグ/調律用: 直近ピッチ/平常 のピッチ比(Lv2・主信号)。 */
-  pitchRatio?: number;
-  /** デバッグ/調律用: 直近の発話ピッチ山(Hz)。 */
-  pitchPeak?: number;
-  /** デバッグ/調律用: 平常ピッチ(Hz・長期平均)。 */
-  pitchBaseline?: number;
-  /** デバッグ/調律用: 判定に使った自己キャリブレーション閾値(ピッチ・Lv2)。 */
-  pitchThreshold?: number;
-  /** デバッグ/調律用: 判定に使った自己キャリブレーション閾値(エネルギー・Lv2)。 */
-  energyThreshold?: number;
 }

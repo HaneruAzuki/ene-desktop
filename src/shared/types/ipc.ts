@@ -55,8 +55,11 @@ export interface EneAPI {
   setVadSpeaking(speaking: boolean): void;
   // 聞き取り状態(main → renderer・UI 表示用)。
   onVoiceState(callback: (state: 'listening' | 'recording' | 'transcribing') => void): void;
-  // 話し終わりの確定テキスト(main → renderer)。renderer は sendMessage に流す。
+  // 話し終わりの確定テキスト(main → renderer)。renderer は sendMessage に流す(非コアレッシング経路)。
   onVoiceTranscript(callback: (text: string) => void): void;
+  // コアレッシング(段階①・ENE_COALESCE)の確定応答(main → renderer)。生成は main 側で完結し、
+  // renderer は受け取った応答を吹き出し/表情へ反映するだけ(音声は ene:voice-chunk で別途到着済み)。
+  onVoiceResponse(callback: (response: ConversationResponse) => void): void;
   // ENE 発話中の割り込み検出(main → renderer)。renderer は再生を止める。
   onVoiceBargeIn(callback: () => void): void;
 
@@ -66,6 +69,9 @@ export interface EneAPI {
 
   // 相槌受信(main → renderer・task_18 Phase B)。wav があれば再生、null でも**うなずき**は出す。
   onBackchannel(callback: (wav: ArrayBuffer | null) => void): void;
+
+  // 思考フィラーの表示文字列(main → renderer・Phase C)。吹き出しに一時表示(応答で上書き)。
+  onThinkingFiller(callback: (text: string) => void): void;
 
   // 起動準備の完了(音声エンジンのヘルス到達＋埋め込みウォーム)。
   //  - isReady: 現在の準備状態を取得(初期表示用・pull)。

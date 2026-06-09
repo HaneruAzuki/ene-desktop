@@ -1,10 +1,8 @@
 {
   "version": 1,
   "cues": {
-    "continuer": ["うん", "うん、うん"],
-    "understanding": ["そっか", "ふーん"],
-    "surprise": ["えっ", "へえ", "ほんと?"],
-    "empathy": ["そっかぁ", "わかる", "うんうん"]
+    "continuer": ["うん", "ふーん、", "へえ", "そう"]
   },
-  "thinkingFiller": ["うーん", "そうだなぁ", "えーっと"]
+  "thinkingFiller": ["そうね", "んーー…そうね"],
+  "accents": { "そうね": 1 }
 }

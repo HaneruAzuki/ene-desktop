@@ -1,18 +1,15 @@
 import { log } from '../shared/logger';
-import { BACKCHANNEL_SPEED_SCALE } from '../shared/constants';
+import {
+  BACKCHANNEL_SPEED_SCALE,
+  BACKCHANNEL_VOLUME_SCALE,
+  BACKCHANNEL_VOICE_RATIO,
+} from '../shared/constants';
 import { BackchannelEngine } from '../conversation/backchannel-engine';
 import { selectBackchannel } from '../conversation/backchannel-pool';
 import { loadBackchannelPool } from '../character/backchannel-loader';
 import { resolveStyle } from '../character/voice-loader';
-import {
-  loadBackchannelCalibration,
-  saveBackchannelCalibration,
-} from '../storage/backchannel-calibration';
 import type { BackchannelPoolData } from '../shared/types/backchannel';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
-
-/** 学習値をディスクに保存するまでの相槌回数(間引き・Lv2b)。 */
-const CALIBRATION_SAVE_EVERY = 5;
 
 // 相槌コントローラ(main・task_18 Phase B)。
 //
@@ -28,8 +25,10 @@ export interface BackchannelDeps {
   /** 実行時の TTS(起動順の都合で遅延参照する)。 */
   getTts: () => TtsEngine | null;
   getVoiceConfig: () => VoiceConfig | null;
-  /** 相槌を送る。wav があれば音声再生、null なら**うなずきのみ**(音声未準備時)。 */
+  /** 相槌を送る。wav があれば音声再生、null なら**うなずきのみ**(音声未準備時/交互の無音側)。 */
   send: (wav: ArrayBuffer | null) => void;
+  /** 思考フィラーの表示文字列を吹き出しへ送る(任意・熟考の入りを文字でも見せる)。 */
+  sendFillerText?: (text: string) => void;
   /** 語選択の揺らぎ(0..1)。 */
   rng: () => number;
 }
@@ -41,35 +40,38 @@ export class BackchannelController {
   private preparing: Promise<void> | null = null;
   private lastPhrase: string | undefined;
   private lastFiller: string | undefined; // 思考フィラーの反復回避
-  /** 学習値(音響キャリブレーション)を一度だけ復元する(永続化・Lv2b)。 */
-  private calibrated = false;
-  /** 相槌の累計回数(学習値の間引き保存用)。 */
-  private fireCount = 0;
+  /** 事前合成の自動再試行回数(TTS 起動待ち・上限あり)。 */
+  private prepareRetries = 0;
+  private static readonly MAX_PREPARE_RETRIES = 8;
+  private static readonly PREPARE_RETRY_MS = 3000;
 
   constructor(private readonly deps: BackchannelDeps) {}
 
   /**
-   * hands-free 開始時に pool ロード＋相槌の事前合成を試みる(best-effort)。
-   * **音声合成は成功するまで毎回リトライ**する(エンジンを後から起動しても拾えるように)。
-   * pool さえ読めれば「うなずき(非言語)」は音声なしでも動く=エンジン不要。
+   * pool ロード＋相槌/フィラーの事前合成を試みる(best-effort)。
+   * 起動直後は TTS(音声エンジン)未起動で音声0件になりうるため、**音声が揃うまで数秒間隔で自動再試行**する
+   * (会話開始前に相槌/フィラーの音を用意する)。pool さえ読めれば「うなずき」は音声なしでも動く。
    */
   async prepare(): Promise<void> {
     if (this.synth && this.synth.size > 0) return; // 音声まで準備済み=完了
     this.preparing ??= this.doPrepare().finally(() => {
       this.preparing = null;
     });
-    return this.preparing;
+    await this.preparing;
+    // TTS 未起動等で音声がまだ揃っていなければ、上限まで数秒後に自動再試行(起動後に温まる)。
+    if (
+      (!this.synth || this.synth.size === 0) &&
+      this.prepareRetries < BackchannelController.MAX_PREPARE_RETRIES
+    ) {
+      this.prepareRetries += 1;
+      setTimeout(() => void this.prepare(), BackchannelController.PREPARE_RETRY_MS);
+    }
   }
 
   private async doPrepare(): Promise<void> {
     try {
       this.pool ??= await loadBackchannelPool(this.deps.characterId);
       if (!this.pool) return; // backchannels.json なし → 相槌なし
-      if (!this.calibrated) {
-        // 前回までの学習値(声の平常・比の分布)を復元(継続利用で賢くする・Lv2b)。
-        this.engine.loadCalibration(await loadBackchannelCalibration());
-        this.calibrated = true; // null(初回)でも再試行しない=初期値で学習開始
-      }
       const tts = this.deps.getTts();
       const voiceConfig = this.deps.getVoiceConfig();
       if (tts && voiceConfig) {
@@ -88,29 +90,22 @@ export class BackchannelController {
   }
 
   /**
-   * 1フレームの発話確率＋RMS を投入(ENE 非発話中=ユーザの番にのみ呼ぶこと)。
+   * 1フレームの発話確率を投入(ENE 非発話中=ユーザの番にのみ呼ぶこと)。
    * 相槌を打つべきなら送る。**タイミング(=うなずき)は pool だけで動く**(音声は任意・あれば一緒に鳴る)。
-   * cue は韻律(Lv2)で continuer/surprise を出し分ける。
+   * 語は continuer(韻律トーン判定 Lv2 は撤去・2026-06-10)。
    */
-  onFrame(prob: number, rms = 0, f0 = 0): void {
+  onFrame(prob: number): void {
     if (!this.pool) return;
-    const decision = this.engine.push(prob, rms, f0);
+    const decision = this.engine.push(prob);
     if (!decision) return;
     const phrase = selectBackchannel(this.pool, decision.cue, this.deps.rng, this.lastPhrase);
     this.lastPhrase = phrase;
-    const wav = this.synth?.get(phrase) ?? null; // 音声未準備なら null=うなずきのみ
-    // §6.2: 本文は出さない。型と韻律の数値(調律用)のみ。
-    log.info(
-      `backchannel: cue=${decision.cue} ` +
-        `pRatio=${decision.pitchRatio?.toFixed(2) ?? 'n/a'}/${decision.pitchThreshold?.toFixed(2) ?? 'n/a'} ` +
-        `eRatio=${decision.energyRatio?.toFixed(2) ?? 'n/a'}/${decision.energyThreshold?.toFixed(2) ?? 'n/a'} ` +
-        `pPeak=${decision.pitchPeak?.toFixed(0) ?? 'n/a'} pBase=${decision.pitchBaseline?.toFixed(0) ?? 'n/a'} ` +
-        `ePeak=${decision.energyPeak?.toFixed(4) ?? 'n/a'} eBase=${decision.energyBaseline?.toFixed(4) ?? 'n/a'}`,
-    );
+    // うなずき(無音)と音声をだいたい交互に(毎回声が出てうっとおしいのを防ぐ・ユーザー要望)。
+    //   声を出す回=合成 WAV / 出さない回=null(=うなずきのみ)。音声未準備時も null。
+    const voiced = this.deps.rng() < BACKCHANNEL_VOICE_RATIO;
+    const wav = voiced ? (this.synth?.get(phrase) ?? null) : null;
+    log.info('backchannel'); // §6.2: 本文は出さない
     this.deps.send(wav);
-    // 学習値を間引いて保存(継続利用で賢くする・Lv2b)。best-effort・非ブロッキング。
-    this.fireCount += 1;
-    if (this.fireCount % CALIBRATION_SAVE_EVERY === 0) void this.save();
   }
 
   /**
@@ -135,14 +130,11 @@ export class BackchannelController {
     const wav = this.synth?.get(phrase) ?? null; // 音声未準備なら null=うなずきのみ
     if (!wav) void this.prepare(); // 音声がまだなら合成を試みる(次回に向けて)
     log.info('thinking filler played'); // §6.2: 本文は出さない
-    this.deps.send(wav);
+    // 吹き出しに「考えている」文字列を表示(合成用の長音 ーー は表示では 1 つに畳む)。
+    this.deps.sendFillerText?.(phrase.replace(/ー{2,}/g, 'ー'));
+    this.deps.send(wav); // フィラーは交互対象外=常に声(準備済みなら)
   }
 
-  /** 学習値(音響キャリブレーション)をディスクへ保存する(best-effort・Lv2b)。 */
-  async save(): Promise<void> {
-    if (!this.calibrated) return; // 何も復元/学習していなければ書かない
-    await saveBackchannelCalibration(this.engine.getCalibration());
-  }
 }
 
 /** 相槌語を neutral スタイルで一度ずつ合成してキャッシュする(§6.2: 本文はログに出さない)。 */
@@ -155,13 +147,18 @@ async function prewarm(
   for (const words of Object.values(pool.cues)) {
     for (const w of words ?? []) phrases.add(w);
   }
-  // 思考フィラー(「うーん」等・Phase C)も同じ neutral スタイルで事前合成する。
+  // 思考フィラー(「そうね」等・Phase C)も同じ neutral スタイルで事前合成する。
   for (const w of pool.thinkingFiller ?? []) phrases.add(w);
-  // 相槌は neutral を少しゆっくり(機械的さを和らげる・前のめり感の緩和)。
+  // 相槌/フィラーは neutral を少しゆっくり＋控えめ音量。語ごとの accent 上書き(例「そうね」=頭高)も反映。
   const base = resolveStyle(voiceConfig, 'neutral');
-  const opts = { ...base, speedScale: (base.speedScale ?? 1) * BACKCHANNEL_SPEED_SCALE };
   const map = new Map<string, ArrayBuffer>();
   for (const phrase of phrases) {
+    const opts = {
+      ...base,
+      speedScale: (base.speedScale ?? 1) * BACKCHANNEL_SPEED_SCALE,
+      volumeScale: (base.volumeScale ?? 1) * BACKCHANNEL_VOLUME_SCALE,
+      accent: pool.accents?.[phrase],
+    };
     try {
       map.set(phrase, await tts.speak(phrase, opts));
     } catch (e) {

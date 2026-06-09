@@ -14,6 +14,8 @@ export interface VoiceStyleParams {
   intonationScale?: number; // 抑揚(選択スタイルの感情の強さ)
   tempoDynamicsScale?: number; // 緩急(AivisSpeech 固有)
   volumeScale?: number; // 音量
+  /** アクセント下げ位置の上書き(1-indexed・最後の accent_phrase に適用)。相槌/フィラーの語ごと調律用(任意)。 */
+  accent?: number;
 }
 
 /** characters/{id}/voice.json のスキーマ。emotion ラベル→スタイル/パラメータ。 */
