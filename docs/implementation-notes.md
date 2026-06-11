@@ -925,6 +925,29 @@
 
 ---
 
+## VRM キャラ表示(F・3D化・2026-06-12)
+
+立ち絵 PNG → VRM 1.0(three-vrm)バストアップ 3D 表示への置換。実装ブリーフ=`docs/handoff-vrm-character-display.md`。
+4決定(ユーザー承認):**A=完全透過・浮遊＋当たり判定 / 振幅リップシンク(B-05解消)/ 配置=`characters/ene/` / GUI スライダー調整**。
+
+### N-VRM-1 🟢 three-vrm 描画を React/TS へ移植・PNG はフォールバックとして維持
+- **新規**: `src/renderer/vrm-renderer.ts`(描画コア=ハーネス `scripts/vrm-harness.html` を移植)・`src/renderer/vrm/expression-resolver.ts`(emotion→表情の純粋関数＋テスト)・`characters/ene/vrm.json`(感情→VRM表情マップ＋初期表示パラメータ＝ハードコードせず外出し §4.5)・`src/character/vrm-loader.ts`(検証＋ArrayBuffer 読込＋ユーザー上書きマージ)・`src/shared/types/vrm.ts`・`VrmSettingsPanel.tsx`。
+- **配線**: `ipc` に `get-vrm-config`/`get-character-model`(10MB を base64化せず ArrayBuffer・§3.8)/`set-vrm-display`＋ウィンドウ可視性通知(非表示で描画停止)。`CharacterDisplay.tsx` は VRM 設定＋モデルが揃えば WebGL、欠ければ既存 PNG 経路へフォールバック(`animation.json`/`resolve-frame.ts` は不変)。
+- **リップシンク**: `audio-player.ts` の Web Audio グラフに `AnalyserNode` を1つ挟み `getVoiceAmplitude()`(RMS)を毎フレーム参照→口形 `aa` を駆動(振幅ドリブン=B-05)。
+- **軽量(柱4)**: 30fps上限/アイドル間引き/非表示停止/DPR上限。配布サイズ +約12MB(モデル11MB＋three-vrm バンドル~1.3MB)=72→~84MB(<100MB)。`three` は `electron.vite.config.ts` の `dedupe:['three']` で単一化。
+- **依存(承認済・反映済)**: `three ^0.169`＋`@pixiv/three-vrm ^3.4`(dependencies)/`@types/three`(dev)。設計 §1.2・license 台帳(B)反映済。
+- **検証**: typecheck 緑・全454テスト緑(expression-resolver 6新規)・本番ビルド緑・**実機で表示/表情/口パク/まばたき/呼吸/うなずき/ドラッグ/クリックスルー/調整スライダーをユーザー確認**。
+
+### N-VRM-2 🔴 実機でしか出ない5つのハマり(全て修正済・memory `vrm-display-gotchas-2026`)
+1. **当たり判定にスキンメッシュ raycast は激重**(31k三角形のスキニング変換が毎 mousemove)→ ドラッグが**とても遅延**。**`readPixels` の 1px alpha 読取に置換**(`preserveDrawingBuffer:true`)=シルエット精度維持・激安・描画停止中も読める。→ ドラッグ激変(ユーザー強調・最重要)。
+2. **モデルが真っ白(輪郭線だけ)**= `index.html` の CSP が `blob:` 不許可で GLB 内蔵テクスチャ(ImageBitmapLoader の blob fetch)が弾かれた。**`img-src ... blob:; connect-src 'self' blob:`** を追加(blob=ローカル object URL・§7.1非抵触)。切り分け=ハーネス(`webSecurity:false`)は色付き/本体は白→CSP 確定。
+3. **SpringBone 発散で髪/頭が body から飛ぶ**= 跳ねた大 delta。`vrm.update` の delta を**クランプ**(物理 `1/30`・汎用 `0.1`)。
+4. **うなずきで首が下がり続ける**= `neck.rotation.x += ...` の累積。正規化ボーン回転は毎フレーム**代入**(0→下→0)＋終了後 0 リセット。
+5. **驚き等で口が開きっぱなし**= `surprised` 表情が口を開く仕様＋会話後も emotion 保持。**talking→idle で emotion を neutral リセット**(表情は応答中のみ)。
+- 残課題: CSS の輪郭グロー(drop-shadow)は VRM では負荷回避で未適用。ハーネス/`vrm-viewer-test` は使い捨て(削除可)。出荷前=VRM ライセンスメタ(`personalNonProfit`/`onlyAuthor`)の再設定要否を確認(投げ銭配布のため)。
+
+---
+
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
 
 MVP 完成後に改善する項目(Router タイムアウト・記憶抽出のレイテンシ/頻度・

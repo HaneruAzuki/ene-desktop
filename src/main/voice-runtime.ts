@@ -75,19 +75,22 @@ export async function streamVoiceChat(
   // 内訳(TTFT/合成)の調査は N-LAT-7 で完了(TTFT 律速=クラウドの床)。ここでは第一声の総時間のみ残す。
   const tStart = performance.now();
   let firstChunkLogged = false;
+  let sentenceIndex = 0; // 応答内の文の通し番号(先頭文 index=0 で吹き出しをリセットさせる)
   const result = await runVoiceChat(streamCall(prompt), {
     tts,
     voiceConfig,
     neverCallsSelf: charContext.identity.selfRecognition.neverCallsSelf,
     makeParser: createJsonStreamParser,
     signal,
-    onAudio: (wav) => {
+    onAudio: (wav, text) => {
       if (!firstChunkLogged) {
         firstChunkLogged = true;
         onFirstAudio?.(); // 第一声=コミット(これ以降の再開は静かなキャンセルにしない)
         log.info(`first voice chunk at ${Math.round(performance.now() - tStart)}ms (streaming)`);
       }
-      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-chunk', wav);
+      // 各文の WAV にテキストと通し番号を同梱(再生開始に同期して吹き出しを1文ずつ伸ばす・Phase A)。
+      if (!mainWindow.isDestroyed())
+        mainWindow.webContents.send('ene:voice-chunk', { wav, text, index: sentenceIndex++ });
     },
   });
 
@@ -118,8 +121,9 @@ export async function speakResponse(
       tts,
       voiceConfig,
       neverCallsSelf: [],
+      // 非ストリーミングは文テキストを同梱しない(text/index 無し=吹き出しは別途・全文表示のまま)。
       onAudio: (wav) => {
-        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-chunk', wav);
+        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-chunk', { wav });
       },
     });
   } catch (e) {

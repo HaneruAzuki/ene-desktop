@@ -47,6 +47,24 @@ export async function appendShortTerm(entry: ShortTermEntry): Promise<void> {
   await saveShortTerm(list);
 }
 
+/**
+ * 最新の assistant エントリのテキストを置き換える(barge-in で「聞かせた分」へ切り詰める・Phase B)。
+ * 末尾から最初の assistant を探して text を差し替える。assistant が無ければ何もしない。
+ * **抽出済み(extracted=true)なら触らない**(既に中期記憶へ移った内容を後から改変しない・安全側)。
+ */
+export async function replaceLastAssistantText(text: string): Promise<void> {
+  const list = await getShortTerm();
+  for (let i = list.length - 1; i >= 0; i--) {
+    const e = list[i];
+    if (e && e.role === 'assistant') {
+      if (e.extracted || e.text === text) return; // 抽出済み/変化なしは何もしない
+      e.text = text;
+      await saveShortTerm(list);
+      return;
+    }
+  }
+}
+
 /** 短期記憶ファイルを削除する(アプリ終了時・設計書 §7.2)。 */
 export async function clearShortTerm(): Promise<void> {
   await fs.rm(getShortTermPath(), { force: true });

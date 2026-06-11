@@ -1,26 +1,16 @@
 import { log } from '../shared/logger';
 import type { ConversationResponse } from '../shared/types/conversation';
 import {
-  COALESCE_CANCEL_EMA_ALPHA,
-  COALESCE_WINDOW_BASE_MS,
-  COALESCE_WINDOW_GAIN_MS,
+  VAD_PROVISIONAL_SILENCE_MS,
   COALESCE_WINDOW_MIN_MS,
   COALESCE_WINDOW_MAX_MS,
+  COALESCE_WINDOW_STEP_DOWN_MS,
+  COALESCE_WINDOW_STEP_UP_MS,
 } from '../shared/constants';
 
-/**
- * 適応(段階②): ターンごとのサイレントキャンセル数を EMA で均し、無音窓(ms)を算出する(純粋)。
- * 窓 = clamp(BASE + GAIN×ema, MIN, MAX)。キャンセルが増える(=窓が短く、まだ喋り終わっていないのに
- * 生成が走る)ほど窓が広がり、皆無なら基準まで縮む。barge-in は信号に含めない(ユーザー指摘)。
- */
-export function adaptWindow(
-  prevEma: number,
-  cancelsThisTurn: number,
-): { ema: number; windowMs: number } {
-  const ema = (1 - COALESCE_CANCEL_EMA_ALPHA) * prevEma + COALESCE_CANCEL_EMA_ALPHA * cancelsThisTurn;
-  const raw = COALESCE_WINDOW_BASE_MS + COALESCE_WINDOW_GAIN_MS * ema;
-  const windowMs = Math.round(Math.min(COALESCE_WINDOW_MAX_MS, Math.max(COALESCE_WINDOW_MIN_MS, raw)));
-  return { ema, windowMs };
+/** 無音窓(ms)を下限/上限でクランプする(案①・純粋)。 */
+export function clampWindow(ms: number): number {
+  return Math.round(Math.min(COALESCE_WINDOW_MAX_MS, Math.max(COALESCE_WINDOW_MIN_MS, ms)));
 }
 
 // ハンズフリーの投機生成＋コアレッシング(段階①・2026-06-10・ENE_COALESCE ゲート)。
@@ -50,6 +40,19 @@ export interface VoiceTurnDeps {
   emitResponse: (response: ConversationResponse) => void;
   /** 適応(段階②): 算出した無音窓(ms)を VadSegmenter へ反映する(任意)。 */
   setSilenceWindow?: (ms: number) => void;
+  /** barge-in(生成完了後): 最新 assistant 記憶を「聞かせた分」へ上書きする(切り詰め・Phase B・任意)。 */
+  updateLastAssistant?: (heardText: string) => void;
+}
+
+/** 進行中の生成の状態。 */
+interface ActiveGen {
+  ctrl: AbortController;
+  /** 第一声が出た(=コミット点)。これ以降の再開は静かなキャンセルにしない。 */
+  committed: boolean;
+  /** このターンのユーザ発話(barge-in 時に「ユーザ＋聞かせた分」を記憶するのに使う)。 */
+  text: string;
+  /** barge-in で切り詰め済み(=この生成の通常コミットを抑止)。 */
+  bargedIn: boolean;
 }
 
 export class VoiceTurnCoordinator {
@@ -62,11 +65,9 @@ export class VoiceTurnCoordinator {
    */
   private userSpeaking = false;
   /** 進行中の生成。committed=第一声が出た(=これ以降は静かなキャンセルにしない)。 */
-  private gen: { ctrl: AbortController; committed: boolean } | null = null;
-  /** このターン(コミットまで)で起きたサイレントキャンセル数(適応の信号・段階②)。 */
-  private silentCancelsThisTurn = 0;
-  /** サイレントキャンセル数のEMA(無音窓の算出に使う。同一アプリ稼働中は保持=その人の傾向を学ぶ)。 */
-  private cancelEma = 0;
+  private gen: ActiveGen | null = null;
+  /** 現在の無音窓(ms・案①でイベントごとに伸縮)。VadSegmenter と同期(初期=暫定値)。同一稼働中は保持。 */
+  private currentWindowMs = VAD_PROVISIONAL_SILENCE_MS;
 
   constructor(private readonly deps: VoiceTurnDeps) {}
 
@@ -75,14 +76,53 @@ export class VoiceTurnCoordinator {
     this.userSpeaking = true;
     if (this.gen && !this.gen.committed) {
       this.gen.ctrl.abort();
-      // 第一声(コミット)前のキャンセル=窓が短く、まだ喋り終わっていなかった証拠(適応の信号・段階②)。
-      this.silentCancelsThisTurn++;
+      // サイレントキャンセル(第一声前)=声が出る前に捕捉できた=余裕あり → 窓を短く(キビキビへ・案①)。
+      this.adjustWindow(-COALESCE_WINDOW_STEP_DOWN_MS);
     }
   }
 
   /** 発話終了(speech-end・STT 開始の直前)。発話中フラグを下ろす(この後 STT→onProvisionalEnd)。 */
   onSpeechEnd(): void {
     this.userSpeaking = false;
+  }
+
+  /**
+   * barge-in のタイミング分類(案①・vad-runtime が判定)。
+   *  - isEarly=true(無音開始〜MAX窓以内の被せ)= 窓を延ばせば防げた=まだ喋ってた → 窓を長く。
+   *  - isEarly=false(MAX窓超)= 本物の割り込み=窓では直せない → 中立。
+   */
+  onBargeInTiming(isEarly: boolean): void {
+    if (isEarly) this.adjustWindow(COALESCE_WINDOW_STEP_UP_MS);
+  }
+
+  /** 無音窓を delta(ms)動かしクランプして反映する(変化があれば setSilenceWindow)。 */
+  private adjustWindow(deltaMs: number): void {
+    const next = clampWindow(this.currentWindowMs + deltaMs);
+    if (next !== this.currentWindowMs) {
+      this.currentWindowMs = next;
+      this.deps.setSilenceWindow?.(next);
+    }
+  }
+
+  /**
+   * トリミ発話中の barge-in(=コミット後の割り込み・Phase B)。**聞かせた分(heardText)だけを記憶**し、
+   * これ以上喋らせない。heardText は renderer(実際に再生した文)が源泉。
+   *  - 生成中(まだ完了していない): 中断して「ユーザ発話＋聞かせた分」をコミット(全文を覚えない)。
+   *  - 生成完了済み(全文を記憶済み): 最新 assistant を聞かせた分へ上書き(切り詰め)。
+   * 第一声前(未コミット)は barge-in ではない(=サイレントキャンセル領域)→ 何もしない。
+   */
+  onBargeIn(heardText: string): void {
+    const g = this.gen;
+    if (g && g.committed) {
+      g.bargedIn = true; // 通常コミットを抑止
+      g.ctrl.abort(); // これ以上の合成/送出を止める
+      this.gen = null;
+      log.info(`barge-in mid-gen: aborted, memorize heard ${heardText.length} chars`); // §6.2: 文字数のみ
+      void this.deps.commit(g.text, { type: 'chat', message: heardText });
+    } else if (!g) {
+      log.info(`barge-in post-gen: truncate last assistant to ${heardText.length} chars`);
+      this.deps.updateLastAssistant?.(heardText);
+    }
   }
 
   /**
@@ -98,18 +138,17 @@ export class VoiceTurnCoordinator {
     if (!this.userSpeaking) void this.startGeneration(this.pendingText);
   }
 
-  /** ハンズフリー終了/リセット。進行中を中断し状態を空にする(cancelEma=学習値は保持)。 */
+  /** ハンズフリー終了/リセット。進行中を中断し状態を空にする(currentWindowMs=学習値は保持)。 */
   reset(): void {
     if (this.gen) this.gen.ctrl.abort();
     this.gen = null;
     this.pendingText = '';
     this.userSpeaking = false;
-    this.silentCancelsThisTurn = 0; // 中断したターンの途中カウントは破棄(cancelEma は保持)
   }
 
   private async startGeneration(text: string): Promise<void> {
     const ctrl = new AbortController();
-    const g: { ctrl: AbortController; committed: boolean } = { ctrl, committed: false };
+    const g: ActiveGen = { ctrl, committed: false, text, bargedIn: false };
     this.gen = g;
     try {
       const response = await this.deps.generate(text, ctrl.signal, () => {
@@ -117,17 +156,12 @@ export class VoiceTurnCoordinator {
         // 第一声が出た=このターンは確定。以降の発話(barge-in 等)は新ターン=連結しない。
         this.pendingText = '';
       });
-      // 中断済み or 自分が最新でない(後続の end が新生成を始めた)なら破棄。
-      if (ctrl.signal.aborted || this.gen !== g) return;
-      // コミット: pending を消費し、UI 反映 → 適応窓更新 → 副作用。
+      // 中断済み / 自分が最新でない / barge-in で切り詰め済み なら通常コミットを破棄。
+      if (ctrl.signal.aborted || this.gen !== g || g.bargedIn) return;
+      // コミット: pending を消費し、UI 反映 → 副作用。窓の調整はイベント(キャンセル/barge-in)側で行う(案①)。
       this.pendingText = '';
       this.gen = null;
       this.deps.emitResponse(response);
-      // 適応(段階②): このターンのサイレントキャンセル数を EMA に反映し、無音窓を更新する。
-      const { ema, windowMs } = adaptWindow(this.cancelEma, this.silentCancelsThisTurn);
-      this.cancelEma = ema;
-      this.silentCancelsThisTurn = 0;
-      this.deps.setSilenceWindow?.(windowMs);
       await this.deps.commit(text, response);
     } catch (e) {
       // 中断(投機キャンセル/reset)は想定内=無言で破棄。それ以外の失敗は記録する(原因究明・§6.2 名前のみ)。

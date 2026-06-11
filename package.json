@@ -22,19 +22,23 @@
     "seed:recall": "node scripts/seed-recall-fixtures.mjs",
     "voice:smoke": "node scripts/voice-smoke.mjs",
     "stt:smoke": "node scripts/stt-smoke.mjs",
-    "vad:smoke": "node scripts/vad-smoke.mjs"
+    "vad:smoke": "node scripts/vad-smoke.mjs",
+    "vrm:smoke": "electron scripts/vrm-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
     "@huggingface/transformers": "^4.2.0",
+    "@pixiv/three-vrm": "^3.4.0",
     "electron-log": "^5.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "^0.169.0"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.169.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "electron": "^30.5.1",

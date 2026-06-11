@@ -180,20 +180,20 @@ export const COALESCE_ENABLED_ENV = 'ENE_COALESCE';
  */
 export const VAD_PROVISIONAL_SILENCE_MS = 500;
 
-// --- コアレッシングの適応(段階②・サイレントキャンセル率で無音窓を自動伸縮・メモリのみ) ---
-// 信号は**サイレントキャンセル率**(第一声=コミットの前にユーザが再開して投機生成が捨てられた回数)。
-// = 「窓が短すぎて、まだ喋り終わっていないのに生成を始めた」だけを測る(barge-in=トリミ発話中の割り込みは
-//   使わない=割り込みグセのある人の窓を不当に広げないため・ユーザー指摘)。昼夜の間の長さ差にも追従する。
+// --- コアレッシングの適応(段階②/案①・無音窓を自動伸縮・メモリのみ) ---
+// 目的「聞こえる中断(barge-in)を避けられる範囲で、できるだけ窓を短く」(ユーザー設計・案①)。
+//  - サイレントキャンセル(第一声=コミット**前**の再開)→ 声が出る前に捕捉=余裕あり → **窓を短く**。
+//  - 早い barge-in(無音開始〜MAX窓以内の被せ)= まだ喋ってた/トリミが速すぎた=窓を延ばせば防げた → **窓を長く**。
+//  - 遅い barge-in(MAX窓超)= 本物の割り込み=窓では直せない → **中立**。
+// barge-in の早い/遅いは「無音開始からの経過 ≤ MAX窓」で判定(=窓を最大にしていたら防げたか)。
 /** 無音窓の下限(ms・これ未満は流暢な人でも食い気味になる)。 */
 export const COALESCE_WINDOW_MIN_MS = 400;
-/** 無音窓の上限(ms・これ超は無反応に感じる)。 */
+/** 無音窓の上限(ms・これ超は無反応に感じる)。早い/遅い barge-in の判定境界も兼ねる。 */
 export const COALESCE_WINDOW_MAX_MS = 1200;
-/** 窓 = BASE + GAIN×cancelEma の基準(ms・キャンセル皆無のとき)。 */
-export const COALESCE_WINDOW_BASE_MS = 450;
-/** 窓 = BASE + GAIN×cancelEma の感度(ms・cancelEma 1 ごとに広げる量)。 */
-export const COALESCE_WINDOW_GAIN_MS = 250;
-/** ターンごとのサイレントキャンセル数を均す EMA 係数(大きいほど速く適応)。 */
-export const COALESCE_CANCEL_EMA_ALPHA = 0.3;
+/** サイレントキャンセル時に窓を縮める量(ms・小さく=じわじわ短く)。 */
+export const COALESCE_WINDOW_STEP_DOWN_MS = 30;
+/** 早い barge-in 時に窓を伸ばす量(ms・大きく=被せ=可聴の失敗は早く back off)。 */
+export const COALESCE_WINDOW_STEP_UP_MS = 200;
 /** 発話開始の確定に必要な最小発話継続(ms)。単発ノイズでの誤発火を防ぐ。 */
 export const VAD_MIN_SPEECH_MS = 160;
 /** 切り出し時に発話頭へ付ける先読みパディング(ms)。語頭の欠けを防ぐ。 */

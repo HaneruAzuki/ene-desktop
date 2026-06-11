@@ -23,8 +23,10 @@ const REPO = process.env.ENE_STT_REPO ?? 'onnx-community/whisper-small';
 const DIR = process.env.ENE_STT_DIR ?? REPO.split('/').pop();
 const DEST_ROOT = join(process.cwd(), 'data', 'models', DIR);
 
-// 精度優先: encoder は fp32。decoder は量子化(q8=_quantized)で十分(サイズ/速度が有利)。
-const ENCODER = 'onnx/encoder_model.onnx';
+// 精度優先: encoder は fp32(whisper-small は小さい)。decoder は量子化(q8=_quantized)で十分。
+//   ただし kotoba-whisper 等は fp32 エンコーダが巨大(~2.5GB・外部データ)なので、
+//   ENE_STT_ENCODER=onnx/encoder_model_quantized.onnx で q8 エンコーダ(645MB)を取得する。
+const ENCODER = process.env.ENE_STT_ENCODER ?? 'onnx/encoder_model.onnx';
 const DECODER_PREFERRED = 'onnx/decoder_model_merged_quantized.onnx'; // q8
 const DECODER_FALLBACK = 'onnx/decoder_model_merged.onnx'; // fp32
 

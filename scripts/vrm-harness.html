@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>VRM 計測ハーネス</title>
+<style>
+  html,body { margin:0; height:100%; background:transparent; overflow:hidden; font-family:system-ui,sans-serif; }
+  #c { display:block; width:100vw; height:100vh; }
+  #hud { position:fixed; top:6px; left:6px; font:11px/1.4 ui-monospace,monospace; color:#cfe; background:#0009; padding:5px 7px; border-radius:6px; white-space:pre; pointer-events:none; }
+  #panel { position:fixed; left:6px; right:6px; bottom:6px; background:#0b0c10cc; border:1px solid #333; border-radius:8px; padding:6px 8px; color:#dde; font-size:11px; }
+  #panel.hidden { display:none; }
+  .r { display:flex; align-items:center; gap:6px; margin:3px 0; }
+  .r span { width:42px; color:#9ab; }
+  input[type=range]{ flex:1; }
+  .btns button { background:#23262e; color:#dde; border:1px solid #444; border-radius:5px; font-size:10px; padding:2px 5px; margin:1px; cursor:pointer; }
+  .btns button.on { background:#2d6; color:#062; }
+  #toggle { position:fixed; top:6px; right:6px; font-size:11px; background:#23262e; color:#dde; border:1px solid #444; border-radius:5px; padding:2px 6px; cursor:pointer; }
+  #err { position:fixed; left:6px; right:6px; top:30px; color:#f99; font:11px ui-monospace,monospace; background:#300a; padding:6px; border-radius:6px; display:none; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hud">loading…</div>
+  <button id="toggle">設定</button>
+  <div id="err"></div>
+  <div id="panel">
+    <div class="r"><span>感情</span><span class="btns" id="emo"></span></div>
+    <div class="r"><span>口形</span><span class="btns" id="vis"></span><button id="talk" style="margin-left:4px">▶喋る</button></div>
+    <div class="r"><span>高さ</span><input type="range" id="camY" min="-0.4" max="0.4" step="0.01" value="0"></div>
+    <div class="r"><span>距離</span><input type="range" id="camZ" min="0.25" max="1.5" step="0.01" value="0.55"></div>
+    <div class="r"><span>向きY</span><input type="range" id="yaw" min="-60" max="60" step="1" value="18"></div>
+    <div class="r"><span>腕下げ</span><input type="range" id="armDown" min="-85" max="85" step="1" value="62"></div>
+    <div class="r"><span>条件</span>
+      <label><input type="checkbox" id="cap30" checked>30fps</label>
+      <label><input type="checkbox" id="spring" checked>物理</label>
+      <label><input type="checkbox" id="blink" checked>瞬き</label>
+    </div>
+  </div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "../node_modules/three/build/three.module.js",
+  "three/addons/": "../node_modules/three/examples/jsm/",
+  "@pixiv/three-vrm": "../node_modules/@pixiv/three-vrm/lib/three-vrm.module.js"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+
+const $ = (id) => document.getElementById(id);
+const showErr = (m) => { $('err').style.display='block'; $('err').textContent=String(m); };
+window.addEventListener('error', e => showErr('error: '+e.message));
+$('toggle').onclick = () => $('panel').classList.toggle('hidden');
+
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+renderer.setClearColor(0x000000, 0);
+function resize(){ renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth, innerHeight, false); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.05, 20);
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const dir = new THREE.DirectionalLight(0xffffff, Math.PI); dir.position.set(1,1,1); scene.add(dir);
+addEventListener('resize', resize); resize();
+
+let vrm=null, headY=1.35, activeEmo='neutral', talking=false, blinkT=0, blinkPhase=0;
+const EMO=['neutral','happy','angry','sad','relaxed','surprised'];
+const VIS=['aa','ih','ou','ee','oh'];
+function emoBtns(){ EMO.forEach(n=>{const b=document.createElement('button');b.textContent=n;b.onclick=()=>applyEmotion(n);$('emo').appendChild(b);}); }
+function visBtns(){ VIS.forEach(n=>{const b=document.createElement('button');b.textContent=n;b.onclick=()=>{setVis(n,1);[...$('vis').children].forEach(x=>x.classList.toggle('on',x===b));};$('vis').appendChild(b);}); }
+emoBtns(); visBtns();
+$('talk').onclick=(e)=>{ talking=!talking; e.target.classList.toggle('on',talking); if(!talking) setVis('aa',0); };
+function applyEmotion(name){ if(!vrm?.expressionManager)return; EMO.forEach(n=>{ if(n!=='neutral') vrm.expressionManager.setValue(n, n===name?1:0); }); activeEmo=name; [...$('emo').children].forEach(b=>b.classList.toggle('on',b.textContent===name)); }
+function setVis(name,w){ if(!vrm?.expressionManager)return; VIS.forEach(n=>vrm.expressionManager.setValue(n, n===name?w:0)); }
+
+const loader = new GLTFLoader();
+loader.register(p => new VRMLoaderPlugin(p));
+async function loadUrl(url){
+  try{
+    const gltf = await loader.loadAsync(url);
+    if(vrm){ scene.remove(vrm.scene); VRMUtils.deepDispose(vrm.scene); }
+    const v = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    VRMUtils.combineSkeletons(gltf.scene);
+    if(v.meta?.metaVersion === '0') VRMUtils.rotateVRM0(v);
+    scene.add(v.scene); vrm=v;
+    if(v.lookAt) v.lookAt.target = camera;
+    const head=v.humanoid?.getNormalizedBoneNode('head');
+    if(head){ const p=new THREE.Vector3(); head.getWorldPosition(p); headY=p.y; }
+    applyEmotion('neutral');
+  }catch(e){ showErr('load failed: '+(e?.message||e)); }
+}
+const vrmParam = new URLSearchParams(location.search).get('vrm');
+if(vrmParam) loadUrl(decodeURIComponent(vrmParam)); else showErr('?vrm= が指定されていません');
+
+const clock=new THREE.Clock();
+let acc=0, frames=0, fpsT=performance.now(), fps=0;
+function frame(){
+  requestAnimationFrame(frame);
+  const dt=clock.getDelta();
+  const cap=$('cap30').checked; acc+=dt;
+  if(cap && acc < 1/30) return;
+  const delta = cap ? acc : dt; acc=0;
+
+  const pan=parseFloat($('camY').value), cz=parseFloat($('camZ').value);
+  camera.position.set(0, headY-0.08+pan, cz);
+  camera.lookAt(0, headY-0.12+pan, 0);
+
+  if(vrm){
+    const chest=vrm.humanoid?.getNormalizedBoneNode('chest');
+    if(chest) chest.rotation.x=Math.sin(performance.now()/1400)*0.02;
+    const armRad=THREE.MathUtils.degToRad(parseFloat($('armDown').value));
+    const la=vrm.humanoid?.getNormalizedBoneNode('leftUpperArm');
+    const ra=vrm.humanoid?.getNormalizedBoneNode('rightUpperArm');
+    if(la) la.rotation.z= armRad; if(ra) ra.rotation.z=-armRad;
+    vrm.scene.rotation.y=THREE.MathUtils.degToRad(parseFloat($('yaw').value));
+    if($('blink').checked){
+      blinkT+=delta;
+      if(blinkPhase>0){ blinkPhase-=delta*6; vrm.expressionManager?.setValue('blink', Math.max(0,Math.sin(Math.min(1,1-blinkPhase)*Math.PI))); if(blinkPhase<=0) vrm.expressionManager?.setValue('blink',0); }
+      else if(blinkT>3.5+Math.random()*2){ blinkT=0; blinkPhase=1; }
+    }
+    if(talking){ const v=VIS[Math.floor(performance.now()/120)%VIS.length]; setVis(v, 0.6+0.4*Math.abs(Math.sin(performance.now()/90))); }
+    if($('spring').checked) vrm.update(delta);
+    else { vrm.expressionManager?.update(); vrm.lookAt?.update(delta); vrm.humanoid?.update(); }
+  }
+  renderer.render(scene, camera);
+
+  frames++; const now=performance.now();
+  if(now-fpsT>=500){ fps=Math.round(frames*1000/(now-fpsT)); frames=0; fpsT=now; }
+  const mem = performance.memory ? (performance.memory.usedJSHeapSize/1048576).toFixed(0)+'MB heap' : '';
+  $('hud').textContent = `FPS ${fps} (cap ${$('cap30').checked?'30':'off'})  ${mem}\nemo:${activeEmo} 物理:${$('spring').checked?'on':'off'}${talking?' 喋り中':''}`;
+}
+frame();
+</script>
+</body>
+</html>

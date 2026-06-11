@@ -11,7 +11,7 @@ import {
   COALESCE_ENABLED_ENV,
   VAD_PROVISIONAL_SILENCE_MS,
 } from '../shared/constants';
-import { appendShortTerm } from '../memory/short-term';
+import { appendShortTerm, replaceLastAssistantText } from '../memory/short-term';
 import { buildConversationMemory } from '../memory/context-builder';
 import { requestExtraction, enforceShortTermCap } from '../memory/extraction-scheduler';
 import { classifyTopicLocal } from '../router/local-classifier';
@@ -23,6 +23,8 @@ import { getSemantic } from '../memory/semantic';
 import { executeOsCommand } from '../os/executor';
 import { recordBirthdayCelebrated, recordConversationTurn } from '../character/active-character';
 import { loadAnimationData } from '../character/animation-loader';
+import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../character/vrm-loader';
+import { loadAppSettings, saveVrmDisplay } from '../storage/app-settings';
 import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
 import { saveWindowPosition, resetToDefaultPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
@@ -37,6 +39,7 @@ import type { ConversationResponse } from '../shared/types/conversation';
 import type { CharacterInfo } from '../shared/types/ipc';
 import type { TranscribeResult } from '../shared/types/stt';
 import type { EmotionLabel } from '../shared/types/animation';
+import type { VrmRenderConfig, VrmDisplayParams } from '../shared/types/vrm';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 import type { VoiceInputMode } from '../shared/types/settings';
 
@@ -289,6 +292,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
           if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-response', response);
         },
         setSilenceWindow: (ms) => applySilenceWindow(ms),
+        // barge-in(生成完了後)時に、最新 assistant 記憶を「聞かせた分」へ切り詰める(Phase B)。
+        updateLastAssistant: (heardText) => void replaceLastAssistantText(heardText),
       })
     : null;
   const coalesce: CoalesceHooks | undefined = coordinator
@@ -296,6 +301,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
         onSpeechStart: () => coordinator.onSpeechStart(),
         onSpeechEnd: () => coordinator.onSpeechEnd(),
         onProvisionalEnd: (text) => coordinator.onProvisionalEnd(text),
+        onBargeInTiming: (isEarly) => coordinator.onBargeInTiming(isEarly),
         reset: () => coordinator.reset(),
         minSilenceMs: VAD_PROVISIONAL_SILENCE_MS,
       }
@@ -316,6 +322,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
   ipcMain.on('ene:vad-stop', () => vad.stop());
   ipcMain.on('ene:vad-speaking', (_event, speaking: boolean) => vad.setSpeaking(speaking));
+  // barge-in 時に renderer が「実際に聞かせた発言(再生済みの文を連結)」を報告する(Phase B)。
+  // coordinator が生成中なら中断＋切り詰めコミット、生成完了済みなら最新 assistant を上書きする。
+  ipcMain.on('ene:voice-heard', (_event, heardText: string) => coordinator?.onBargeIn(heardText));
 
   // マイク入力方式の取得(設定・task_17 Phase C)。変更は右クリックメニューから(main が保存＋通知)。
   ipcMain.handle('ene:get-voice-input-mode', async (): Promise<VoiceInputMode> => runtime.voiceInputMode);
@@ -343,6 +352,40 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     }
     return { name: 'ENE', portraitUrl: '' };
   });
+
+  // --- VRM 表示(F・3D化)。vrm.json が無ければ null=renderer は PNG 立ち絵へフォールバック ---
+  // 表情マップ＋初期パラメータ(ユーザー上書きをマージ済み)。モデル本体は別 IPC で取得する。
+  ipcMain.handle('ene:get-vrm-config', async (): Promise<VrmRenderConfig | null> => {
+    const characterId = runtime.charContext?.identity.characterId;
+    if (!characterId) return null;
+    const config = await loadVrmConfig(characterId);
+    if (!config) return null;
+    const settings = await loadAppSettings();
+    return buildVrmRenderConfig(config, settings.vrmDisplay);
+  });
+
+  // VRM モデル本体(ArrayBuffer)。10MB を base64 化せず生バイトで渡す(§3.8)。読めなければ null。
+  ipcMain.handle('ene:get-character-model', async (): Promise<ArrayBuffer | null> => {
+    const characterId = runtime.charContext?.identity.characterId;
+    if (!characterId) return null;
+    const config = await loadVrmConfig(characterId);
+    if (!config) return null;
+    return loadVrmModelBytes(characterId, config.model);
+  });
+
+  // GUI スライダーの調整結果を保存(renderer は即時ローカル反映済み・ここは永続化のみ)。
+  ipcMain.handle('ene:set-vrm-display', async (_event, display: Partial<VrmDisplayParams>): Promise<void> => {
+    await saveVrmDisplay(display);
+  });
+
+  // ウィンドウの可視性を renderer へ通知(非表示中は VRM 描画を止める=軽量原則 柱4・§3.6)。
+  const notifyVisibility = (visible: boolean): void => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:window-visibility', visible);
+  };
+  mainWindow.on('hide', () => notifyVisibility(false));
+  mainWindow.on('minimize', () => notifyVisibility(false));
+  mainWindow.on('show', () => notifyVisibility(true));
+  mainWindow.on('restore', () => notifyVisibility(true));
 
   // 起動挨拶を1回だけ返す(pull 方式。取得後はクリアして再表示しない)。
   ipcMain.handle('ene:get-initial-greeting', async (): Promise<string | null> => {

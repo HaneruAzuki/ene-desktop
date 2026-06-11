@@ -167,3 +167,78 @@ body,
   background: #4caf50;
   box-shadow: 0 0 10px rgba(76, 175, 80, 0.85);
 }
+
+/* VRM 描画キャンバス(F・3D化)。3D カメラがバストアップをフレーミングするのでウィンドウ全面に置く。
+   背景は WebGL 側で透明クリア。CSS の drop-shadow は毎フレーム合成コストになるため付けない(軽量・柱4)。
+   呼吸/うなずきはボーンで行うので CSS アニメも使わない。 */
+.character--vrm {
+  top: 0;
+  height: 100%;
+  object-fit: unset;
+  filter: none;
+  animation: none;
+}
+
+/* VRM 表示調整パネルの開閉ボタン(歯車・右上)。 */
+.vrm-gear {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.82);
+  color: #333;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 40;
+}
+
+/* VRM 表示調整パネル(スライダー・開いている間だけ表示)。 */
+.vrm-panel {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 64px;
+  background: rgba(11, 12, 16, 0.86);
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #dde;
+  font-size: 11px;
+  z-index: 40;
+}
+.vrm-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.vrm-panel__close {
+  background: none;
+  border: none;
+  color: #dde;
+  font-size: 14px;
+  cursor: pointer;
+}
+.vrm-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+.vrm-panel__label {
+  width: 40px;
+  color: #9ab;
+}
+.vrm-panel__row input[type='range'] {
+  flex: 1;
+}
+.vrm-panel__value {
+  width: 34px;
+  text-align: right;
+  color: #9ab;
+}

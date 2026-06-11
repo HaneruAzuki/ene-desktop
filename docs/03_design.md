@@ -34,6 +34,16 @@
 | ロギング | electron-log | `^5.x` | Electron標準的なロガー |
 | APIキー暗号化 | Electron `safeStorage` | (built-in) | OS標準暗号化機構 |
 | ローカル埋め込み | @huggingface/transformers | `^4.x` | 記憶の意味検索(task_15 Phase B)。ruri-v3-310m(ONNX)をローカル実行。**native ランタイム `onnxruntime-node` を推移的に同梱**(配布は win-x64・CPU推論のみ=GPU用 DirectML/他OS/`onnxruntime-web` は除外しサイズ抑制)。承認済み 2026-06・N-15-9 |
+| 3D表示 | three | `^0.169.x` | VRMキャラのWebGL描画。MIT。tree-shake後の配布JS増分は小(gzip ~155KB)。承認済み 2026-06 |
+| VRMローダ/表情 | @pixiv/three-vrm | `^3.x` | VRM 1.0 の読込・表情(Expression)・SpringBone・LookAt。MIT。three にのみ依存。承認済み 2026-06 |
+
+> 📌 **キャラ表示の3D化(VRM・three-vrm・2026-06 承認)**:立ち絵差分(PNG)に加え `three`＋`@pixiv/three-vrm` で VRM 1.0 を表示する。
+> - **配布JS増分は約1MB**(three gzip ~155KB＋three-vrm)。three-vrm は純JSのため vite が `out/renderer` にバンドル(onnxruntime のような external 化は不要・`electron-builder.yml` の変更も不要)。型は `@types/three`(devDependencies)。
+> - **キャラVRM本体**(`characters/{id}|model/*.vrm`・約3〜10MB)は portrait.png 同様 **exe へ同梱**(`characters/**` は既に files/asarUnpack 対象)。whisper/ruri のような任意・別DLアセットとは区別する(表示に必須のため)。小窓表示前提でテクスチャ1K・マテリアル削減により最適化。
+> - 描画差し替えは §11.2 の想定どおり `CharacterDisplay.tsx` を VRM 版にし、**PNG立ち絵経路はフォールバックとして残す**(VRM未配置・低スペック時)。
+> - **表示パラメータ(高さ・距離・向きY・腕の下げ・待機ポーズ)は実行時に調整可能**にする。VRMは常にTポーズで書き出されるため、ポーズ・フレーミングは実行時にボーン回転＋カメラで付与する(エクスポート時には焼かない)。
+> - **既定化の関門=成功基準7(CPU3%/100MB)**:小窓・透過・最前面で計測ハーネス(`npm run vrm:smoke`)により実機検証し、満たす場合のみ既定化。30fps上限・非発話時間引き・非表示時停止を前提。
+> - ライセンス three=MIT / three-vrm=MIT(`docs/B_dependency_license_audit.md` §2.1)。
 
 #### 開発時のみ(devDependencies — exe には含まれない)
 

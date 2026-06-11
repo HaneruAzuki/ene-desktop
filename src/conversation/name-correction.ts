@@ -1,21 +1,27 @@
-// STT 名前補正(B-10 Part4 / N-LAT-? )。
+// STT 名前補正(B-10 Part4 / N-LAT-?)。
 //
-// STT(whisper)は固有名詞の自称「トリミ」を「取り身」等に誤認しやすい。
+// STT(whisper)は固有名詞の自称「トリミ」を「取り身」「取り見」等に誤認しやすい。
 // whisper のプロンプトバイアス(prompt_ids)は現行 transformers.js では generate() が
 // 消費しない(実装上コメントアウト)ため使えない。→ **保守的な後処理**で補う。
 //
-// 方針(ユーザー判断・低リスク): **発話全体が名前エイリアス(=呼びかけ)のときだけ**
-//   callsSelf(例「トリミ」)へ置換する。文中の「取り身」(魚の話など正当な語)は触らない=過補正回避。
+// 方針(ユーザー判断・2026-06): **呼びかけ位置**(=トリミに話しかけている強い兆候)で自称へ置換する。
+//  - 発話の**先頭**にエイリアスがあり、直後が句読点/空白/文末(例「取り見、今日ね」)
+//  - 発話の**末尾**にエイリアスがあり、直前が句読点/空白(例「ねえ、取り身」)
+// 文中の正当語(「メモを取り見直した」「鳥見に行く」等)は**触らない**=過補正回避。
 // エイリアスはキャラ依存値として identity.json に外出し(§4.5・ハードコード禁止)。
 //
 // 純粋関数(I/O なし)=単体テスト対象。STT 経路(vad-runtime)でのみ適用し、テキスト入力には適用しない。
 
-/** 末尾の句読点・感嘆/疑問・空白を分離する(「取り身！」→ core「取り身」/ trail「！」)。 */
-const TRAILING_RE = /^([\s\S]*?)([、。.!?！？…・\s]*)$/;
+/** 呼びかけの区切りとみなす文字(句読点・感嘆/疑問・中黒・空白)。 */
+const BOUNDARY = '[、。，,．.！!？?…・\\s]';
+
+/** 正規表現メタ文字をエスケープ(エイリアスは通常メタ文字を含まないが安全側)。 */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
- * 発話全体が名前エイリアスのときだけ、自称(canonical)へ置換する。末尾の句読点は保持。
- * それ以外(文中にエイリアスを含む等)は元のまま返す=過補正しない。
+ * 呼びかけ位置(先頭/末尾)のエイリアスだけを自称(canonical)へ置換する。文中の正当語は触らない。
  *
  * @param text STT の確定テキスト
  * @param aliases STT が誤認しやすい綴り(identity.sttAliases)
@@ -23,11 +29,18 @@ const TRAILING_RE = /^([\s\S]*?)([、。.!?！？…・\s]*)$/;
  */
 export function correctNameMishear(text: string, aliases: string[], canonical: string): string {
   if (!canonical || aliases.length === 0) return text;
-  const trimmed = text.trim();
-  if (!trimmed) return text;
-  const m = TRAILING_RE.exec(trimmed);
-  const core = m?.[1] ?? trimmed;
-  const trail = m?.[2] ?? '';
-  if (aliases.includes(core)) return canonical + trail;
-  return text;
+  // 長い綴りを先にして交替(部分一致の取りこぼし回避)。空文字は除外。
+  const group = [...aliases]
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join('|');
+  if (!group) return text;
+
+  let out = text;
+  // 先頭の呼びかけ:「(空白)綴り」のあとが 区切り or 文末。
+  out = out.replace(new RegExp(`^(\\s*)(?:${group})(?=${BOUNDARY}|$)`), `$1${canonical}`);
+  // 末尾の呼びかけ:「区切り のあとに 綴り」が文末(末尾の区切りは保持)。
+  out = out.replace(new RegExp(`(${BOUNDARY})(?:${group})(${BOUNDARY}*)$`), `$1${canonical}$2`);
+  return out;
 }

@@ -27,8 +27,8 @@ export interface VoiceChatDeps {
   voiceConfig: VoiceConfig;
   /** identity.json の neverCallsSelf(自称検知語・ハードコード禁止・§5.4)。 */
   neverCallsSelf: string[];
-  /** 合成済み音声を再生キューへ(renderer 連携は呼び出し側)。 */
-  onAudio: (wav: ArrayBuffer) => void;
+  /** 合成済み音声を再生キューへ(renderer 連携は呼び出し側)。text=この文の表示テキスト(再生同期の吹き出し用)。 */
+  onAudio: (wav: ArrayBuffer, text: string) => void;
   /** emotion 確定時に表情/スタイルへ反映(任意)。 */
   onEmotion?: (emotion: EmotionLabel) => void;
   /** ストリーム書式パーサの生成(既定=bracket 形式。JSON ストリーミングは createJsonStreamParser を渡す)。 */
@@ -72,7 +72,7 @@ export async function runVoiceChat(
     if (deps.signal?.aborted) throwAborted();
     const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion));
     if (deps.signal?.aborted) throwAborted(); // 合成中に中断されたら発話しない
-    deps.onAudio(wav);
+    deps.onAudio(wav, display); // display=ルビ除去済の表示テキスト(再生同期で吹き出しに出す)
     spoken.push(display);
     return true;
   };

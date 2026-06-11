@@ -3,9 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- blob: は VRM(GLB)の埋め込みテクスチャを GLTFLoader が読むのに必要(ImageBitmapLoader が
+         blob URL を fetch するため img-src/connect-src 双方に許可)。blob: はローカルのメモリ内
+         オブジェクト URL であり外部通信ではない(§7.1 の外部送信制限に抵触しない・F)。 -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; img-src 'self' data: blob:; connect-src 'self' blob:; style-src 'self' 'unsafe-inline'"
     />
     <title>魚川トリミ</title>
   </head>

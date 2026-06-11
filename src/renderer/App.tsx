@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CharacterDisplay, type CharacterDisplayHandle } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea } from './components/InputArea';
+import { VrmSettingsPanel } from './components/VrmSettingsPanel';
 import { playClick } from './sound';
-import { enqueueAudio, stopPlayback, setPlaybackHandlers } from './audio-player';
+import { enqueueAudio, stopPlayback, setPlaybackHandlers, setSentenceHandler, getVoiceAmplitude } from './audio-player';
 import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
@@ -13,6 +14,7 @@ import type { CharacterInfo } from '../shared/types/ipc';
 import type { CharacterState } from '../shared/types/animation';
 import type { VoiceInputMode } from '../shared/types/settings';
 import type { ConversationResponse } from '../shared/types/conversation';
+import type { VrmRenderConfig, VrmDisplayParams } from '../shared/types/vrm';
 
 // トップコンポーネント(設計書 §8 / task_13)。
 // キャラ表示・吹き出し・入力欄・統合マイクボタンを束ねる。
@@ -45,16 +47,28 @@ export function App(): React.ReactElement | null {
     emotion: 'neutral',
     pose: 'stand',
   });
+  // VRM 表示(F・3D化)。config/model が揃えば VRM、欠ければ PNG フォールバック。
+  const [vrmConfig, setVrmConfig] = useState<VrmRenderConfig | null>(null);
+  const [vrmModel, setVrmModel] = useState<ArrayBuffer | null>(null);
+  const [vrmDisplay, setVrmDisplay] = useState<VrmDisplayParams | null>(null);
+  const [visible, setVisible] = useState(true); // ウィンドウ可視性(非表示で VRM 描画停止)
+  const [showVrmPanel, setShowVrmPanel] = useState(false); // 表示調整パネル
 
   const charRef = useRef<CharacterDisplayHandle>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   const micButtonRef = useRef<HTMLButtonElement>(null);
+  const gearRef = useRef<HTMLButtonElement>(null);
+  const vrmPanelRef = useRef<HTMLDivElement>(null);
+  const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastIgnoreRef = useRef<boolean | null>(null);
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
   const voiceModeRef = useRef(false); // 非同期コールバックから handsFreeOn を読む
+  // ストリーミング音声で「再生開始済み=聞かせた文」を貯める(Phase A: 再生同期の吹き出し)。
+  // 先頭文(index=0)でリセットし、文が再生されるたび追記する。
+  const spokenRef = useRef<string[]>([]);
   const readyRef = useRef(false); // 起動準備完了(多重通知の冪等化)
   const interactedRef = useRef(false); // 既にユーザーが会話を始めたか(準備完了後の挨拶差し替え判定)
 
@@ -77,6 +91,23 @@ export function App(): React.ReactElement | null {
     window.ene.onAppReady(() => markReady());
   }, []);
 
+  // VRM 表示(F): 設定とモデルを取得(両方揃えば VRM、欠ければ PNG フォールバック)。
+  useEffect(() => {
+    void window.ene.getVrmConfig().then((cfg) => {
+      setVrmConfig(cfg);
+      if (cfg) setVrmDisplay(cfg.display);
+    });
+    void window.ene.getCharacterModel().then(setVrmModel);
+  }, []);
+
+  // ウィンドウ可視性 → VRM 描画の停止/再開(§3.6・軽量原則 柱4)。
+  useEffect(() => {
+    window.ene.onWindowVisibility(setVisible);
+    const onVis = (): void => setVisible(!document.hidden);
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
   // トレイ / コンテキストメニューからのイベント＋マイク入力方式の変更通知
   useEffect(() => {
     window.ene.onOpenInputArea(() => openInput());
@@ -86,9 +117,20 @@ export function App(): React.ReactElement | null {
     window.ene.onVoiceInputModeChanged((mode) => applyVoiceInputMode(mode));
   }, []);
 
-  // 音声応答チャンク(WAV)を逐次再生(task_17 Phase A)
+  // 音声応答チャンク(WAV＋任意で文テキスト/通し番号)を逐次再生(task_17 Phase A)。
   useEffect(() => {
-    window.ene.onVoiceChunk((chunk) => void enqueueAudio(chunk));
+    window.ene.onVoiceChunk((chunk) => void enqueueAudio(chunk.wav, chunk.text, chunk.index));
+  }, []);
+
+  // 文の再生開始に同期して吹き出しを1文ずつ伸ばす(Phase A・ストリーミング音声のみ)。
+  // 先頭文(index=0)で貯めをリセット。barge-in 時はここまで貯まった分が「聞かせた発言」になる。
+  useEffect(() => {
+    setSentenceHandler((text, index) => {
+      if (index === 0) spokenRef.current = [];
+      spokenRef.current.push(text);
+      setBubble(spokenRef.current.join(''));
+      setCharState((s) => (s.activity === 'talking' ? s : { ...s, activity: 'talking', pose: 'stand' }));
+    });
   }, []);
 
   // 相槌(聞くターン・task_18 Phase B): WAV があれば即時再生＋必ずうなずく(音声未準備でもうなずきは出す)。
@@ -133,8 +175,8 @@ export function App(): React.ReactElement | null {
     });
     window.ene.onVoiceTranscript((text) => void respond(text));
     // コアレッシング(ENE_COALESCE)時は main で生成が完結し、確定応答だけが届く(投機キャンセルは届かない)。
-    // 既に「考え中(transcribing)」は onVoiceState で表示済み・音声は ene:voice-chunk で再生済み。
-    window.ene.onVoiceResponse((response) => applyResponseUI(response));
+    // 吹き出しは文の再生に同期して伸ばす(setSentenceHandler)ので、ここでは**全文をセットしない**(表情/口パクのみ)。
+    window.ene.onVoiceResponse((response) => applyResponseUI(response, false));
     window.ene.onVoiceBargeIn(() => handleBargeIn());
   }, []);
 
@@ -162,28 +204,65 @@ export function App(): React.ReactElement | null {
     return () => clearTimeout(id);
   }, [charState.activity, charState.pose]);
 
-  // クリックスルー(§8.6): キャラ不透明 OR 吹き出し OR 入力欄 OR マイクボタン の上なら不透過。
+  // クリックスルー(§8.6): キャラ不透明 OR 吹き出し OR 入力欄 OR マイク OR 歯車 OR パネル の上なら不透過。
+  // 判定には VRM のレイキャスト(やや重い)が含まれるため、mousemove ごとでなく rAF で1フレーム1回に間引く
+  // (ドラッグ中の連続 mousemove でレイキャストが詰まり移動がカクつくのを防ぐ)。
   useEffect(() => {
-    const onMove = (e: MouseEvent): void => {
+    let pending = false;
+    let mx = 0;
+    let my = 0;
+    const evaluate = (): void => {
+      pending = false;
       const interactive =
-        (charRef.current?.isOpaqueAt(e.clientX, e.clientY) ?? true) ||
-        rectContains(bubbleRef.current, e.clientX, e.clientY) ||
-        rectContains(inputRef.current, e.clientX, e.clientY) ||
-        rectContains(micButtonRef.current, e.clientX, e.clientY);
+        (charRef.current?.isOpaqueAt(mx, my) ?? true) ||
+        rectContains(bubbleRef.current, mx, my) ||
+        rectContains(inputRef.current, mx, my) ||
+        rectContains(micButtonRef.current, mx, my) ||
+        rectContains(gearRef.current, mx, my) ||
+        rectContains(vrmPanelRef.current, mx, my);
       const ignore = !interactive;
       if (lastIgnoreRef.current !== ignore) {
         lastIgnoreRef.current = ignore;
         void window.ene.setIgnoreMouseEvents(ignore);
       }
     };
+    const onMove = (e: MouseEvent): void => {
+      mx = e.clientX;
+      my = e.clientY;
+      if (!pending) {
+        pending = true;
+        requestAnimationFrame(evaluate);
+      }
+    };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
+  // 【開発用】数字キー 1〜6 で表情を強制切替し、VRM の表情レンダリングを会話なしで単体確認する。
+  // dev ビルドのみ有効(本番では無効・キーマップは neutral/joy/anger/sorrow/surprise/embarrassed)。
+  useEffect(() => {
+    const isDev = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+    if (!isDev) return;
+    const map: Record<string, CharacterState['emotion']> = {
+      '1': 'neutral',
+      '2': 'joy',
+      '3': 'anger',
+      '4': 'sorrow',
+      '5': 'surprise',
+      '6': 'embarrassed',
+    };
+    const h = (e: KeyboardEvent): void => {
+      const em = map[e.key];
+      if (em) setCharState((s) => ({ ...s, emotion: em }));
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
   }, []);
 
   /** 吹き出しを閉じ、talking 中なら idle に戻す。 */
   function dismissBubble(): void {
     setBubble(null);
-    setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle' } : s));
+    setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
   }
 
   /** 入力欄を開く(操作=起き上がる・クリック音)。 */
@@ -227,22 +306,22 @@ export function App(): React.ReactElement | null {
 
   /**
    * 確定応答を UI(吹き出し/表情/口パク)へ反映する。
-   * テキスト/非コアレッシング音声は respond() から、コアレッシング音声は onVoiceResponse から呼ぶ
-   * (生成は main 側で完結し、ここは表示だけ)。
+   * テキスト/非コアレッシング音声は respond() から(setBubbleToo=true=全文表示)、
+   * コアレッシング音声は onVoiceResponse から(setBubbleToo=false=吹き出しは文の再生に同期させる)呼ぶ。
    */
-  function applyResponseUI(response: ConversationResponse): void {
+  function applyResponseUI(response: ConversationResponse, setBubbleToo = true): void {
     interactedRef.current = true;
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
-    setBubble(response.message);
+    if (setBubbleToo) setBubble(response.message);
 
     const talkMs = Math.min(
       TALKING_MAX_MS,
       Math.max(TALKING_MIN_MS, response.message.length * MOUTH_FLAP_MS),
     );
     talkingTimerRef.current = setTimeout(() => {
-      setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle' } : s));
+      setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
     }, talkMs);
   }
 
@@ -256,8 +335,10 @@ export function App(): React.ReactElement | null {
   function handleBargeIn(): void {
     stopPlayback();
     stopBackchannel(); // 鳴り残った相槌もダッキング(割り込み時に黙らせる)
+    // Phase B: 実際に聞かせた発言(再生開始済みの文を連結)を main へ報告し、記憶を切り詰めさせる。
+    window.ene.notifyBargeInHeard(spokenRef.current.join(''));
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
-    setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle' } : s));
+    setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
     window.ene.setVadSpeaking(false);
   }
 
@@ -333,6 +414,13 @@ export function App(): React.ReactElement | null {
     setVoiceInputMode(mode);
   }
 
+  /** VRM 表示パラメータの変更(即時反映＋デバウンスして data/config へ保存)。 */
+  function handleVrmDisplayChange(d: VrmDisplayParams): void {
+    setVrmDisplay(d);
+    if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
+    vrmSaveTimerRef.current = setTimeout(() => void window.ene.setVrmDisplay(d), 400);
+  }
+
   if (!characterInfo) return null;
 
   // マイクボタンの操作は方式で異なる。ハンズフリー=クリックでトグル、PTT=押している間だけ。
@@ -365,6 +453,11 @@ export function App(): React.ReactElement | null {
         state={charState}
         nodKey={nodKey}
         onClick={openInput}
+        vrmConfig={vrmConfig}
+        vrmModel={vrmModel}
+        vrmDisplay={vrmDisplay ?? undefined}
+        amplitudeProvider={getVoiceAmplitude}
+        visible={visible}
       />
       {inputVisible && (
         <InputArea ref={inputRef} onSubmit={handleSubmit} onClose={() => setInputVisible(false)} />
@@ -379,6 +472,28 @@ export function App(): React.ReactElement | null {
       >
         🎙️
       </button>
+      {/* VRM 表示調整(F・GUI スライダー)。VRM モードのときだけ歯車を出す。 */}
+      {vrmConfig && vrmDisplay && (
+        <>
+          <button
+            ref={gearRef}
+            className="vrm-gear"
+            title="表示を調整"
+            aria-label="表示を調整"
+            onClick={() => setShowVrmPanel((v) => !v)}
+          >
+            ⚙
+          </button>
+          {showVrmPanel && (
+            <VrmSettingsPanel
+              ref={vrmPanelRef}
+              display={vrmDisplay}
+              onChange={handleVrmDisplayChange}
+              onClose={() => setShowVrmPanel(false)}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

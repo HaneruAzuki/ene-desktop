@@ -11,6 +11,7 @@ import {
   VAD_SPEECH_PAD_MS,
   VAD_MIN_SILENCE_MS,
   STT_SAMPLE_RATE,
+  COALESCE_WINDOW_MAX_MS,
 } from '../shared/constants';
 
 /**
@@ -25,6 +26,8 @@ export interface CoalesceHooks {
   onSpeechEnd: () => void;
   /** 暫定ターン終了(STT 完了テキスト)。連結＋(ユーザが黙っていれば)投機生成。 */
   onProvisionalEnd: (text: string) => void;
+  /** トリミ発話中の barge-in のタイミング分類(案①・窓の伸縮)。isEarly=無音開始〜MAX窓以内の被せ。 */
+  onBargeInTiming: (isEarly: boolean) => void;
   reset: () => void;
   /** 暫定ターン終了とみなす無音(ms)。VadSegmenter の minSilence を上書きする。 */
   minSilenceMs: number;
@@ -53,6 +56,7 @@ export class VadRuntime {
   private busy = false;
   private recording = false;
   private speaking = false; // ENE が発話中(barge-in 判定用)
+  private lastSpeechEndAt = 0; // 直近の speech-end の時刻(案①: barge-in の早い/遅い分類=無音開始からの経過)
   private recorded: Float32Array[] = [];
   private ring: Float32Array[] = []; // 直近フレーム(先読みパディング用)
 
@@ -177,6 +181,11 @@ export class VadRuntime {
     if (this.speaking) {
       // ENE が喋っている最中の発話開始 = 割り込み。
       this.send('ene:voice-barge-in');
+      // 案①: barge-in の早い/遅いを分類して窓を伸縮(早い=無音開始=直近 speech-end から MAX窓以内)。
+      if (this.coalesce && this.lastSpeechEndAt) {
+        const sinceSilence = performance.now() - this.lastSpeechEndAt;
+        this.coalesce.onBargeInTiming(sinceSilence <= COALESCE_WINDOW_MAX_MS);
+      }
     }
     // コアレッシング: 発話開始を coordinator へ(未コミットの投機生成を静かにキャンセル＋発話中フラグ)。
     // STT 中の再開もここで拾えるので、onProvisionalEnd 時点で「まだ喋っている」と判定できる。
@@ -203,7 +212,8 @@ export class VadRuntime {
     if (!this.recording) return;
     this.recording = false;
     // コアレッシング: 無音で区切れた=ユーザは(今は)黙った。STT の前にフラグを下ろす
-    // (STT 中に再開すれば onSpeechStart が再び立てる)。
+    // (STT 中に再開すれば onSpeechStart が再び立てる)。直近 speech-end の時刻も記録(案①: barge-in 分類)。
+    this.lastSpeechEndAt = performance.now();
     this.coalesce?.onSpeechEnd();
     if (this.vadDebug) {
       // 分断原因の切り分け: zeroRms が多い/maxArrivalGap が大きいなら取り込み(ScriptProcessor)が犯人。

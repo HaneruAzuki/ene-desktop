@@ -46,7 +46,12 @@ export default defineConfig({
     },
     resolve: {
       alias: { '@shared': resolve(__dirname, 'src/shared') },
+      // three は単一インスタンスに集約する。three と @pixiv/three-vrm が別コピーの three を
+      // 掴むと MToon マテリアルの instanceof 判定が壊れ、テクスチャが当たらず真っ白に描画される(F)。
+      dedupe: ['three'],
     },
+    // dev のesbuild事前バンドルでも three/three-vrm を同一に解決させる(白化防止)。
+    optimizeDeps: { include: ['three', '@pixiv/three-vrm'] },
     esbuild: { jsx: 'automatic' },
   },
 });

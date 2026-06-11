@@ -13,6 +13,7 @@ import { getUnextractedEntries, clearShortTerm } from '../memory/short-term';
 import { extractFromShortTerm } from '../memory/extraction-trigger';
 import { isForgettingEnabled, requestForgetting } from '../memory/forgetting';
 import { warmEmbedder } from '../memory/embedder';
+import { warmStt } from '../conversation/stt-transcriber';
 import { warmLocalRouter } from '../router/local-classifier';
 import { makeLlmComplete } from '../conversation/client';
 import { openApiKeyDialog } from './api-key-dialog';
@@ -165,6 +166,9 @@ export async function runStartupSequence(
     runtime.ready = true;
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:app-ready');
     log.info('app fully ready (voice engine + embedder warmed)');
+    // STT(whisper/kotoba)モデルを背景でウォーム。初回発話の「読込で数十秒待ち」を前倒し(best-effort)。
+    // 準備完了の後に開始=起動の重い処理(エンジン/埋め込み)と競合させない。kotoba(~1GB)で特に効く。
+    void warmStt();
   });
 
   // マイク入力方式(設定)を読み込む(task_17 Phase C・既定 push-to-talk)。

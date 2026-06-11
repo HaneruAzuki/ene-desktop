@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { EneAPI } from '../shared/types/ipc';
+import type { EneAPI, VoiceChunk } from '../shared/types/ipc';
 import type { ConversationResponse } from '../shared/types/conversation';
 
 // Renderer 向けの安全な API 公開(設計書 §4.3)。
@@ -8,6 +8,14 @@ import type { ConversationResponse } from '../shared/types/conversation';
 const eneAPI: EneAPI = {
   sendMessage: (text) => ipcRenderer.invoke('ene:send-message', text),
   getCharacterInfo: () => ipcRenderer.invoke('ene:get-character-info'),
+  getVrmConfig: () => ipcRenderer.invoke('ene:get-vrm-config'),
+  getCharacterModel: () => ipcRenderer.invoke('ene:get-character-model'),
+  setVrmDisplay: (display) => ipcRenderer.invoke('ene:set-vrm-display', display),
+  onWindowVisibility: (cb) => {
+    // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:window-visibility');
+    ipcRenderer.on('ene:window-visibility', (_event, visible: boolean) => cb(visible));
+  },
   getInitialGreeting: () => ipcRenderer.invoke('ene:get-initial-greeting'),
   hasApiKey: () => ipcRenderer.invoke('ene:has-api-key'),
   saveApiKey: (key) => ipcRenderer.invoke('ene:save-api-key', key),
@@ -40,6 +48,7 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:voice-barge-in');
     ipcRenderer.on('ene:voice-barge-in', () => cb());
   },
+  notifyBargeInHeard: (text) => ipcRenderer.send('ene:voice-heard', text),
   getVoiceInputMode: () => ipcRenderer.invoke('ene:get-voice-input-mode'),
   onVoiceInputModeChanged: (cb) => {
     ipcRenderer.removeAllListeners('ene:voice-input-mode-changed');
@@ -51,7 +60,7 @@ const eneAPI: EneAPI = {
     // 二重登録防止: dev の StrictMode で effect が2回走るとリスナーが累積し、
     // 各センテンスが2回再生される。常に単一リスナーへ張り替える。
     ipcRenderer.removeAllListeners('ene:voice-chunk');
-    ipcRenderer.on('ene:voice-chunk', (_event, chunk: ArrayBuffer) => cb(chunk));
+    ipcRenderer.on('ene:voice-chunk', (_event, chunk: VoiceChunk) => cb(chunk));
   },
   onBackchannel: (cb) => {
     // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。

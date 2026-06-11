@@ -188,6 +188,11 @@ export function getVoiceConfigPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'voice.json');
 }
 
+/** characters/{characterId}/vrm.json(VRM 表示設定・emotion→表情/初期パラメータ・任意・F)。 */
+export function getVrmConfigPath(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'vrm.json');
+}
+
 /** characters/{characterId}/backchannels.json(相槌の語彙・任意・task_18)。 */
 export function getBackchannelPoolPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'backchannels.json');

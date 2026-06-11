@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   VoiceTurnCoordinator,
-  adaptWindow,
+  clampWindow,
   type VoiceTurnDeps,
 } from '../../src/main/voice-turn-coordinator';
 import type { ConversationResponse } from '../../src/shared/types/conversation';
@@ -153,60 +153,79 @@ describe('VoiceTurnCoordinator (段階① 投機＋コアレッシング)', () =
     expect(calls).toHaveLength(0);
   });
 
-  it('適応(段階②): キャンセルのあったターンは窓を広げ、無いターンは縮める', async () => {
+  it('barge-in(生成中): 中断して「ユーザ＋聞かせた分」をコミットし、全文はコミットしない(Phase B)', async () => {
+    const { deps, calls, commits } = harness();
+    const c = new VoiceTurnCoordinator(deps);
+    c.onProvisionalEnd('質問'); // gen0
+    calls[0].onFirstAudio(); // committed=トリミ発話中
+    c.onBargeIn('えっとね、'); // 聞かせた分だけ
+    expect(calls[0].signal.aborted).toBe(true); // これ以上喋らせない
+    await flush();
+    expect(commits).toEqual([{ text: '質問', response: { type: 'chat', message: 'えっとね、' } }]);
+    // 後から gen が resolve しても通常コミットしない(bargedIn)。
+    calls[0].resolve(chat('えっとね、続きの全文'));
+    await flush();
+    expect(commits).toHaveLength(1);
+  });
+
+  it('barge-in(生成完了後): 最新 assistant を聞かせた分へ上書きする(Phase B)', async () => {
+    const { deps, calls, commits } = harness();
+    const updates: string[] = [];
+    deps.updateLastAssistant = (t) => updates.push(t);
+    const c = new VoiceTurnCoordinator(deps);
+    c.onProvisionalEnd('質問');
+    calls[0].onFirstAudio();
+    calls[0].resolve(chat('文0文1文2の全文')); // 完了 → 全文コミット
+    await flush();
+    expect(commits).toHaveLength(1);
+    c.onBargeIn('文0文1'); // 再生途中で割り込み(gen は完了済み=null)
+    expect(updates).toEqual(['文0文1']); // 聞かせた分へ上書き
+  });
+
+  it('第一声前(未コミット)の onBargeIn は何もしない', () => {
+    const { deps, calls, commits } = harness();
+    const updates: string[] = [];
+    deps.updateLastAssistant = (t) => updates.push(t);
+    const c = new VoiceTurnCoordinator(deps);
+    c.onProvisionalEnd('質問'); // gen0・未コミット
+    c.onBargeIn('x');
+    expect(calls[0].signal.aborted).toBe(false);
+    expect(commits).toEqual([]);
+    expect(updates).toEqual([]);
+  });
+
+  it('案①(段階②): サイレントキャンセルで窓を短く、早い barge-in で長く、遅い barge-in は中立', () => {
     const { deps, calls } = harness();
     const windows: number[] = [];
     deps.setSilenceWindow = (ms) => windows.push(ms);
     const c = new VoiceTurnCoordinator(deps);
 
-    // ターン1: 第一声前に1回再開(=サイレントキャンセル)してから連結・コミット
-    c.onSpeechStart();
-    c.onSpeechEnd();
+    // サイレントキャンセル(第一声前の再開)→ 窓を短く(初期 500 から STEP_DOWN 縮む)
     c.onProvisionalEnd('A'); // gen0
-    c.onSpeechStart(); // 第一声前に再開 → サイレントキャンセル+1
+    c.onSpeechStart(); // 第一声前に再開 = サイレントキャンセル
     expect(calls[0].signal.aborted).toBe(true);
-    calls[0].reject(new Error('aborted'));
-    await flush();
-    c.onSpeechEnd();
-    c.onProvisionalEnd('B'); // gen1 = 'A B'
-    calls[1].onFirstAudio();
-    calls[1].resolve(chat('x'));
-    await flush();
-    const w1 = windows[windows.length - 1];
-    expect(w1).toBeGreaterThan(450); // キャンセルで広がった
+    const afterCancel = windows[windows.length - 1];
+    expect(afterCancel).toBeLessThan(500);
 
-    // ターン2: キャンセルなしのクリーンなターン → 窓が縮む
-    c.onSpeechStart();
-    c.onSpeechEnd();
-    c.onProvisionalEnd('C'); // gen2
-    calls[2].onFirstAudio();
-    calls[2].resolve(chat('y'));
-    await flush();
-    const w2 = windows[windows.length - 1];
-    expect(w2).toBeLessThan(w1);
+    // 早い barge-in → 窓を長く(STEP_UP は大きいので afterCancel より上)
+    c.onBargeInTiming(true);
+    const afterEarly = windows[windows.length - 1];
+    expect(afterEarly).toBeGreaterThan(afterCancel);
+
+    // 遅い barge-in → 変化なし(setSilenceWindow を呼ばない)
+    const n = windows.length;
+    c.onBargeInTiming(false);
+    expect(windows.length).toBe(n);
   });
 });
 
-describe('adaptWindow (段階② 無音窓の適応・純粋)', () => {
-  it('キャンセル皆無なら基準(450ms)', () => {
-    expect(adaptWindow(0, 0)).toEqual({ ema: 0, windowMs: 450 });
+describe('clampWindow (案① 無音窓のクランプ・純粋)', () => {
+  it('下限 400 / 上限 1200 でクランプ', () => {
+    expect(clampWindow(100)).toBe(400);
+    expect(clampWindow(2000)).toBe(1200);
   });
-
-  it('キャンセルが増えると窓が広がる', () => {
-    const r = adaptWindow(0, 2); // ema=0.6 → 450+250*0.6=600
-    expect(r.ema).toBeCloseTo(0.6, 5);
-    expect(r.windowMs).toBe(600);
-  });
-
-  it('上限 1200ms でクランプ(キャンセル多発)', () => {
-    let ema = 0;
-    for (let i = 0; i < 30; i++) ema = adaptWindow(ema, 5).ema;
-    expect(adaptWindow(ema, 5).windowMs).toBe(1200);
-  });
-
-  it('クリーンなターンが続くと基準へ縮む', () => {
-    let ema = 3; // 高い状態から
-    for (let i = 0; i < 30; i++) ema = adaptWindow(ema, 0).ema;
-    expect(adaptWindow(ema, 0).windowMs).toBe(450);
+  it('範囲内はそのまま(丸め)', () => {
+    expect(clampWindow(600)).toBe(600);
+    expect(clampWindow(523.4)).toBe(523);
   });
 });
