@@ -56,8 +56,11 @@ if (!acquireSingleInstanceLock()) {
 
   // 終了前に記憶抽出 + 短期記憶クリア(設計書 §7.2)。
   // preventDefault して非同期処理を待ってから quit する。
+  // apiKey の有無で終了処理全体を止めない: API 依存の記憶抽出(flushExtraction)は
+  // runShutdownSequence 内で apiKey を見て出し分けるが、短期記憶クリア(clearShortTerm)は
+  // API キーが無くても必ず走らせる(キャンセル経路でも残った短期記憶を残さない)。
   app.on('before-quit', (event) => {
-    if (!shuttingDown && runtime.apiKey) {
+    if (!shuttingDown) {
       event.preventDefault();
       shuttingDown = true;
       void runShutdownSequence(runtime).finally(() => app.quit());

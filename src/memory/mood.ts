@@ -3,6 +3,7 @@ import {
   MOOD_TAU_NEG_DAYS,
   MOOD_FLOOR,
   MOOD_PRIOR_WEIGHT,
+  DAY_MS,
 } from '../shared/constants';
 import type { EpisodicRecord } from '../shared/types/memory';
 
@@ -14,8 +15,6 @@ import type { EpisodicRecord } from '../shared/types/memory';
 //  - canon(provenance:'self')は mood を動かさない(過去の人生記憶が常時心情を支配しない)。
 //  - 中立プライア(MOOD_PRIOR_WEIGHT)で 0 へ縮約 → 沈黙すれば自然に中立へ(古い負で暗転ロックしない)。
 //  - 下限 MOOD_FLOOR(“デレの床”)で暗転ロックを回避(倫理の一線)。
-
-const DAY_MS = 86_400_000;
 
 /**
  * 直近の user episodic から心情(-2..+2 目安)を導出する。now は注入(テスト決定化)。

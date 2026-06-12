@@ -12,6 +12,7 @@ export interface CharacterIdentity {
   birthday?: {
     month: number; // 1-12
     day: number; // 1-31
+    congratsKeywords?: string[]; // 誕生日に「祝われた」と判定する検出語(§4.5 外出し・任意)
   };
   personality: {
     core: string;

@@ -47,13 +47,8 @@ export interface EneAPI {
   // 起動挨拶(pull 方式・1回だけ取得)
   getInitialGreeting(): Promise<string | null>;
 
-  // 設定関連
-  hasApiKey(): Promise<boolean>;
-  saveApiKey(key: string): Promise<void>;
-
   // ウィンドウ操作
   moveWindow(x: number, y: number): Promise<void>;
-  resetWindowPosition(): Promise<void>;
   setIgnoreMouseEvents(ignore: boolean): Promise<void>; // クリックスルー制御(§8.6)
 
   // キャラ右クリックメニュー(main 側でネイティブメニュー表示)
@@ -111,11 +106,9 @@ export interface EneAPI {
 
   // ライフサイクル(main → renderer)
   onAppReady(callback: () => void): void;
-  onError(callback: (error: string) => void): void;
 
   // タスクトレイ/コンテキストメニューからのイベント受信(main → renderer)
   onOpenInputArea(callback: () => void): void;
-  onResetPosition(callback: () => void): void;
 }
 
 declare global {

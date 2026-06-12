@@ -151,11 +151,6 @@ export function getVectorIndexPath(): string {
   return path.join(getMemoryIndexDir(), 'vectors.json');
 }
 
-/** data/memory/{activeCharacterId}/relationships/(人物 gist・予約)。 */
-export function getRelationshipsDir(): string {
-  return path.join(getMemoryDir(), 'relationships');
-}
-
 // --- 同梱キャラ定義(読み取り専用・配布物に含まれる) ---
 
 /** 同梱キャラ定義のルート。dev/prod とも app.getAppPath() 配下の characters/。 */

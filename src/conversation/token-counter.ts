@@ -9,7 +9,6 @@ import type { BuiltPrompt } from '../shared/types/conversation';
 //    ローカルの簡易見積もりでガードレールを実装する(上限は保護目的)。
 //    厳密計測が必要になれば SDK 更新を検討(docs/implementation-notes.md 参照)。
 
-export const TOKEN_TARGET = 20_000;
 export const TOKEN_WARN_LIMIT = 25_000;
 export const TOKEN_HARD_LIMIT = 50_000;
 

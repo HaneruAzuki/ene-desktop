@@ -1,4 +1,4 @@
-import { FAMILIARITY_THRESHOLDS } from '../shared/constants';
+import { FAMILIARITY_THRESHOLDS, DAY_MS } from '../shared/constants';
 import type { RelationshipFacts } from '../shared/types/character';
 
 // 親しさ段階の導出(task_16・開示ゲーティング・design-revision-character-heart §4.2)。
@@ -7,8 +7,6 @@ import type { RelationshipFacts } from '../shared/types/character';
 //  - 経過日数 AND 会話実日数 AND ターン累計の **全部** が閾値を満たした最大段(1..5)。
 //  - 事実は単調増加なので段も**単調非減少**(知り合った仲は戻らない=ドゥームループ無縁)。
 //  - 保存スカラーは持たない。事実(active-character.json の relationship)から毎回導出する。
-
-const DAY_MS = 86_400_000;
 
 /**
  * 関係の事実から familiarityStage(1..5)を導出する。now は注入(テスト決定化)。

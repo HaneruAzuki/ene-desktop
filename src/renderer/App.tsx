@@ -112,9 +112,6 @@ export function App(): React.ReactElement | null {
   // トレイ / コンテキストメニューからのイベント＋マイク入力方式の変更通知
   useEffect(() => {
     window.ene.onOpenInputArea(() => openInput());
-    window.ene.onResetPosition(() => {
-      /* 位置リセットは main 側で実施。 */
-    });
     window.ene.onVoiceInputModeChanged((mode) => applyVoiceInputMode(mode));
   }, []);
 
@@ -189,6 +186,15 @@ export function App(): React.ReactElement | null {
     // 吹き出しは文の再生に同期して伸ばす(setSentenceHandler)ので、ここでは**全文をセットしない**(表情/口パクのみ)。
     window.ene.onVoiceResponse((response) => applyResponseUI(response, false));
     window.ene.onVoiceBargeIn(() => handleBargeIn());
+  }, []);
+
+  // アンマウント時に走らせっぱなしのタイマーを止める(口パク終了の talkingTimer・VRM 保存デバウンスの
+  // vrmSaveTimer)。アンマウント後の setState/IPC を防ぐ(リーク防止)。
+  useEffect(() => {
+    return () => {
+      if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
+      if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
+    };
   }, []);
 
   // 入力欄を開いた瞬間に Tier0 キャッシュを温める(task_14 Phase 3)。

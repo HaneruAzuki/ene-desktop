@@ -48,15 +48,20 @@ export function validateVrmConfig(raw: unknown): VrmConfig | null {
   };
 }
 
-/** vrm.json を読み込む。無ければ null(フォールバック)。 */
+// vrm.json は配布物の静的アセット(実行中に変わらない)。get-vrm-config と get-character-model の
+// 二重読みを避けるため characterId 単位でメモ化する(柱4・軽量原則)。
+const vrmConfigCache = new Map<string, VrmConfig | null>();
+
+/** vrm.json を読み込む(メモ化)。無ければ/不正なら null(フォールバック)。 */
 export async function loadVrmConfig(characterId: string): Promise<VrmConfig | null> {
+  const cached = vrmConfigCache.get(characterId);
+  if (cached !== undefined) return cached;
   const raw = await readJson<unknown>(getVrmConfigPath(characterId));
-  if (raw === null) return null;
-  const validated = validateVrmConfig(raw);
-  if (!validated) {
+  const validated = raw === null ? null : validateVrmConfig(raw);
+  if (raw !== null && !validated) {
     log.warn(`vrm.json invalid for ${characterId}; falling back to portrait`);
-    return null;
   }
+  vrmConfigCache.set(characterId, validated);
   return validated;
 }
 

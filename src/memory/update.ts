@@ -26,6 +26,13 @@ export async function applyCorrections(
 
   for (const c of corrections) {
     if (!c.targetFile) continue;
+    // セキュリティ:targetFile は LLM 由来。パストラバーサル(".." 含み)は episodic.ts の
+    // resolveEpisodicPath が throw するが、ここで先に弾いて best-effort のループを止めない
+    // (1件の悪意ある targetFile が他の正当な correction を巻き込まないようにする)。
+    if (c.targetFile.split(/[\\/]/).includes('..')) {
+      log.warn(`correction skipped: invalid targetFile (path traversal)`);
+      continue;
+    }
     const target = await loadEpisodicById(c.targetFile);
     if (!target) {
       log.warn(`correction target not found: kind=${c.kind}`);

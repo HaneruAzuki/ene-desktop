@@ -64,29 +64,6 @@ export interface SemanticMemory {
 }
 
 /**
- * 人物 gist 層(器のみ予約・design-revision-memory-v2 §1.2)。
- * 中身は将来の Reflection/統合処理が埋める。0.3 初期は未使用。
- */
-export interface RelationshipMemory {
-  schemaVersion: number;
-  canonical: string; // 正規名(エンティティ正規レジストリ兼用)
-  aliases?: string[]; // 表記ゆれ・人物分裂/統合の管理
-  gist: string; // 質的記述(数値なし)
-  importance: number; // 関係の重み(忘却優先度)
-  updatedAt: string; // ISO8601
-}
-
-/** Episodic 検索クエリ(明示フィルタ用・MVP: タグ/カテゴリ/重要度/年範囲)。 */
-export interface MemorySearchQuery {
-  tags?: string[];
-  category?: string;
-  minImportance?: number;
-  yearFrom?: number;
-  yearTo?: number;
-  limit?: number; // デフォルト 5
-}
-
-/**
  * 想起クエリ(会話時の既定想起・Router 非依存・design-revision-memory-v2 §1.5)。
  * ユーザー発言(text)を引き金に全件横断で引く。
  */
@@ -95,14 +72,6 @@ export interface RetrievalQuery {
   entities?: string[]; // 抽出済み人物等(任意)
   limit?: number; // 既定 5
   category?: string; // 任意の補助フィルタ(通常未指定＝全件横断)
-}
-
-/**
- * 想起の抽象(§4.4 疎結合)。内部実装(語彙→ハイブリッド→ベクトル)を差し替えても
- * Conversation Layer は無改修。
- */
-export interface MemoryRetriever {
-  retrieve(query: RetrievalQuery): Promise<EpisodicMemory[]>;
 }
 
 /** レイヤー間で受け渡す記憶コンテキスト。 */

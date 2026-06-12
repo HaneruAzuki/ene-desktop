@@ -7,6 +7,7 @@ import {
   IMPORTANCE_DEFAULT,
 } from '../shared/constants';
 import { validateSemanticPatch } from './schema-validation';
+import { extractJsonObject, toStringArray } from '../shared/llm-parse';
 import type {
   Correction,
   EpisodicMemory,
@@ -66,24 +67,6 @@ const EXTRACTION_SYSTEM = [
   '- 確信が持てない場合は corrections を出さない(空配列か省略)。推測で過去を書き換えない。',
 ].join('\n');
 
-/** コードフェンス・前後テキストを除去して最初の JSON オブジェクトを抽出・パースする。 */
-function parseJsonObject(raw: string): Record<string, unknown> | null {
-  let text = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-  const first = text.indexOf('{');
-  const last = text.lastIndexOf('}');
-  if (first === -1 || last === -1 || last < first) return null;
-  text = text.slice(first, last + 1);
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as Record<string, unknown>;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 function clampImportance(v: unknown): number {
   const n = typeof v === 'number' ? Math.round(v) : NaN;
   if (Number.isNaN(n)) return IMPORTANCE_DEFAULT;
@@ -97,10 +80,6 @@ function clampValence(v: unknown): number {
   return Math.min(2, Math.max(-2, n));
 }
 
-function stringArray(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-}
-
 function normalizeEpisodic(raw: Record<string, unknown>): EpisodicMemory {
   const summary = typeof raw.summary === 'string' ? raw.summary : '';
   return {
@@ -109,8 +88,8 @@ function normalizeEpisodic(raw: Record<string, unknown>): EpisodicMemory {
     date: nowLocalIso(),
     topic: typeof raw.topic === 'string' ? raw.topic : '',
     summary: summary.slice(0, EPISODIC_SUMMARY_MAX_CHARS),
-    tags: stringArray(raw.tags),
-    entities: stringArray(raw.entities),
+    tags: toStringArray(raw.tags),
+    entities: toStringArray(raw.entities),
     importance: clampImportance(raw.importance),
     category: typeof raw.category === 'string' && raw.category.length > 0 ? raw.category : 'general',
     valence: clampValence(raw.valence),
@@ -132,7 +111,7 @@ function normalizeCorrections(raw: unknown): Correction[] {
       kind: kind as Correction['kind'],
     };
     if (typeof c.newSummary === 'string') correction.newSummary = c.newSummary;
-    if (Array.isArray(c.newEntities)) correction.newEntities = stringArray(c.newEntities);
+    if (Array.isArray(c.newEntities)) correction.newEntities = toStringArray(c.newEntities);
     if (typeof c.reason === 'string') correction.reason = c.reason;
     out.push(correction);
   }
@@ -168,8 +147,10 @@ export async function extractMemoryFromConversation(
     return {};
   }
 
-  const parsed = parseJsonObject(raw);
-  if (!parsed) return {};
+  // コードフェンス・前後テキストを除去して最初の JSON オブジェクトを抽出・パースする。
+  const extracted = extractJsonObject(raw);
+  if (typeof extracted !== 'object' || extracted === null) return {};
+  const parsed = extracted as Record<string, unknown>;
 
   const result: ExtractionResult = {};
   if (parsed.episodic && typeof parsed.episodic === 'object' && !Array.isArray(parsed.episodic)) {

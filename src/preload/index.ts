@@ -17,10 +17,7 @@ const eneAPI: EneAPI = {
     ipcRenderer.on('ene:window-visibility', (_event, visible: boolean) => cb(visible));
   },
   getInitialGreeting: () => ipcRenderer.invoke('ene:get-initial-greeting'),
-  hasApiKey: () => ipcRenderer.invoke('ene:has-api-key'),
-  saveApiKey: (key) => ipcRenderer.invoke('ene:save-api-key', key),
   moveWindow: (x, y) => ipcRenderer.invoke('ene:move-window', x, y),
-  resetWindowPosition: () => ipcRenderer.invoke('ene:reset-window-position'),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke('ene:set-ignore-mouse-events', ignore),
   showCharacterContextMenu: () => ipcRenderer.invoke('ene:show-character-context-menu'),
   warmCache: () => ipcRenderer.invoke('ene:warm-cache'),
@@ -82,14 +79,10 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:app-ready');
     ipcRenderer.on('ene:app-ready', () => cb());
   },
-  onError: (cb) => {
-    ipcRenderer.on('ene:error', (_event, error: string) => cb(error));
-  },
   onOpenInputArea: (cb) => {
+    // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:open-input-area');
     ipcRenderer.on('ene:open-input-area', () => cb());
-  },
-  onResetPosition: (cb) => {
-    ipcRenderer.on('ene:reset-position', () => cb());
   },
 };
 

@@ -16,7 +16,6 @@ import {
   loadEpisodicById,
   updateEpisodicById,
   loadAllEpisodicFiles,
-  searchEpisodic,
   episodicId,
   migrateEpisodic,
 } from '../../src/memory/episodic';
@@ -87,14 +86,5 @@ describe('episodic v2 (design-revision-memory-v2)', () => {
 
   it('updateEpisodicById は存在しない ID では何もしない(例外を投げない)', async () => {
     await expect(updateEpisodicById('2099/none/x.json', { summary: 'y' })).resolves.toBeUndefined();
-  });
-
-  it('searchEpisodic は supersededBy を持つ記録を除外する(current ビュー)', async () => {
-    const oldId = await saveEpisodic(mem({ date: '2026-02-01T00:00:00+09:00', topic: 'old', tags: ['z'] }));
-    await saveEpisodic(mem({ date: '2026-02-02T00:00:00+09:00', topic: 'new', tags: ['z'] }));
-    await updateEpisodicById(oldId, { supersededBy: '2026/general/2026-02-02T00-00-00.json' });
-
-    const found = await searchEpisodic({ tags: ['z'] });
-    expect(found.map((m) => m.topic)).toEqual(['new']);
   });
 });

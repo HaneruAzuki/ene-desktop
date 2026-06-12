@@ -25,8 +25,7 @@ import { recordBirthdayCelebrated, recordConversationTurn } from '../character/a
 import { loadAnimationData } from '../character/animation-loader';
 import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../character/vrm-loader';
 import { loadAppSettings, saveVrmDisplay } from '../storage/app-settings';
-import { isApiKeyAvailable, encryptAndSaveApiKey } from '../storage/encryption';
-import { saveWindowPosition, resetToDefaultPosition } from './window-position';
+import { saveWindowPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
 import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse, streamVoiceChat } from './voice-runtime';
@@ -210,8 +209,9 @@ async function commitTurn(
 
   // 7. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)。
   if (runtime.charContext?.birthdayHint === 'today') {
-    const congrats = ['誕生日', 'おめでとう', 'ハッピーバースデー', 'Happy Birthday', 'バースデー'];
-    if (congrats.some((w) => text.includes(w))) {
+    // 検出語は identity.json に外出し(§4.5・ハードコード禁止)。未定義なら祝い検出はしない。
+    const keywords = runtime.charContext.identity.birthday?.congratsKeywords ?? [];
+    if (keywords.some((w) => text.includes(w))) {
       await recordBirthdayCelebrated(todayLocalYmd().year);
     }
   }
@@ -397,22 +397,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // 起動準備の完了状態(renderer の初期表示用・pull)。完了通知は ene:app-ready(push)で送る。
   ipcMain.handle('ene:is-ready', async (): Promise<boolean> => runtime.ready);
 
-  ipcMain.handle('ene:has-api-key', async (): Promise<boolean> => isApiKeyAvailable());
-
-  ipcMain.handle('ene:save-api-key', async (_event, key: string): Promise<void> => {
-    // 形式検証・疎通テストはダイアログ側(task_09)で行う。ここは保存のみ。
-    await encryptAndSaveApiKey(key);
-    runtime.apiKey = key;
-  });
-
   ipcMain.handle('ene:move-window', async (_event, x: number, y: number): Promise<void> => {
     mainWindow.setBounds({ x, y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
     // ドラッグ中の連続呼び出しに備え、保存はデバウンスする。
     debouncedSavePosition(x, y);
-  });
-
-  ipcMain.handle('ene:reset-window-position', async (): Promise<void> => {
-    resetToDefaultPosition(mainWindow);
   });
 
   ipcMain.handle('ene:set-ignore-mouse-events', async (_event, ignore: boolean): Promise<void> => {

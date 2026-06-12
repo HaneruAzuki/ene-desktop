@@ -14,7 +14,8 @@ export async function getSemantic(): Promise<SemanticMemory> {
   return validateSemantic(raw);
 }
 
-export async function saveSemantic(memory: SemanticMemory): Promise<void> {
+// updateSemantic からのみ呼ぶ内部関数(外部公開しない・保存前検証を一元化するため)。
+async function saveSemantic(memory: SemanticMemory): Promise<void> {
   // 保存前に必ずスキーマ検証(CLAUDE §7.3)。
   await writeJson(getSemanticPath(), validateSemantic(memory));
 }

@@ -10,7 +10,11 @@ vi.mock('../../src/storage/paths', () => ({
     `${h.memDir}/episodic/${year}/${category}`,
 }));
 
-import { saveEpisodic, searchEpisodic } from '../../src/memory/episodic';
+import {
+  saveEpisodic,
+  loadEpisodicById,
+  updateEpisodicById,
+} from '../../src/memory/episodic';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {
@@ -41,23 +45,27 @@ describe('episodic (設計書 §3.3 / §5.2)', () => {
     expect(files).toContain('2026-05-10T17-30-00.json');
   });
 
-  it('searchEpisodic はタグ/カテゴリ/重要度/年でフィルタし importance 降順で返す', async () => {
-    await saveEpisodic(mem({ date: '2026-01-01T00:00:00+09:00', topic: 'a', tags: ['x'], importance: 2, category: 'work' }));
-    await saveEpisodic(mem({ date: '2026-01-02T00:00:00+09:00', topic: 'b', tags: ['y'], importance: 5, category: 'work' }));
-    await saveEpisodic(mem({ date: '2025-01-01T00:00:00+09:00', topic: 'c', tags: ['x'], importance: 3, category: 'health' }));
-
-    expect((await searchEpisodic({ tags: ['x'] })).map((m) => m.topic)).toEqual(['c', 'a']);
-    expect((await searchEpisodic({ category: 'work' })).map((m) => m.topic)).toEqual(['b', 'a']);
-    expect((await searchEpisodic({ minImportance: 3 })).map((m) => m.topic)).toEqual(['b', 'c']);
-    expect((await searchEpisodic({ yearFrom: 2025, yearTo: 2025 })).map((m) => m.topic)).toEqual(['c']);
+  it('正当な ID は通常どおり読み書きできる(ガードが正常系を壊さない)', async () => {
+    const id = await saveEpisodic(
+      mem({ date: '2026-05-10T17:30:00+09:00', topic: '健康', category: 'daily' }),
+    );
+    expect(id).toBe('2026/daily/2026-05-10T17-30-00.json');
+    await updateEpisodicById(id, { summary: '更新' });
+    expect((await loadEpisodicById(id))?.summary).toBe('更新');
   });
 
-  it('デフォルト limit は 5', async () => {
-    for (let i = 0; i < 7; i++) {
-      await saveEpisodic(
-        mem({ date: `2026-03-0${i + 1}T00:00:00+09:00`, topic: `t${i}`, tags: ['z'], importance: 1, category: 'general' }),
-      );
+  it('パストラバーサルする ID(../, ..\\, 絶対パス)は拒否する(脱出防止)', async () => {
+    // resolveEpisodicPath は読み書きの両経路で呼ばれるため、いずれの入口でも throw する。
+    const traversals = [
+      '../../etc/passwd',
+      '..\\..\\windows\\system32',
+      '2026/../../escape.json',
+      'C:\\Windows\\system.json',
+      '/etc/passwd',
+    ];
+    for (const bad of traversals) {
+      await expect(loadEpisodicById(bad)).rejects.toThrow();
+      await expect(updateEpisodicById(bad, { summary: 'x' })).rejects.toThrow();
     }
-    expect((await searchEpisodic({ tags: ['z'] })).length).toBe(5);
   });
 });

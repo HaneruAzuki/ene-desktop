@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripRuby, rubyToReading, hasRuby } from '../../src/conversation/ruby';
+import { stripRuby, rubyToReading } from '../../src/conversation/ruby';
 
 // 青空文庫式ルビの解決(Claude振り仮名方式)。
 
@@ -22,7 +22,6 @@ describe('ruby (Claude振り仮名)', () => {
     const s = 'やあ、元気?';
     expect(stripRuby(s)).toBe(s);
     expect(rubyToReading(s)).toBe(s);
-    expect(hasRuby(s)).toBe(false);
   });
 
   it('｜で基底の先頭を明示できる', () => {
@@ -35,10 +34,5 @@ describe('ruby (Claude振り仮名)', () => {
     const s = '今日は3冊《さんさつ》読んだ';
     expect(stripRuby(s)).toBe('今日は3冊読んだ');
     expect(rubyToReading(s)).toBe('今日はさんさつ読んだ');
-  });
-
-  it('hasRuby はルビの有無を判定する', () => {
-    expect(hasRuby(EXAMPLE)).toBe(true);
-    expect(hasRuby('ルビなし')).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getErrorMessage } from '../../src/main/api-key-error-messages';
+import { getErrorMessage } from '../../src/shared/api-key-error-messages';
 
 describe('getErrorMessage (設計書 §3.7)', () => {
   it('auth は「APIキーが無効」を含む', () => {

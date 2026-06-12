@@ -1,9 +1,9 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, isAbsolute } from 'node:path';
 import { getMemoryDir } from '../storage/paths';
 import { readJson, writeJson, listJsonFiles } from '../storage/json-store';
-import { DEFAULT_EPISODIC_SEARCH_LIMIT, EPISODIC_SCHEMA_VERSION } from '../shared/constants';
-import type { EpisodicMemory, EpisodicRecord, MemorySearchQuery } from '../shared/types/memory';
+import { EPISODIC_SCHEMA_VERSION } from '../shared/constants';
+import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
 
 // 中期記憶(Episodic・設計書 §3.3 / §5.2 / design-revision-memory-v2)。
 // 出来事・事実の要約をファイル単位で保存。ファイルパスが一意 ID を兼ねる(別フィールドを持たない)。
@@ -28,9 +28,44 @@ export function episodicId(memory: EpisodicMemory): string {
   return `${yearOf(memory.date)}/${memory.category}/${isoToFilename(memory.date)}.json`;
 }
 
-/** 相対 ID を絶対パスへ解決する。 */
+/**
+ * 相対 ID を絶対パスへ解決する。
+ *
+ * セキュリティ:id は LLM 由来の targetFile/category を含みうる(update.ts 経由)。
+ * パストラバーサル(`../` で episodic ルート外へ脱出)を厳格に拒否する。
+ * 方針は src/os/validators.ts validatePath と同様(resolve→relative→境界判定)。
+ *  1. 区切りで割って ".." セグメントを含むなら即拒否(`../`・`..\\` 両対応)。
+ *  2. 各セグメントが絶対パス断片なら拒否(`C:\\...` や `/etc` の埋め込みを弾く)。
+ *  3. 解決後に root からの相対が ".." 始まり or 絶対なら拒否(境界の最終確認)。
+ * 正当な ID(例 "2026/daily/2026-05-10T....json")はそのまま通る。
+ */
 function resolveEpisodicPath(id: string): string {
-  return join(getMemoryDir(), 'episodic', ...id.split('/'));
+  const root = join(getMemoryDir(), 'episodic');
+  // 0. id 全体が絶対パスなら拒否。Windows では先頭 "/" 始まりも isAbsolute=true で、
+  //    join するとルート配下に化けて境界チェックをすり抜けるため、ここで先に弾く
+  //    ("/etc/passwd" や "C:\\..." を無効化)。
+  if (isAbsolute(id)) {
+    throw new Error(`不正な episodic ID(絶対パス): ${id}`);
+  }
+  // 区切りは "/"(可搬性のため常に "/")だが、念のため "\\" も割って検査する。
+  const segments = id.split(/[\\/]/);
+  for (const seg of segments) {
+    // 1. ".." セグメント(脱出の主経路)を拒否。
+    if (seg === '..') {
+      throw new Error(`不正な episodic ID(パストラバーサル): ${id}`);
+    }
+    // 2. 絶対パス断片(ドライブレター埋め込み等)を拒否。
+    if (isAbsolute(seg)) {
+      throw new Error(`不正な episodic ID(絶対パス埋め込み): ${id}`);
+    }
+  }
+  const resolved = join(root, ...segments);
+  // 3. 解決後の境界チェック(validatePath と同手法・最終防衛線)。
+  const rel = relative(root, resolved);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(`不正な episodic ID(ルート外への脱出): ${id}`);
+  }
+  return resolved;
 }
 
 /**
@@ -108,32 +143,4 @@ export async function loadAllEpisodicFiles(): Promise<EpisodicRecord[]> {
     throw e;
   }
   return out;
-}
-
-/**
- * 明示フィルタ検索(タグ/カテゴリ/重要度/年)。会話時の既定想起は retriever に移行したが、
- * 明示条件での検索用途に存続(§11.4 整合)。supersededBy を持つ古い記録は既定で除外(current ビュー)。
- */
-export async function searchEpisodic(query: MemorySearchQuery): Promise<EpisodicMemory[]> {
-  const all = await loadAllEpisodicFiles();
-  const limit = query.limit ?? DEFAULT_EPISODIC_SEARCH_LIMIT;
-
-  const filtered = all
-    .map((r) => r.memory)
-    .filter((m) => {
-      if (m.supersededBy) return false; // 古い記録は current ビューから除外
-      if (query.tags && query.tags.length > 0) {
-        if (!query.tags.some((t) => m.tags?.includes(t))) return false;
-      }
-      if (query.category !== undefined && m.category !== query.category) return false;
-      if (query.minImportance !== undefined && m.importance < query.minImportance) return false;
-      const y = yearOf(m.date);
-      if (query.yearFrom !== undefined && y < query.yearFrom) return false;
-      if (query.yearTo !== undefined && y > query.yearTo) return false;
-      return true;
-    });
-
-  // importance 降順(同値は元の順序を維持)
-  filtered.sort((a, b) => b.importance - a.importance);
-  return filtered.slice(0, limit);
 }

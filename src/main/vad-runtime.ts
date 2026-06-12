@@ -3,7 +3,6 @@ import { performance } from 'node:perf_hooks';
 import { log } from '../shared/logger';
 import { SileroVad } from '../conversation/silero-vad';
 import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../conversation/vad-segmenter';
-import { frameRms } from '../conversation/backchannel-engine';
 import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
 import { turnNodStrength } from '../conversation/turn-nod';
 import type { BackchannelController } from './backchannel-controller';
@@ -60,16 +59,6 @@ export class VadRuntime {
   private lastSpeechEndAt = 0; // 直近の speech-end の時刻(案①: barge-in の早い/遅い分類=無音開始からの経過)
   private recorded: Float32Array[] = [];
   private ring: Float32Array[] = []; // 直近フレーム(先読みパディング用)
-
-  // 取り込み診断(ENE_VAD_DEBUG=1・分断原因の切り分け・一時)。
-  // 仮説: ScriptProcessorNode(512)が会話負荷でアンダーラン→ゼロ埋め(無音)の隙間→VADが終話誤確定。
-  // zeroRms=取り込みがゼロ埋めしたフレーム数 / maxArrivalGap・stalls=メインスレッド停滞の指標。
-  private readonly vadDebug = process.env['ENE_VAD_DEBUG'] === '1';
-  private lastFrameAt = 0;
-  private dbgFrames = 0;
-  private dbgZeroFrames = 0;
-  private dbgMaxGapMs = 0;
-  private dbgGapStalls = 0; // 到着間隔が 64ms(=2フレーム)超だった回数
 
   // 相槌(task_18 Phase B・任意)。ユーザ発話中の言いよどみで相槌を打つ。
   // listenOnly: 相槌テスト用(env ENE_LISTEN_ONLY=1)。ターン終了時に文字起こし・応答(Claude/記憶)を
@@ -148,17 +137,6 @@ export class VadRuntime {
       if (this.ring.length > PREROLL_FRAMES) this.ring.shift();
       if (this.recording) {
         this.recorded.push(frame);
-        if (this.vadDebug) {
-          const now = performance.now();
-          if (this.lastFrameAt) {
-            const gap = now - this.lastFrameAt;
-            if (gap > this.dbgMaxGapMs) this.dbgMaxGapMs = gap;
-            if (gap > 64) this.dbgGapStalls++;
-          }
-          this.lastFrameAt = now;
-          this.dbgFrames++;
-          if (frameRms(frame) < 1e-4) this.dbgZeroFrames++; // ≈0 = 取り込みのゼロ埋め(無音)疑い
-        }
         if (this.recorded.length > MAX_RECORD_FRAMES) this.endTurn(); // 暴走打ち切り
       }
 
@@ -194,13 +172,6 @@ export class VadRuntime {
     if (this.recording) return;
     this.recording = true;
     this.recorded = [...this.ring]; // 先読みパディング込みで開始
-    if (this.vadDebug) {
-      this.dbgFrames = 0;
-      this.dbgZeroFrames = 0;
-      this.dbgMaxGapMs = 0;
-      this.dbgGapStalls = 0;
-      this.lastFrameAt = 0;
-    }
     this.sendState('recording');
   }
 
@@ -223,13 +194,6 @@ export class VadRuntime {
     const nodStrength = turnNodStrength(speechMs);
     log.info(`turn nod (speech=${Math.round(speechMs)}ms strength=${nodStrength})`);
     this.send('ene:turn-nod', nodStrength);
-    if (this.vadDebug) {
-      // 分断原因の切り分け: zeroRms が多い/maxArrivalGap が大きいなら取り込み(ScriptProcessor)が犯人。
-      log.info(
-        `vad capture: frames=${this.dbgFrames} zeroRms=${this.dbgZeroFrames} ` +
-          `maxArrivalGap=${Math.round(this.dbgMaxGapMs)}ms stalls(>64ms)=${this.dbgGapStalls}`,
-      );
-    }
     this.backchannel?.reset(); // ターン終了=次の発話は相槌カウンタを 0 から
     if (this.listenOnly) {
       // 相槌テスト: 文字起こし・応答(Claude/記憶=レイテンシ源)をスキップし聞き取りに戻る。

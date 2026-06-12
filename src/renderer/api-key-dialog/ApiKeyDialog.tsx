@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getErrorMessage } from '../../main/api-key-error-messages';
+import { getErrorMessage } from '../../shared/api-key-error-messages';
 
 // APIキー管理ダイアログ UI(設計書 §3.7)。
 // 形式検証は同期(インライン)、疎通テスト・保存は window.eneApiKey 経由(main)。

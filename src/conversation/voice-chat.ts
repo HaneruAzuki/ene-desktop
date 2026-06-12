@@ -1,4 +1,4 @@
-import { createVoiceStreamParser, type VoiceStreamParser } from './stream-parser';
+import { createJsonStreamParser, type VoiceStreamParser } from './json-stream-parser';
 import { splitSentences } from './sentence-splitter';
 import { detectAiSelfReference } from './ai-self-check';
 import { stripRuby, rubyToReading } from './ruby';
@@ -9,7 +9,7 @@ import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 
 // 音声会話のストリーミング統合(task_17 C1/C2 / design-revision-voice §2,§3)。
 //
-// Claude のストリーム → stream-parser → C2 文単位ゲート → TtsEngine.speak → 再生。
+// Claude のストリーム → json-stream-parser → C2 文単位ゲート → TtsEngine.speak → 再生。
 // モデルストリーム・TTS・再生・表情反映は DI(実 API/実エンジンなしで検証可・§4.4)。
 
 /** モデルのテキストデルタを順次 yield するストリーム(実装は Claude streaming を注入)。 */
@@ -31,7 +31,7 @@ export interface VoiceChatDeps {
   onAudio: (wav: ArrayBuffer, text: string) => void;
   /** emotion 確定時に表情/スタイルへ反映(任意)。 */
   onEmotion?: (emotion: EmotionLabel) => void;
-  /** ストリーム書式パーサの生成(既定=bracket 形式。JSON ストリーミングは createJsonStreamParser を渡す)。 */
+  /** ストリーム書式パーサの生成(既定=JSON 形式 createJsonStreamParser)。 */
   makeParser?: () => VoiceStreamParser;
   /** 中断シグナル(コアレッシングの投機キャンセル)。abort されたら**それ以上音声を出さず**打ち切る。 */
   signal?: AbortSignal;
@@ -52,7 +52,7 @@ export async function runVoiceChat(
   stream: ModelStream,
   deps: VoiceChatDeps,
 ): Promise<VoiceChatResult> {
-  const parser = (deps.makeParser ?? createVoiceStreamParser)();
+  const parser = (deps.makeParser ?? createJsonStreamParser)();
   let emotion: EmotionLabel = 'neutral';
   let emotionEmitted = false;
   const spoken: string[] = [];

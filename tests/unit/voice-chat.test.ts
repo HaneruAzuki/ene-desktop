@@ -38,13 +38,17 @@ describe('runVoiceChat', () => {
     const onAudio = vi.fn();
     const onEmotion = vi.fn();
 
-    const result = await runVoiceChat(streamOf(['[[emotion:joy]]', 'やあ。', '元気？']), {
-      tts,
-      voiceConfig: config,
-      neverCallsSelf: ['AI'],
-      onAudio,
-      onEmotion,
-    });
+    // 既定の JSON ストリーミングパーサ(createJsonStreamParser)経路を検証する。
+    const result = await runVoiceChat(
+      streamOf(['{"type":"chat","emotion":"joy","message":"やあ。元気？"}']),
+      {
+        tts,
+        voiceConfig: config,
+        neverCallsSelf: ['AI'],
+        onAudio,
+        onEmotion,
+      },
+    );
 
     expect(result.emotion).toBe('joy');
     expect(result.spokenText).toBe('やあ。元気？');
@@ -62,7 +66,7 @@ describe('runVoiceChat', () => {
     const onAudio = vi.fn();
 
     const result = await runVoiceChat(
-      streamOf(['[[emotion:neutral]]', '私はAIです。', 'よろしく。']),
+      streamOf(['{"type":"chat","emotion":"neutral","message":"私はAIです。よろしく。"}']),
       { tts, voiceConfig: config, neverCallsSelf: ['AI'], onAudio },
     );
 
@@ -72,9 +76,9 @@ describe('runVoiceChat', () => {
     expect(onAudio).not.toHaveBeenCalled();
   });
 
-  it('emotion sentinel が無ければ neutral で発話する', async () => {
+  it('emotion 指定が無ければ neutral で発話する', async () => {
     const { tts, calls } = recordingTts();
-    const result = await runVoiceChat(streamOf(['こんにちは。']), {
+    const result = await runVoiceChat(streamOf(['{"type":"chat","message":"こんにちは。"}']), {
       tts,
       voiceConfig: config,
       neverCallsSelf: [],
@@ -87,7 +91,9 @@ describe('runVoiceChat', () => {
   it('末尾 os_command は喋り終わり後に command として返る', async () => {
     const { tts } = recordingTts();
     const result = await runVoiceChat(
-      streamOf(['[[emotion:neutral]]開くね。[[os_command:{"action":"open_notepad"}]]']),
+      streamOf([
+        '{"type":"os_command","emotion":"neutral","message":"開くね。","command":{"action":"open_notepad"}}',
+      ]),
       { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} },
     );
     expect(result.spokenText).toBe('開くね。');

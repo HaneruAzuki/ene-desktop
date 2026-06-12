@@ -5,11 +5,6 @@ import { openApiKeyDialog } from './api-key-dialog';
 // APIキー失効時の自動再表示(設計書 §6.1)。
 // 401/402/429 を検知したら API キーダイアログを再表示する。
 
-export function isAuthError(error: unknown): boolean {
-  const e = error as { status?: number };
-  return e?.status === 401 || e?.status === 402 || e?.status === 429;
-}
-
 export async function handleApiAuthError(
   error: unknown,
   parent?: BrowserWindow,

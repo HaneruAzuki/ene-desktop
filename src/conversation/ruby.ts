@@ -31,8 +31,3 @@ export function rubyToReading(message: string): string {
     .replace(/《[^《》]*》/g, '') // 取り残し《よみ》は除去(基底はそのまま=エンジン辞書に委ねる)
     .replace(/｜/g, '');
 }
-
-/** ルビ注釈(《…》）を含むか。 */
-export function hasRuby(message: string): boolean {
-  return /《[^《》]*》/.test(message);
-}

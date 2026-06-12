@@ -61,11 +61,4 @@ export class SileroVad {
     this.c = Float32Array.from(out.cn.data as Float32Array);
     return (out.output.data as Float32Array)[0];
   }
-
-  async dispose(): Promise<void> {
-    if (this.session) {
-      await this.session.release();
-      this.session = null;
-    }
-  }
 }

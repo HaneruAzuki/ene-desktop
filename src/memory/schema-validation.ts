@@ -22,7 +22,7 @@ function isStringRecord(v: unknown): v is Record<string, string> {
   );
 }
 
-export function isExtraValue(v: unknown): v is ExtraValue {
+function isExtraValue(v: unknown): v is ExtraValue {
   return (
     typeof v === 'string' ||
     typeof v === 'number' ||

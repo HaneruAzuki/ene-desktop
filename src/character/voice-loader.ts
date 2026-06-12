@@ -10,6 +10,27 @@ import type { TtsOptions, VoiceConfig, VoiceStyleParams } from '../shared/types/
 
 const NUMERIC_KEYS = ['speedScale', 'intonationScale', 'tempoDynamicsScale', 'volumeScale'] as const;
 
+// baseUrl は後段の TTS クライアントが HTTP リクエスト先に使う(ローカル AivisSpeech サイドカー)。
+// 検証なしだと file:/javascript:/smb: 等のスキームや不正文字列が通り SSRF 面になる(公開前監査の指摘)。
+// http/https かつホスト名を持つ整形式 URL のみ許可する(localhost / 127.0.0.1 は当然通す)。
+const ALLOWED_BASE_URL_PROTOCOLS = ['http:', 'https:'] as const;
+
+/** baseUrl が http/https かつホスト名を持つ整形式 URL なら true。それ以外(他スキーム・不正)は false。 */
+function isValidBaseUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    // new URL() が投げる = 整形式でない(相対 URL や空文字含む)。
+    return false;
+  }
+  if (!ALLOWED_BASE_URL_PROTOCOLS.includes(url.protocol as (typeof ALLOWED_BASE_URL_PROTOCOLS)[number])) {
+    return false;
+  }
+  // ホスト名が無い URL(例:file:///path は hostname が空)を弾く。
+  return url.hostname.length > 0;
+}
+
 /** 1スタイルを検証(styleId 必須・他の数値パラメータは任意)。不正なら null。 */
 function validateStyle(raw: unknown): VoiceStyleParams | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -28,6 +49,8 @@ export function validateVoiceConfig(raw: unknown): VoiceConfig | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const o = raw as Record<string, unknown>;
   if (typeof o.engine !== 'string' || typeof o.baseUrl !== 'string') return null;
+  // baseUrl は http/https の整形式 URL のみ許可(他スキーム・不正は拒否=他の不正フィールドと同様 null へ)。
+  if (!isValidBaseUrl(o.baseUrl)) return null;
   if (typeof o.styles !== 'object' || o.styles === null) return null;
 
   const styles: Partial<Record<EmotionLabel, VoiceStyleParams>> = {};

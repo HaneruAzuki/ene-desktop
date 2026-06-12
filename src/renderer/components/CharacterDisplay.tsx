@@ -60,6 +60,9 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     const stateRef = useRef(state);
     const rafRef = useRef<number | null>(null);
     const pendingPosRef = useRef<{ x: number; y: number } | null>(null);
+    // ドラッグ中(押下中)に window へ張った mousemove/mouseup ハンドラ。アンマウント時に確実に外すため保持する
+    // (通常は mouseup 内で外れるが、ドラッグ途中のアンマウントでは外れず漏れる)。
+    const dragHandlersRef = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
 
     // 口パク(PNG モードの talking 中のみ開閉トグル)。
     const [flapOpen, setFlapOpen] = useState(false);
@@ -257,15 +260,34 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
       const onUp = (): void => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        dragHandlersRef.current = null;
         if (press.isDragging) rendererRef.current?.setDragging(false);
         const gesture = classifyGesture(Date.now() - press.startTime, press.isDragging);
         if (gesture === 'click') {
           onClickRef.current();
         }
       };
+      dragHandlersRef.current = { move: onMove, up: onUp };
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     }
+
+    // アンマウント時のクリーンアップ: ドラッグ途中(mouseup 未到来)でも window リスナーを外し、
+    // 予約済みの位置反映 rAF をキャンセルする(リーク防止)。
+    useEffect(() => {
+      return () => {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        const handlers = dragHandlersRef.current;
+        if (handlers) {
+          window.removeEventListener('mousemove', handlers.move);
+          window.removeEventListener('mouseup', handlers.up);
+          dragHandlersRef.current = null;
+        }
+      };
+    }, []);
 
     function onContextMenu(e: React.MouseEvent): void {
       e.preventDefault();

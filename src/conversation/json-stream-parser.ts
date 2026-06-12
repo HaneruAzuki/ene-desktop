@@ -1,8 +1,8 @@
-import { EMOTION_LABELS, type EmotionLabel } from '../shared/types/animation';
-import type { OsAction, OsCommand } from '../shared/types/os';
+import { type EmotionLabel } from '../shared/types/animation';
+import type { OsCommand } from '../shared/types/os';
 import { splitSentences, splitFirstChunk } from './sentence-splitter';
 import { FIRST_CHUNK_MAX_CHARS } from '../shared/constants';
-import type { VoiceStreamParser, StreamChunk, StreamFinal } from './stream-parser';
+import { normalizeEmotion, parseOsCommand } from '../shared/llm-parse';
 
 // JSON応答のストリーミング解釈(C1・B-06)。`runVoiceChat` が使う VoiceStreamParser を満たす。
 //
@@ -15,13 +15,27 @@ import type { VoiceStreamParser, StreamChunk, StreamFinal } from './stream-parse
 //
 // 純粋ロジック(I/O 無し)=単体テスト対象。
 
-const VALID_ACTIONS: readonly OsAction[] = ['open_notepad', 'open_browser', 'open_folder'];
+/** push の戻り値。確定した emotion(最初の一度だけ)と、今回確定した発話文。 */
+export interface StreamChunk {
+  emotion?: EmotionLabel;
+  sentences: string[];
+}
+
+/** flush の戻り値。残っていた最終文と、末尾トレーラの OS コマンド(妥当な場合のみ)。 */
+export interface StreamFinal {
+  sentences: string[];
+  command?: OsCommand;
+}
+
+export interface VoiceStreamParser {
+  /** テキストデルタを与え、確定した emotion / 発話文を得る。 */
+  push(delta: string): StreamChunk;
+  /** ストリーム終端。残りの文と OS コマンドを得る。 */
+  flush(): StreamFinal;
+}
+
 const MSG_OPEN_RE = /"message"\s*:\s*"/;
 const EMOTION_RE = /"emotion"\s*:\s*"([^"]*)"/;
-
-function normalizeEmotion(v: string): EmotionLabel | undefined {
-  return (EMOTION_LABELS as readonly string[]).includes(v) ? (v as EmotionLabel) : undefined;
-}
 
 /** tail(message 終了後の生バッファ)から command を取り出して検証する。 */
 function parseCommandFromTail(tail: string): OsCommand | undefined {
@@ -36,16 +50,7 @@ function parseCommandFromTail(tail: string): OsCommand | undefined {
       depth -= 1;
       if (depth === 0) {
         try {
-          const obj: unknown = JSON.parse(tail.slice(open, i + 1));
-          if (typeof obj !== 'object' || obj === null) return undefined;
-          const o = obj as Record<string, unknown>;
-          if (typeof o.action !== 'string' || !VALID_ACTIONS.includes(o.action as OsAction)) return undefined;
-          if ((o.action === 'open_browser' || o.action === 'open_folder') && typeof o.target !== 'string') {
-            return undefined;
-          }
-          const cmd: OsCommand = { action: o.action as OsAction };
-          if (typeof o.target === 'string') cmd.target = o.target;
-          return cmd;
+          return parseOsCommand(JSON.parse(tail.slice(open, i + 1)));
         } catch {
           return undefined;
         }

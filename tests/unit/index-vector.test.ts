@@ -14,12 +14,10 @@ vi.mock('../../src/storage/paths', () => ({
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
 }));
 
-import { saveEpisodic } from '../../src/memory/episodic';
 import {
   cosineSimilarity,
   searchVectors,
   syncVectorIndex,
-  rebuildVectorIndex,
   loadVectorIndex,
 } from '../../src/memory/index-vector';
 import type { Embedder } from '../../src/memory/embedder';
@@ -89,19 +87,5 @@ describe('index-vector — sync(増分)', () => {
     const entry = idx.entries.find((e) => e.id === 'a.json');
     expect(entry?.summary).toBe('ラーメンの話');
     expect(entry?.vector).toEqual([0, 1, 0]); // 食べ物軸
-  });
-});
-
-describe('index-vector — 再生成(派生キャッシュ)', () => {
-  it('vectors.json を削除しても episodic 本体から再生成でき内容が一致する', async () => {
-    await saveEpisodic(mem({ date: '2026-02-01T00:00:00+09:00', summary: '勉強したい' }));
-    await saveEpisodic(mem({ date: '2026-02-02T00:00:00+09:00', category: 'hobby', summary: 'ラーメン食べたい' }));
-    const embedder = makeEmbedder();
-
-    const first = await rebuildVectorIndex(embedder);
-    await fs.rm(`${h.memDir}/index/vectors.json`, { force: true });
-    const second = await rebuildVectorIndex(embedder);
-
-    expect(second.entries).toEqual(first.entries);
   });
 });

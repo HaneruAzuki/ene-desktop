@@ -1,4 +1,5 @@
 import { EPISODIC_SUMMARY_MAX_CHARS } from '../shared/constants';
+import { extractJsonObject, toStringArray } from '../shared/llm-parse';
 import type { EpisodicRecord } from '../shared/types/memory';
 import type { LlmComplete } from './extractor';
 
@@ -13,17 +14,14 @@ export interface PeriodSummary {
   entities: string[];
 }
 
-/** 文字列配列に正規化(string 以外は捨てる)。 */
-function toStringArray(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-}
-
 /** 応答テキストから最初の JSON オブジェクトを取り出してパースする(失敗は throw)。 */
 function parsePeriodSummary(raw: string): PeriodSummary {
-  const start = raw.indexOf('{');
-  const end = raw.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('summary: no JSON object in response');
-  const obj = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+  // 抽出失敗時は throw する(呼出側は削除を行わず記録を温存する)。
+  const parsed = extractJsonObject(raw);
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('summary: no JSON object in response');
+  }
+  const obj = parsed as Record<string, unknown>;
   const summary = typeof obj['summary'] === 'string' ? obj['summary'].trim() : '';
   if (!summary) throw new Error('summary: empty summary');
   const topic = typeof obj['topic'] === 'string' && obj['topic'].trim() ? obj['topic'].trim() : '';

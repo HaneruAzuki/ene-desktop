@@ -1,7 +1,6 @@
 import { getVectorIndexPath } from '../storage/paths';
 import { readJson, writeJson } from '../storage/json-store';
 import { EMBEDDING_DIM } from '../shared/constants';
-import { loadRecallPool } from './recall-pool';
 import type { Embedder } from './embedder';
 import type { EpisodicRecord } from '../shared/types/memory';
 
@@ -20,7 +19,8 @@ export interface VectorIndex {
   entries: VectorEntry[];
 }
 
-export interface ScoredId {
+// searchVectors の内部的な戻り値型(外部公開しない)。
+interface ScoredId {
   id: string;
   score: number;
 }
@@ -87,23 +87,6 @@ export async function pruneVectorIndex(validIds: Set<string>): Promise<void> {
   if (kept.length !== index.entries.length) {
     await saveVectorIndex({ dim: index.dim, entries: kept });
   }
-}
-
-/** 想起プール(user+canon)から索引を作り直す(欠落時・モデル後から導入時の一括生成)。 */
-export async function rebuildVectorIndex(embedder: Embedder): Promise<VectorIndex> {
-  const records = await loadRecallPool();
-  const summaries = records.map((r) => r.memory.summary);
-  const vectors = await embedder.embed(summaries, 'document');
-  const index: VectorIndex = {
-    dim: EMBEDDING_DIM,
-    entries: records.map((r, i) => ({
-      id: r.id,
-      summary: r.memory.summary,
-      vector: vectors[i] ?? [],
-    })),
-  };
-  await saveVectorIndex(index);
-  return index;
 }
 
 /** コサイン類似度(正規化済みでも安全に計算)。 */
