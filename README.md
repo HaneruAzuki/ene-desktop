@@ -44,6 +44,8 @@ ene/                … 同梱キャラ定義(=characterId。JSON＋立ち絵＋
 | [docs/02_requirements.md](docs/02_requirements.md) | 機能要件・非機能要件 |
 | [docs/03_design.md](docs/03_design.md) | 技術設計(真実の源)・ディレクトリ構成 §2 |
 | [docs/05_architecture.md](docs/05_architecture.md) | 体(フォルダ)× 魂(哲学)の対応・流れ図 |
+| [docs/ui-design.md](docs/ui-design.md) | UI 設計(操作バー・オーバーレイ・2026-06 改修) |
+| [docs/user-manual.md](docs/user-manual.md) | 使い方ガイド(配布同梱・エンドユーザ向け) |
 | [docs/A_character_profile_samples.md](docs/A_character_profile_samples.md) | キャラJSON完全サンプル |
 | [CLAUDE.md](CLAUDE.md) | 開発規約・禁止事項 |
 | [tasks/README.md](tasks/README.md) | 実装タスク一覧 |
