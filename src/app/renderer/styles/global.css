@@ -139,34 +139,82 @@ body,
   color: #888;
 }
 
-/* 統合マイクボタン(入力欄の下・中央・大きめ・常時表示)。
-   ON(リッスン中=ハンズフリー起動中 or PTT 押下中)で緑に点灯。OFF は白。 */
-.mic-main {
+/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2)。
+   キャラ下部(胸元の不透明部)にホバーで重ねて出す。離脱で即アンマウント(透明余白には置かない)。
+   出現はフェードイン / 非表示は DOM 除去(即時)。bottom は実機で胸元に合わせて微調整可。 */
+.control-overlay {
   position: absolute;
-  bottom: 8px;
   left: 50%;
+  bottom: 64px;
   transform: translateX(-50%);
-  width: 48px;
-  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 25;
+  animation: ene-fade-in 0.15s ease-out;
+}
+@keyframes ene-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 操作ボタンの横一列(左→右:マイク / 音量 / 離席 / 設定 / じゃあね)。 */
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ctl-btn {
+  width: 34px;
+  height: 34px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.94);
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 30;
   transition:
     background 0.15s,
-    box-shadow 0.15s;
+    box-shadow 0.15s,
+    transform 0.1s;
+}
+.ctl-btn:active {
+  transform: scale(0.94);
 }
 
-.mic-main--on {
+/* マイクは主操作=少し大きめ。ON(リッスン中)で緑に点灯。 */
+.ctl-mic {
+  width: 42px;
+  height: 42px;
+  font-size: 19px;
+}
+.ctl-mic--on {
   background: #4caf50;
   box-shadow: 0 0 10px rgba(76, 175, 80, 0.85);
+}
+
+/* じゃあねは少し離す(誤クリック防止・最頻用のマイクから最遠)。 */
+.ctl-bye {
+  margin-left: 6px;
+}
+
+/* オーバーレイ内の入力ピル(操作バーの直下)。.input-area の絶対配置を打ち消す。 */
+.control-overlay .input-area {
+  position: static;
+  transform: none;
+  bottom: auto;
+  left: auto;
+  width: 200px;
 }
 
 /* VRM 描画キャンバス(F・3D化)。3D カメラがバストアップをフレーミングするのでウィンドウ全面に置く。
@@ -178,24 +226,6 @@ body,
   object-fit: unset;
   filter: none;
   animation: none;
-}
-
-/* VRM 表示調整パネルの開閉ボタン(歯車・右上)。 */
-.vrm-gear {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.82);
-  color: #333;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  z-index: 40;
 }
 
 /* VRM 表示調整パネル(スライダー・開いている間だけ表示)。 */
