@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { ANTHROPIC_BASE_URL } from '../conversation/client';
 import type { PingResult } from '../shared/types/api-key';
 
 // APIキーの形式検証と疎通テスト(設計書 §3.7「バリデーションの3段階」)。
@@ -12,7 +13,7 @@ export function isValidKeyFormat(key: string): boolean {
 export type ApiKeyPing = (key: string) => Promise<void>;
 
 const defaultPing: ApiKeyPing = async (key) => {
-  const client = new Anthropic({ apiKey: key });
+  const client = new Anthropic({ apiKey: key, baseURL: ANTHROPIC_BASE_URL });
   await client.messages.create({
     model: 'claude-haiku-4-5-20251001', // 軽量モデルで最小コスト
     max_tokens: 1,

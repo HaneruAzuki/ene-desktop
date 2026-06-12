@@ -23,6 +23,18 @@ const CONVERSATION_MODEL = MODEL_SONNET;
 const MAX_TOKENS = 1024;
 const TEMPERATURE = 0.7; // キャラの自然さと JSON 安定性のバランス(設計書 §3.4)
 
+/**
+ * Claude API の送信先を公式エンドポイントに固定する(セキュリティ・§4.2/§7.1)。
+ * SDK は baseURL 未指定だと環境変数 `ANTHROPIC_BASE_URL` を読むため、悪意ある env で
+ * 会話テキスト(唯一の外部送信)を任意の URL へ転送されうる。明示固定でその経路を塞ぐ。
+ */
+export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
+
+/** baseURL を公式に固定した Anthropic クライアントを生成する(全構築をここに集約)。 */
+function createClient(apiKey: string): Anthropic {
+  return new Anthropic({ apiKey, baseURL: ANTHROPIC_BASE_URL });
+}
+
 /** Sonnet を1回呼び、応答の生テキスト(完全な JSON 文字列)を返す。 */
 export type ModelCall = (prompt: BuiltPrompt) => Promise<string>;
 /** プロンプトのトークン数を判定する。 */
@@ -64,7 +76,7 @@ function toMessagesParam(messages: BuiltPrompt['messages']): Anthropic.Beta.Prom
 }
 
 function makeDefaultDeps(apiKey: string, model: string = CONVERSATION_MODEL): ChatDeps {
-  const client = new Anthropic({ apiKey });
+  const client = createClient(apiKey);
   return {
     callModel: async ({ system, messages }) => {
       // 0.30.1 のプロンプトキャッシュはベータ名前空間(N-14)。Tier0 を固定プレフィックスとして使い回す。
@@ -93,7 +105,7 @@ function makeDefaultDeps(apiKey: string, model: string = CONVERSATION_MODEL): Ch
  * Memory Layer の extractor へ注入する LlmComplete を満たす(設計書 §3.3 の抽出は Sonnet 使用)。
  */
 export function makeLlmComplete(apiKey: string): LlmComplete {
-  const client = new Anthropic({ apiKey });
+  const client = createClient(apiKey);
   return async ({ system, user, maxTokens }) => {
     const resp = await client.messages.create({
       model: CONVERSATION_MODEL,
@@ -115,7 +127,7 @@ export function makeStreamCall(
   model: string = CONVERSATION_MODEL,
   signal?: AbortSignal, // コアレッシングの中断(投機生成のキャンセル)。abort で HTTP も止めトークンを節約する。
 ): ModelStreamCall {
-  const client = new Anthropic({ apiKey });
+  const client = createClient(apiKey);
   return async function* stream({ system, messages }): AsyncGenerator<string> {
     const events = await client.beta.promptCaching.messages.create(
       {
@@ -157,7 +169,7 @@ export async function warmPromptCache(
   apiKey: string,
 ): Promise<void> {
   try {
-    const client = new Anthropic({ apiKey });
+    const client = createClient(apiKey);
     // 本会話と同じ buildPrompt を使い、キャッシュ可能プレフィックスをバイト同一で再現する。
     const prompt = buildPrompt(charContext, { semantic, shortTerm: [], relevantEpisodic: [] }, WARM_ROUTER, 'warm');
     await client.beta.promptCaching.messages.create({
