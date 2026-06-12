@@ -49,12 +49,12 @@
 
 | 項目 | 採用技術 | バージョン | 選定理由 |
 |------|---------|-----------|---------|
-| アプリ基盤 | Electron | `^30.x` | 透過ウィンドウ・常駐表示・Windows互換性。electron-builder の要件で **devDependencies に置く**(`electron` を dependencies に置くとビルド拒否)。ランタイムは electron-builder が exe に同梱するため「配布物に含まれる」性質は保たれる。ユーザ承認済み・N-00-4 参照 |
+| アプリ基盤 | Electron | `^42.x` | 透過ウィンドウ・常駐表示・Windows互換性。electron-builder の要件で **devDependencies に置く**(`electron` を dependencies に置くとビルド拒否)。ランタイムは electron-builder が exe に同梱するため「配布物に含まれる」性質は保たれる。ユーザ承認済み・N-00-4 参照。**2026-06-13: 30(EOL)→42 へアップグレード**(サポート中メジャー。使用は安定コア API のみで破壊的変更の影響なし。回帰=typecheck/build/426テスト/lint/depcruise 緑＋実機表示・onnxruntime ロード確認) |
 | 言語 | TypeScript | `^5.x`(strict) | 型安全・長期保守・Claude Code相性 |
 | ランタイム | Node.js | 24 LTS | Electronとの互換性。2026年時点で LTS 系列が 24 に移行し、winget で 20 LTS が入手不可となったためユーザ承認のうえ 20→24 に更新(旧: 20 LTS) |
 | ビルドツール | Vite | `^5.x` | 高速・TypeScript標準対応 |
 | Electron統合 | electron-vite | `^2.x` | Electron + Vite + React の統合 |
-| ビルド/配布 | electron-builder | `^24.x` | Windows向けexe生成 |
+| ビルド/配布 | electron-builder | `^26.x` | Windows向けexe生成(Electron 42 対応のため 24→26 に更新・2026-06-13) |
 | テスト | Vitest | `^1.x` | 高速・TS標準対応 |
 | Lint | ESLint | `^8.x` | コード品質。アーキ境界の一部(キャラ固有文字列のドメイン/shared 層への埋め込み禁止)も `no-restricted-syntax` で担保(§5.1) |
 | Lint(TS拡張) | @typescript-eslint | `^7.x` | TypeScript用ルール |
