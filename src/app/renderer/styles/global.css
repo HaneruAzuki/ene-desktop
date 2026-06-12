@@ -127,12 +127,19 @@ body,
   width: 100%;
   padding: 8px 12px;
   border: none;
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.96);
   color: #1a1a1a;
   font-size: 13px;
+  font-family: inherit;
+  line-height: 18px;
   outline: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  box-sizing: border-box;
+  resize: none;
+  overflow-y: auto;
+  max-height: 70px; /* ≈3行(18px×3 + 上下padding16px)。超過分は内部スクロール。 */
+  display: block;
 }
 
 .input-field::placeholder {
@@ -145,7 +152,7 @@ body,
 .control-overlay {
   position: absolute;
   left: 50%;
-  bottom: 64px;
+  bottom: 8px;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -167,16 +174,16 @@ body,
 .control-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ctl-btn {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.94);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
@@ -194,9 +201,9 @@ body,
 
 /* マイクは主操作=少し大きめ。ON(リッスン中)で緑に点灯。 */
 .ctl-mic {
-  width: 42px;
-  height: 42px;
-  font-size: 19px;
+  width: 48px;
+  height: 48px;
+  font-size: 21px;
 }
 .ctl-mic--on {
   background: #4caf50;
@@ -214,7 +221,30 @@ body,
   transform: none;
   bottom: auto;
   left: auto;
-  width: 200px;
+  width: 244px;
+}
+
+/* マイクON の常駐サイン(ホバーを外しても「聞いてるよ」を緑で表示=プライバシーの可視化・ui-design §3)。 */
+.mic-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 9px;
+  border: none;
+  border-radius: 15px;
+  background: #4caf50;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.85);
+}
+.mic-indicator__dot {
+  font-size: 15px;
+  line-height: 1;
+}
+.mic-indicator__label {
+  font-weight: 500;
 }
 
 /* VRM 描画キャンバス(F・3D化)。3D カメラがバストアップをフレーミングするのでウィンドウ全面に置く。

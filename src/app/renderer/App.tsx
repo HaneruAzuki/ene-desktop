@@ -14,18 +14,19 @@ import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } fro
 import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { CharacterState } from '../../shared/types/animation';
-import type { VoiceInputMode } from '../../shared/types/settings';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
 
-// トップコンポーネント(設計書 §8 / task_13)。
-// キャラ表示・吹き出し・入力欄・統合マイクボタンを束ねる。
-// task_17: マイクは「入力欄の下・中央」の単一ボタンに統合。設定(右クリックメニュー)で
-//   Push-to-Talk(押している間録音) / ハンズフリー(VAD自動) を切替える。
+// トップコンポーネント(設計書 §8 / task_13 / UI改修 2026-06)。
+// キャラ表示・吹き出し・ホバーで現れる操作バー(マイク/音量/離席/設定/じゃあね)＋入力ピルを束ねる。
+// マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
 //   ボタンは ON(リッスン中)/OFF だけ示す。状態テキストは出さない(聞き取り中はキャラは neutral)。
 
 /** これ未満の長さ(秒)の push-to-talk 録音は誤タップ扱いで無視する。 */
 const MIN_RECORDING_SEC = 0.3;
+
+/** マイク単一ハイブリッドの判別: 押下がこの ms 未満=タップ(ハンズフリーのトグル)、以上=PTT(押している間録音)。 */
+const TAP_MAX_MS = 250;
 
 /** 起動準備が整うまで吹き出しに出す「まだ話しかけないで」サイン(音声エンジン起動・ウォーム中)。 */
 const WAIT_MESSAGE = 'ちょっと待って、…いま準備してるところ。';
@@ -38,7 +39,6 @@ export function App(): React.ReactElement | null {
   const [hovered, setHovered] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
-  const [voiceInputMode, setVoiceInputMode] = useState<VoiceInputMode>('push-to-talk');
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
   const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
@@ -64,6 +64,8 @@ export function App(): React.ReactElement | null {
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
+  const pressHeldRef = useRef(false); // マイク押下が長押し(PTT)に確定したか
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // タップ/長押し判別タイマー
   const voiceModeRef = useRef(false); // 非同期コールバックから handsFreeOn を読む
   // ストリーミング音声で「再生開始済み=聞かせた文」を貯める(Phase A: 再生同期の吹き出し)。
   // 先頭文(index=0)でリセットし、文が再生されるたび追記する。
@@ -71,14 +73,13 @@ export function App(): React.ReactElement | null {
   const readyRef = useRef(false); // 起動準備完了(多重通知の冪等化)
   const interactedRef = useRef(false); // 既にユーザーが会話を始めたか(準備完了後の挨拶差し替え判定)
 
-  // ON(リッスン中)かどうか: ハンズフリーは VAD 起動中、PTT は押下中。
-  const micActive = voiceInputMode === 'hands-free' ? handsFreeOn : recording;
+  // ON(リッスン中)かどうか: ハンズフリー起動中 or PTT 録音中。
+  const micActive = handsFreeOn || recording;
 
-  // 起動時に CharacterInfo / マイク入力方式を取得 ＋ 起動準備の状態を反映。
+  // 起動時に CharacterInfo を取得 ＋ 起動準備の状態を反映。
   // 準備が整うまでは挨拶を出さず「ちょっと待って、」を表示する(整い次第・挨拶へ差し替え)。
   useEffect(() => {
     void window.ene.getCharacterInfo().then(setCharacterInfo);
-    void window.ene.getVoiceInputMode().then(setVoiceInputMode);
     void window.ene.isReady().then((r) => {
       if (r) markReady();
       else if (!readyRef.current && !interactedRef.current) setBubble(WAIT_MESSAGE);
@@ -107,10 +108,9 @@ export function App(): React.ReactElement | null {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
-  // トレイ / コンテキストメニューからのイベント＋マイク入力方式の変更通知
+  // トレイ / コンテキストメニューからのイベント(入力欄を開く)。
   useEffect(() => {
     window.ene.onOpenInputArea(() => openInput());
-    window.ene.onVoiceInputModeChanged((mode) => applyVoiceInputMode(mode));
   }, []);
 
   // 音声応答チャンク(WAV＋任意で文テキスト/通し番号)を逐次再生(task_17 Phase A)。
@@ -194,6 +194,7 @@ export function App(): React.ReactElement | null {
     return () => {
       if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
       if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     };
   }, []);
 
@@ -392,15 +393,44 @@ export function App(): React.ReactElement | null {
     }
   }
 
-  /** 設定でマイク入力方式が変わった時の適用(別方式へ移る前に現方式を止める)。 */
-  function applyVoiceInputMode(mode: VoiceInputMode): void {
-    if (mode !== 'hands-free' && voiceModeRef.current) stopHandsFree();
-    if (mode !== 'push-to-talk' && recorderRef.current) {
-      recorderRef.current.cancel();
-      recorderRef.current = null;
-      setRecording(false);
+  // --- マイク単一ハイブリッド(短タップ=ハンズフリーON/OFF・長押し=押している間 PTT) ---
+  // 押下時点ではタップか長押しか不明。TAP_MAX_MS 押し続けたら長押し=PTT を開始、
+  // それ未満で離せばタップ=ハンズフリーをトグルする。ハンズフリーON中はタップで OFF。
+  function micDown(): void {
+    pressHeldRef.current = false;
+    if (handsFreeOn) return; // ON 中は離した時に OFF にするだけ(長押しでも PTT に入らない)
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = setTimeout(() => {
+      pressHeldRef.current = true;
+      void startPtt();
+    }, TAP_MAX_MS);
+  }
+  function micUp(): void {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
     }
-    setVoiceInputMode(mode);
+    if (handsFreeOn) {
+      stopHandsFree(); // ON 中のクリック=OFF
+      return;
+    }
+    if (pressHeldRef.current) {
+      pressHeldRef.current = false;
+      void stopPtt(); // 長押し=PTT を確定(録音停止→認識)
+    } else {
+      void startHandsFree(); // タップ=ハンズフリー ON
+    }
+  }
+  function micLeave(): void {
+    // 押しながら外れた時: PTT 中なら確定、判別前ならキャンセル(誤操作回避)。
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (pressHeldRef.current) {
+      pressHeldRef.current = false;
+      void stopPtt();
+    }
   }
 
   /** VRM 表示パラメータの変更(即時反映＋デバウンスして data/config へ保存)。 */
@@ -412,21 +442,11 @@ export function App(): React.ReactElement | null {
 
   if (!characterInfo) return null;
 
-  // マイクボタンの操作は方式で異なる。ハンズフリー=クリックでトグル、PTT=押している間だけ。
-  const micHandlers =
-    voiceInputMode === 'hands-free'
-      ? { onClick: () => void (handsFreeOn ? stopHandsFree() : startHandsFree()) }
-      : {
-          onMouseDown: () => void startPtt(),
-          onMouseUp: () => void stopPtt(),
-          onMouseLeave: () => void stopPtt(),
-        };
-  const micTitle =
-    voiceInputMode === 'hands-free'
-      ? handsFreeOn
-        ? 'ハンズフリー: ON(クリックで OFF)'
-        : 'ハンズフリー: OFF(クリックで ON)'
-      : '押している間だけ録音(離すと認識)';
+  // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
+  const micHandlers = { onMouseDown: micDown, onMouseUp: micUp, onMouseLeave: micLeave };
+  const micTitle = handsFreeOn
+    ? '聞いてるよ(クリックで切る)'
+    : 'クリックで聞く / 押している間だけ話す';
 
   return (
     <div className="app">
@@ -449,25 +469,41 @@ export function App(): React.ReactElement | null {
         amplitudeProvider={getVoiceAmplitude}
         visible={visible}
       />
-      {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2)。
+      {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2/§3)。
           キャラ下部(胸元の不透明部)にホバーで重ねて出す。離脱で即アンマウント(透明余白には置かない
-          =手を伸ばす途中で消えない)。入力中/マイク稼働中/明示展開中は離れても保持する。
-          段階1: マイクと「設定(=当面 VRM 調整パネルの開閉)」のみ配線。音量/離席/じゃあねは段階3/5/4 で実装。 */}
+          =手を伸ばす途中で消えない)。入力中/明示展開中は離れても保持する。
+          マイクON 中はホバーを外すと、操作バーの代わりに最小の常駐サイン(緑「聞いてるよ」)を残す。
+          段階2: マイクは単一ハイブリッド配線。音量/離席/じゃあねは段階3/5/4 で実装。 */}
       {(hovered || forceOpen || inputFocused || micActive) && (
         <div className="control-overlay" ref={overlayRef}>
-          <ControlBar
-            micActive={micActive}
-            micHandlers={micHandlers}
-            micTitle={micTitle}
-            onSettings={() => setShowVrmPanel((v) => !v)}
-          />
-          <InputArea
-            autoFocus={forceOpen}
-            onSubmit={handleSubmit}
-            onClose={() => setForceOpen(false)}
-            onActivate={warmCacheOnce}
-            onFocusChange={setInputFocused}
-          />
+          {hovered || forceOpen || inputFocused ? (
+            <>
+              <ControlBar
+                micActive={micActive}
+                micHandlers={micHandlers}
+                micTitle={micTitle}
+                onSettings={() => setShowVrmPanel((v) => !v)}
+              />
+              <InputArea
+                autoFocus={forceOpen}
+                onSubmit={handleSubmit}
+                onClose={() => setForceOpen(false)}
+                onActivate={warmCacheOnce}
+                onFocusChange={setInputFocused}
+              />
+            </>
+          ) : (
+            // マイクON だがホバー外: 最小の常駐サイン(クリックで切る)。
+            <button
+              className="mic-indicator"
+              onClick={() => void stopHandsFree()}
+              title="聞いてるよ(クリックで切る)"
+              aria-label="音声入力をオフ"
+            >
+              <span className="mic-indicator__dot">🎙️</span>
+              <span className="mic-indicator__label">聞いてるよ</span>
+            </button>
+          )}
         </div>
       )}
       {/* VRM 表示調整パネル(段階1: 操作バーの設定ボタンから開閉。段階6 で統合設定パネルへ置換)。 */}
