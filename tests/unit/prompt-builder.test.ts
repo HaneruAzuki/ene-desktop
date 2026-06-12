@@ -138,4 +138,58 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     // behavior も入力も違うが Tier0(先頭ブロック)は変わらない
     expect(a.system[0]?.text).toBe(b.system[0]?.text);
   });
+
+  // --- P2: ふるまいの規範(Tier0・cacheable) ---
+  it('規範(閉世界・反同調・聞き取り自覚など)が system(Tier0)に含まれる', () => {
+    const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
+    const sys = systemText(p);
+    expect(sys).toContain('ふるまいの規範');
+    expect(sys).toContain('覚えていること'); // 閉世界規範
+    expect(sys).toContain('調子を合わせ'); // 反同調規範
+    // 規範は cacheable な Tier0 に入る(揮発ターンではない)。
+    expect(p.system[0]?.cacheable).toBe(true);
+    expect(lastUserText(p)).not.toContain('ふるまいの規範');
+  });
+
+  // --- P5: 長期記憶の名前読み・誕生日 ---
+  it('名前の読みがあればルビ付きで、誕生日があれば semantic に出る', () => {
+    const mc = makeMemoryContext({
+      semantic: { version: 1, userName: '優希', userNameReading: 'ゆうき', userBirthday: { month: 6, day: 12 } },
+    });
+    const sys = systemText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(sys).toContain('優希《ゆうき》');
+    expect(sys).toContain('6月12日');
+  });
+
+  // --- P1/P4/P5/P7: moment(いま/気にかけ/まだ知らないこと/誕生日/有限性) ---
+  it('moment の各要素が現 user ターンに整形される', () => {
+    const mc = makeMemoryContext({
+      moment: {
+        nowIso: '2026-06-13T23:40:00+09:00',
+        timeOfDay: '深夜',
+        elapsedLabel: '3日ぶり',
+        openLoops: ['面接の結果待ち'],
+        knowledgeGaps: ['相手の名前'],
+        userBirthdayToday: true,
+        finitenessHint: '(いまは夜遅い時間。)',
+      },
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).toContain('# いま');
+    expect(text).toContain('深夜');
+    expect(text).toContain('3日ぶり');
+    expect(text).toContain('気にかけていること');
+    expect(text).toContain('面接の結果待ち');
+    expect(text).toContain('まだ知らないこと');
+    expect(text).toContain('相手の名前');
+    expect(text).toContain('相手の誕生日'); // userBirthdayToday
+    expect(text).toContain('夜遅い時間'); // finitenessHint
+    // moment はキャッシュ境界より後ろ=system(Tier0)を汚さない。
+    expect(systemText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'))).not.toContain('# いま');
+  });
+
+  it('moment 未指定でも従来どおり動く(後方互換)', () => {
+    const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
+    expect(lastUserText(p)).not.toContain('# いま');
+  });
 });

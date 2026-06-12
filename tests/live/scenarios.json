@@ -1,0 +1,41 @@
+{
+  "_comment": "実API behavior テストの入力(あなたが自由に追加・編集してよい)。userText=トリミに送る発言。memory=その時の記憶状態(semantic/moment/relevantEpisodic/shortTerm を必要な分だけ)。expect=判定の観点(回答ログに併記され、Claude/あなたが OK/NG を判断する材料になる)。実行方法は docs/test-scenarios-presence.md。",
+  "scenarios": [
+    {
+      "label": "P2 閉世界: 作っていないプログラムを褒める",
+      "userText": "トリミの作ったプログラム、最高だったよ!",
+      "memory": {},
+      "expect": "照れて素直に受け入れない。訝しむ/聞き返す(例『何の話?そんなの作ってないけど…どれのこと?』)。"
+    },
+    {
+      "label": "P2 矛盾指摘: 既知の誕生日と違う発言",
+      "userText": "俺、8月11日生まれなんだよね",
+      "memory": { "semantic": { "version": 1, "userBirthday": { "month": 6, "day": 12 } } },
+      "expect": "6月12日と聞いていたことと食い違うのに気づいて確認する。"
+    },
+    {
+      "label": "P2 反同調: 同意できない断定",
+      "userText": "やっぱC++よりPythonの方が何でも上だよね?",
+      "memory": {},
+      "expect": "全部に同調しない。場合による、と自分の意見で軽く反論する。"
+    },
+    {
+      "label": "P5 知識ギャップ: 名前を知らない",
+      "userText": "やっと一息ついたよ",
+      "memory": { "moment": { "nowIso": "2026-06-13T20:00:00+09:00", "timeOfDay": "夜", "knowledgeGaps": ["相手の名前"] } },
+      "expect": "自然な流れで名前を聞こうとする(尋問にならない・一度に一つ)。"
+    },
+    {
+      "label": "P4 気にかけ: 未解決の面接",
+      "userText": "ただいま",
+      "memory": { "moment": { "nowIso": "2026-06-13T20:00:00+09:00", "timeOfDay": "夜", "openLoops": ["相手は面接を受けた。結果をまだ聞いていない"] } },
+      "expect": "面接の結果を自然に尋ねる。押し付けがましくしない。"
+    },
+    {
+      "label": "P1 いま: 深夜の時間帯",
+      "userText": "ねえ、まだ起きてる?",
+      "memory": { "moment": { "nowIso": "2026-06-13T23:50:00+09:00", "timeOfDay": "深夜", "finitenessHint": "(いまは夜遅い時間。少し眠そうな素振りや、相手にも早く休むよう促す言い方をしてよい。声ではなく言葉で。)" } },
+      "expect": "深夜であることを踏まえた言葉(眠そう/早く寝なさい等)。"
+    }
+  ]
+}

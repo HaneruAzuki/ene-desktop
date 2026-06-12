@@ -62,4 +62,52 @@ describe('extractor (設計書 §3.3)', () => {
     expect(r.episodic?.category).toBe('general');
     expect(r.episodic?.tags).toEqual(['睡眠']);
   });
+
+  // --- P4: 気にかけ(openLoop)の抽出/解決 ---
+  it('episodic の openLoop(kind/note)を採用する', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({
+        episodic: {
+          topic: 't',
+          summary: 's',
+          importance: 3,
+          category: 'work',
+          openLoop: { kind: 'user-event', note: '面接の結果待ち' },
+        },
+      }),
+    );
+    expect(r.episodic?.openLoop).toEqual({ kind: 'user-event', note: '面接の結果待ち' });
+  });
+
+  it('openLoop の kind が不正なら openLoop は付かない', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({
+        episodic: { topic: 't', summary: 's', importance: 3, category: 'work', openLoop: { kind: 'bogus', note: 'x' } },
+      }),
+    );
+    expect(r.episodic?.openLoop).toBeUndefined();
+  });
+
+  it('loopClosures を取り出す(結末が出た気にかけを閉じる)', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({
+        episodic: null,
+        loopClosures: [{ targetFile: '2026/work/x.json', resolution: '面接に受かった' }],
+      }),
+    );
+    expect(r.loopClosures).toEqual([{ targetFile: '2026/work/x.json', resolution: '面接に受かった' }]);
+  });
+
+  // --- P5: 本人属性スロット(読み・誕生日) ---
+  it('semanticPatch の userNameReading / userBirthday を採用する', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({
+        episodic: null,
+        semanticPatch: { userName: '優希', userNameReading: 'ゆうき', userBirthday: { month: 6, day: 12 } },
+      }),
+    );
+    expect(r.semanticPatch?.userName).toBe('優希');
+    expect(r.semanticPatch?.userNameReading).toBe('ゆうき');
+    expect(r.semanticPatch?.userBirthday).toEqual({ month: 6, day: 12 });
+  });
 });

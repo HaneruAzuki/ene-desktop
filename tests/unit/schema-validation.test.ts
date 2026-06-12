@@ -36,4 +36,26 @@ describe('schema-validation (設計書 §3.3)', () => {
     expect(p.userName).toBe('太郎');
     expect((p as Record<string, unknown>).version).toBeUndefined();
   });
+
+  // --- P5: 名前の読み・誕生日スロット ---
+  it('userNameReading を採用する(文字列のみ)', () => {
+    expect(validateSemanticPatch({ userNameReading: 'ゆうき' }).userNameReading).toBe('ゆうき');
+    expect(validateSemanticPatch({ userNameReading: 123 }).userNameReading).toBeUndefined();
+  });
+
+  it('userBirthday は月日が範囲内の整数のときだけ採用する', () => {
+    expect(validateSemanticPatch({ userBirthday: { month: 6, day: 12 } }).userBirthday).toEqual({ month: 6, day: 12 });
+    expect(validateSemanticPatch({ userBirthday: { month: 6, day: 12, year: 1994 } }).userBirthday).toEqual({
+      month: 6,
+      day: 12,
+      year: 1994,
+    });
+  });
+
+  it('userBirthday の範囲外・型不一致は無視する', () => {
+    expect(validateSemanticPatch({ userBirthday: { month: 13, day: 1 } }).userBirthday).toBeUndefined();
+    expect(validateSemanticPatch({ userBirthday: { month: 6, day: 40 } }).userBirthday).toBeUndefined();
+    expect(validateSemanticPatch({ userBirthday: { month: '6', day: 12 } }).userBirthday).toBeUndefined();
+    expect(validateSemanticPatch({ userBirthday: 'June' }).userBirthday).toBeUndefined();
+  });
 });

@@ -6,6 +6,9 @@ out/
 # 音声スモークの出力 WAV(task_17・手動検証用・生成物)
 voice-smoke-out/
 
+# 実API behavior チェックの出力(トリミの応答=会話内容を含むためコミットしない・§7.1/§10.2)
+presence-live-results.md
+
 # ユーザーデータ(実行時生成・ポータブル)
 data/
 
