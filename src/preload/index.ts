@@ -67,6 +67,11 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:backchannel');
     ipcRenderer.on('ene:backchannel', (_event, wav: ArrayBuffer | null) => cb(wav));
   },
+  onTurnNod: (cb) => {
+    // ターン終端うなずき(無音窓終端で1回・深さ=発話長)。二重登録防止で単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:turn-nod');
+    ipcRenderer.on('ene:turn-nod', (_event, strength: number) => cb(strength));
+  },
   onThinkingFiller: (cb) => {
     // 思考フィラーの表示文字列(「そうね」等)。吹き出しに一時表示=応答で上書きされる。
     ipcRenderer.removeAllListeners('ene:thinking-filler');

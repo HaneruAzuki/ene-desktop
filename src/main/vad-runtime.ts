@@ -5,6 +5,7 @@ import { SileroVad } from '../conversation/silero-vad';
 import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../conversation/vad-segmenter';
 import { frameRms } from '../conversation/backchannel-engine';
 import { transcribe, isSttModelAvailable } from '../conversation/stt-transcriber';
+import { turnNodStrength } from '../conversation/turn-nod';
 import type { BackchannelController } from './backchannel-controller';
 import {
   VAD_FRAME_SIZE,
@@ -215,6 +216,13 @@ export class VadRuntime {
     // (STT 中に再開すれば onSpeechStart が再び立てる)。直近 speech-end の時刻も記録(案①: barge-in 分類)。
     this.lastSpeechEndAt = performance.now();
     this.coalesce?.onSpeechEnd();
+    // ターン終端うなずき(2026-06-12): 無音窓が閉じた=「無音枠終端」で1回うなずき、ターン受け取りを視覚で示す。
+    //   深さは直前の発話の長さ(録音フレーム数→ms)で出し分ける(短い=軽く / 長い=重め)。STT を待たない=窓終端ぴったり。
+    //   §6.2: ms と深さ(数値)のみログ・本文は出さない。listenOnly でも窓終端の視覚信号として出す。
+    const speechMs = (this.recorded.length * VAD_FRAME_SIZE * 1000) / STT_SAMPLE_RATE;
+    const nodStrength = turnNodStrength(speechMs);
+    log.info(`turn nod (speech=${Math.round(speechMs)}ms strength=${nodStrength})`);
+    this.send('ene:turn-nod', nodStrength);
     if (this.vadDebug) {
       // 分断原因の切り分け: zeroRms が多い/maxArrivalGap が大きいなら取り込み(ScriptProcessor)が犯人。
       log.info(

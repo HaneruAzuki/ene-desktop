@@ -21,6 +21,8 @@ interface Props {
   state: CharacterState;
   /** 増えるたびに1回うなずく(相槌の非言語表現・task_18 Phase B)。 */
   nodKey?: number;
+  /** うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け・2026-06-12)。未指定は 1.0。 */
+  nodStrength?: number;
   onClick: () => void;
   // --- VRM(F)。両方揃えば VRM モード、欠ければ PNG フォールバック ---
   vrmConfig?: VrmRenderConfig | null;
@@ -33,8 +35,8 @@ interface Props {
   visible?: boolean;
 }
 
-/** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる・PNG モード用)。 */
-const NOD_MS = 500;
+/** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる・PNG モード用)。1.5倍ゆっくりに(2026-06-12)。 */
+const NOD_MS = 830;
 
 interface PressState {
   startX: number;
@@ -47,7 +49,7 @@ interface PressState {
 
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
   function CharacterDisplay(
-    { portraitUrl, animation, state, nodKey, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true },
+    { portraitUrl, animation, state, nodKey, nodStrength = 1, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true },
     ref,
   ) {
     const imgRef = useRef<HTMLImageElement>(null);
@@ -137,17 +139,18 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
       return () => window.removeEventListener('resize', onResize);
     }, [vrmMode]);
 
-    // 相槌のうなずき: VRM はボーン、PNG は CSS クラスで表現(0/未指定は無視)。
+    // うなずき(相槌＝聞くターン / ターン終端＝無音窓終端): VRM はボーン、PNG は CSS クラスで表現(0/未指定は無視)。
+    //   nodStrength=深さ(相槌 1.0 / ターン終端は発話長で出し分け)。VRM は回転量、PNG は CSS 変数 --nod-scale を倍率に。
     useEffect(() => {
       if (!nodKey) return;
       if (rendererRef.current) {
-        rendererRef.current.nod();
+        rendererRef.current.nod(nodStrength);
       } else {
         setNodding(true);
         const id = setTimeout(() => setNodding(false), NOD_MS);
         return () => clearTimeout(id);
       }
-    }, [nodKey]);
+    }, [nodKey, nodStrength]);
 
     // --- 以降は PNG モードの口パク・フレーム解決・alpha 描画(VRM モードでは未使用) ---
     useEffect(() => {
@@ -293,6 +296,8 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
         src={displaySrc}
         alt="魚川トリミ"
         draggable={false}
+        // うなずきの深さを CSS 変数で渡す(ene-nod の translateY 倍率)。非うなずき時は無指定。
+        style={nodding ? ({ ['--nod-scale']: String(nodStrength) } as React.CSSProperties) : undefined}
         onMouseDown={onMouseDown}
         onContextMenu={onContextMenu}
         onLoad={drawToCanvas}

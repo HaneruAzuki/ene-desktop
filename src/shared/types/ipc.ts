@@ -97,6 +97,10 @@ export interface EneAPI {
   // 相槌受信(main → renderer・task_18 Phase B)。wav があれば再生、null でも**うなずき**は出す。
   onBackchannel(callback: (wav: ArrayBuffer | null) => void): void;
 
+  // ターン終端うなずき(main → renderer・2026-06-12)。無音窓終端で1回うなずく。
+  //  strength = うなずきの深さ(相槌の基準 1.0 比・発話が長いほど重め)。音は鳴らさず視覚のみ。
+  onTurnNod(callback: (strength: number) => void): void;
+
   // 思考フィラーの表示文字列(main → renderer・Phase C)。吹き出しに一時表示(応答で上書き)。
   onThinkingFiller(callback: (text: string) => void): void;
 

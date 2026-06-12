@@ -4,6 +4,11 @@ import {
   clampWindow,
   type VoiceTurnDeps,
 } from '../../src/main/voice-turn-coordinator';
+import {
+  VAD_PROVISIONAL_SILENCE_MS,
+  COALESCE_WINDOW_MIN_MS,
+  COALESCE_WINDOW_MAX_MS,
+} from '../../src/shared/constants';
 import type { ConversationResponse } from '../../src/shared/types/conversation';
 
 // 投機生成＋コアレッシングの状態機械(段階①)。generate/commit/emit を注入して純粋に検証する。
@@ -200,12 +205,12 @@ describe('VoiceTurnCoordinator (段階① 投機＋コアレッシング)', () =
     deps.setSilenceWindow = (ms) => windows.push(ms);
     const c = new VoiceTurnCoordinator(deps);
 
-    // サイレントキャンセル(第一声前の再開)→ 窓を短く(初期 500 から STEP_DOWN 縮む)
+    // サイレントキャンセル(第一声前の再開)→ 窓を短く(初期 VAD_PROVISIONAL_SILENCE_MS から STEP_DOWN 縮む)
     c.onProvisionalEnd('A'); // gen0
     c.onSpeechStart(); // 第一声前に再開 = サイレントキャンセル
     expect(calls[0].signal.aborted).toBe(true);
     const afterCancel = windows[windows.length - 1];
-    expect(afterCancel).toBeLessThan(500);
+    expect(afterCancel).toBeLessThan(VAD_PROVISIONAL_SILENCE_MS);
 
     // 早い barge-in → 窓を長く(STEP_UP は大きいので afterCancel より上)
     c.onBargeInTiming(true);
@@ -220,12 +225,14 @@ describe('VoiceTurnCoordinator (段階① 投機＋コアレッシング)', () =
 });
 
 describe('clampWindow (案① 無音窓のクランプ・純粋)', () => {
-  it('下限 400 / 上限 1200 でクランプ', () => {
-    expect(clampWindow(100)).toBe(400);
-    expect(clampWindow(2000)).toBe(1200);
+  it('下限 COALESCE_WINDOW_MIN_MS / 上限 COALESCE_WINDOW_MAX_MS でクランプ', () => {
+    expect(clampWindow(100)).toBe(COALESCE_WINDOW_MIN_MS);
+    expect(clampWindow(2000)).toBe(COALESCE_WINDOW_MAX_MS);
   });
   it('範囲内はそのまま(丸め)', () => {
-    expect(clampWindow(600)).toBe(600);
-    expect(clampWindow(523.4)).toBe(523);
+    // 範囲内の代表値(下限+上限の中点付近)と小数の丸めを確認する。
+    const mid = Math.round((COALESCE_WINDOW_MIN_MS + COALESCE_WINDOW_MAX_MS) / 2);
+    expect(clampWindow(mid)).toBe(mid);
+    expect(clampWindow(mid + 0.4)).toBe(mid);
   });
 });

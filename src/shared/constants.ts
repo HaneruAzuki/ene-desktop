@@ -177,6 +177,7 @@ export const COALESCE_ENABLED_ENV = 'ENE_COALESCE';
  * コアレッシング時の**暫定**ターン終了とみなす無音(ms)。短くして投機生成を早く始める
  * (どのみち Claude の応答に時間がかかる=その死に時間が「発話再開を待つ窓」になる)。
  * 第一声(コミット)が出る前にユーザが再開すれば静かにキャンセルして連結し直す。
+ * 文中の間での分断は**適応(下記 COALESCE_WINDOW_*)に任せる**方針(長く話すほど窓が落ち着く)。
  */
 export const VAD_PROVISIONAL_SILENCE_MS = 500;
 
@@ -227,9 +228,26 @@ export const BACKCHANNEL_VOLUME_SCALE = 0.6;
  * (ユーザー要望: からだのうなずきと音声をだいたい交互に)。フィラーは別(常に声を出す)。
  */
 export const BACKCHANNEL_VOICE_RATIO = 0.5;
+/**
+ * 相槌(聞くターン)のうなずきの深さ(基準 1.0=従来のうなずき幅 比)。
+ * 1.0→0.4(2026-06-12 ユーザー): ターン終端うなずきを浅くしたら相槌が相対的に深く見えたため、浅い側(0.4)に合わせる。
+ */
+export const BACKCHANNEL_NOD_STRENGTH = 0.4;
 // 韻律トーン判定 Lv2 の閾値(BACKCHANNEL_EMPHASIS_RATIO / BACKCHANNEL_PITCH_RATIO)は
 // 2026-06-10 に撤去した(語彙を continuer に統一して死蔵化したため)。
 // 設計は docs/archive/design-revision-backchannel-prosody-lv2.md。
+
+// --- ターン終端うなずき(ターンテイキングの視覚信号・2026-06-12 ユーザー設計) ---
+// 無音窓が閉じた瞬間(VAD endTurn=「無音枠終端」)に1回うなずき、ターンを受け取ったことを**音を増やさず視覚で**示す。
+// 深さは**発話の長さ(秒)**で出し分ける:短い発話=情報量が少なく即理解=軽く / 長い発話=情報量が多く
+// 「一拍考えてから答える」所作=重め。発話秒数は endTurn 時点で確定済み(STT 待ち不要=窓終端ぴったりで出る)。
+// フィラー(音声)は据え置き=ここは body=フォルダ側の非言語表現のみ。設計憲法:遅延では決めない(問い/発話の性質で決める)。
+/** これ以上の発話長(ms)を「長い=重めのうなずき」とみなす境目。10秒=人が即答できる情報量の上限の目安(ユーザー設計)。 */
+export const TURN_NOD_LONG_THRESHOLD_MS = 10000;
+/** 短い発話のうなずきの深さ(基準 1.0=従来のうなずき幅 比)。控えめ(実機で半分に・2026-06-12 ユーザー)。 */
+export const TURN_NOD_STRENGTH_SHORT = 0.4;
+/** 長い発話のうなずきの深さ(基準 1.0=従来のうなずき幅 比)。やや深め(実機で半分に・2026-06-12 ユーザー)。 */
+export const TURN_NOD_STRENGTH_LONG = 0.8;
 
 // --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
 

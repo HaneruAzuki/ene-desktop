@@ -59,7 +59,8 @@ export class VrmRenderer {
   private talking = false;
   private blinkT = 0;
   private blinkPhase = 0;
-  private nodPhase = 0; // 相槌のうなずき(>0 の間だけ頭を下げる)
+  private nodPhase = 0; // うなずき(>0 の間だけ頭を下げる)
+  private nodStrength = 1; // うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け)
   private mouthOpen = 0; // 平滑化した開口量
   private acc = 0; // 30fps cap 用の時間アキュムレータ
   private rafId: number | null = null;
@@ -140,8 +141,9 @@ export class VrmRenderer {
     this.talking = talking;
   }
 
-  /** 相槌のうなずきを1回起こす(task_18 のうなずきの VRM 版)。 */
-  nod(): void {
+  /** うなずきを1回起こす(task_18 のうなずきの VRM 版)。strength=深さ(1.0=相槌の基準)。 */
+  nod(strength = 1): void {
+    this.nodStrength = strength;
     this.nodPhase = 1;
   }
 
@@ -288,8 +290,9 @@ export class VrmRenderer {
     if (!neck) return;
     // 代入で 0→下→0 の一往復(加算は累積して首が下がり続けるので不可)。終了後は中立(0)へ戻す。
     if (this.nodPhase > 0) {
-      this.nodPhase = Math.max(0, this.nodPhase - delta * 3);
-      neck.rotation.x = Math.sin((1 - this.nodPhase) * Math.PI) * 0.25;
+      // 減衰係数 2 = 一往復 約0.5秒(3=約0.33秒 から 1.5倍ゆっくり・「ピョコン」回避・2026-06-12 ユーザー)。
+      this.nodPhase = Math.max(0, this.nodPhase - delta * 2);
+      neck.rotation.x = Math.sin((1 - this.nodPhase) * Math.PI) * 0.25 * this.nodStrength;
     } else {
       neck.rotation.x = 0;
     }

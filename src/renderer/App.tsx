@@ -9,7 +9,7 @@ import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
-import { STT_SAMPLE_RATE } from '../shared/constants';
+import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../shared/constants';
 import type { CharacterInfo } from '../shared/types/ipc';
 import type { CharacterState } from '../shared/types/animation';
 import type { VoiceInputMode } from '../shared/types/settings';
@@ -41,7 +41,8 @@ export function App(): React.ReactElement | null {
   const [voiceInputMode, setVoiceInputMode] = useState<VoiceInputMode>('push-to-talk');
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
-  const [nodKey, setNodKey] = useState(0); // 相槌のうなずき(増えるたびに1回うなずく・task_18)
+  const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
+  const [nodStrength, setNodStrength] = useState(1); // うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け)
   const [charState, setCharState] = useState<CharacterState>({
     activity: 'idle',
     emotion: 'neutral',
@@ -137,6 +138,16 @@ export function App(): React.ReactElement | null {
   useEffect(() => {
     window.ene.onBackchannel((wav) => {
       if (wav) void playBackchannel(wav);
+      setNodStrength(BACKCHANNEL_NOD_STRENGTH); // 相槌のうなずきは控えめ(ターン終端の浅い側と同程度)
+      setNodKey((k) => k + 1);
+    });
+  }, []);
+
+  // ターン終端うなずき(2026-06-12): 無音窓終端で1回うなずき、ターン受け取りを視覚で示す(音は鳴らさない)。
+  //   深さ(strength)は発話の長さで出し分け(main 側で算出)=短い発話は軽く・長い発話は重め。
+  useEffect(() => {
+    window.ene.onTurnNod((strength) => {
+      setNodStrength(strength);
       setNodKey((k) => k + 1);
     });
   }, []);
@@ -452,6 +463,7 @@ export function App(): React.ReactElement | null {
         animation={characterInfo.animation}
         state={charState}
         nodKey={nodKey}
+        nodStrength={nodStrength}
         onClick={openInput}
         vrmConfig={vrmConfig}
         vrmModel={vrmModel}
