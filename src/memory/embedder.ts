@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { log } from '../shared/logger';
-import { getModelsDir } from '../storage/paths';
+import { getModelsDir } from '../shared/node/paths';
 import {
   EMBEDDING_MODEL_DIR,
   EMBEDDING_QUERY_PREFIX,

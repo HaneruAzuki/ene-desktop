@@ -104,7 +104,7 @@ export interface ActiveCharacter {
 
 /**
  * 現在状態レイヤー(task_16・決定5)。更新可能な“今”(事実のみ・感情スカラーなし)。
- * characters/{id}/current-state.json。不在でも background のみで動く(後方互換)。
+ * {id}/current-state.json。不在でも background のみで動く(後方互換)。
  */
 export interface CurrentState {
   characterId: string;

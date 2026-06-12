@@ -4,7 +4,7 @@ import os from 'node:os';
 import { promises as fs } from 'node:fs';
 
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getShortTermPath: (): string => `${h.memDir}/short-term.json`,
   getSemanticPath: (): string => `${h.memDir}/semantic.json`,
   getMemoryDir: (): string => h.memDir,
@@ -13,7 +13,7 @@ vi.mock('../../src/storage/paths', () => ({
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
 }));
 
@@ -21,7 +21,7 @@ import { extractFromShortTerm } from '../../src/memory/extraction-trigger';
 import { getShortTerm } from '../../src/memory/short-term';
 import { getSemantic } from '../../src/memory/semantic';
 import { loadAllEpisodicFiles } from '../../src/memory/episodic';
-import { writeJson } from '../../src/storage/json-store';
+import { writeJson } from '../../src/shared/node/json-store';
 import type { ShortTermEntry } from '../../src/shared/types/memory';
 
 beforeEach(async () => {

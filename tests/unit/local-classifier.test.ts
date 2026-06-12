@@ -3,7 +3,7 @@ import {
   classifyByKeyword,
   classifyByEmbedding,
   classifyTopicLocal,
-} from '../../src/router/local-classifier';
+} from '../../src/knowledge/local-classifier';
 import type { Embedder } from '../../src/memory/embedder';
 import type { CharacterKnowledgeDomains, DomainLevel } from '../../src/shared/types/character';
 

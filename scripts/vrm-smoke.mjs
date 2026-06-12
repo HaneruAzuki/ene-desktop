@@ -3,7 +3,7 @@
 // 目的: 成功基準7(常駐 CPU 3% / 配布 100MB)のうち、3D表示の常駐 CPU/RAM を実機検証する。
 //
 // 使い方:
-//   npm run vrm:smoke                       … 既定 characters/model/Torimi.vrm を読み込む
+//   npm run vrm:smoke                       … 既定 ene/torimi.vrm を読み込む
 //   ENE_VRM="C:\\path\\to\\foo.vrm" npm run vrm:smoke
 //
 // 注意: これは計測専用の使い捨て。配布物にもアプリ本体フローにも含めない。
@@ -15,10 +15,10 @@ import { existsSync } from 'node:fs';
 const here = dirname(fileURLToPath(import.meta.url));
 const vrmPath = process.env.ENE_VRM
   ? resolve(process.env.ENE_VRM)
-  : resolve(here, '../characters/model/Torimi.vrm');
+  : resolve(here, '../ene/torimi.vrm');
 
 if (!existsSync(vrmPath)) {
-  console.error(`VRM が見つかりません: ${vrmPath}\nENE_VRM=パス で指定するか characters/model/ に置いてください。`);
+  console.error(`VRM が見つかりません: ${vrmPath}\nENE_VRM=パス で指定するか ene/ に置いてください。`);
   process.exit(1);
 }
 

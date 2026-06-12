@@ -5,9 +5,9 @@ import { promises as fs } from 'node:fs';
 
 // 記憶の非破壊更新(supersede/refine/reattribute)の全パターン検証。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateBackchannelPool } from '../../src/character/backchannel-loader';
+import { validateBackchannelPool } from '../../src/voice/backchannel-loader';
 
 // backchannels.json の検証(純粋ロジック)。continuer 必須・型ごとに空でない文字列のみ採用。
 

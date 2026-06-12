@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { join, relative, isAbsolute } from 'node:path';
-import { getMemoryDir } from '../storage/paths';
-import { readJson, writeJson, listJsonFiles } from '../storage/json-store';
+import { getMemoryDir } from '../shared/node/paths';
+import { readJson, writeJson, listJsonFiles } from '../shared/node/json-store';
 import { EPISODIC_SCHEMA_VERSION } from '../shared/constants';
 import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
 
@@ -33,7 +33,7 @@ export function episodicId(memory: EpisodicMemory): string {
  *
  * セキュリティ:id は LLM 由来の targetFile/category を含みうる(update.ts 経由)。
  * パストラバーサル(`../` で episodic ルート外へ脱出)を厳格に拒否する。
- * 方針は src/os/validators.ts validatePath と同様(resolve→relative→境界判定)。
+ * 方針は src/app/main/os/validators.ts validatePath と同様(resolve→relative→境界判定)。
  *  1. 区切りで割って ".." セグメントを含むなら即拒否(`../`・`..\\` 両対応)。
  *  2. 各セグメントが絶対パス断片なら拒否(`C:\\...` や `/etc` の埋め込みを弾く)。
  *  3. 解決後に root からの相対が ".." 始まり or 絶対なら拒否(境界の最終確認)。

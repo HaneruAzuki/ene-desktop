@@ -18,7 +18,7 @@ import { loadCharacterProfile } from '../../../src/character/loader';
 import { buildSystemPrompt } from '../../../src/character/system-prompt-builder';
 
 beforeEach(() => {
-  h.appPath = process.cwd(); // 実際の characters/ene を読む
+  h.appPath = process.cwd(); // 実際の ene/ を読む
 });
 
 describe('受入: 知らない領域の認識(成功基準4 の機構)', () => {

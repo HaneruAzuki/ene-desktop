@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { promises as fs } from 'node:fs';
 
-// app.getAppPath() を制御して characters/ のルートを差し替える。
+// app.getAppPath() を制御してキャラ定義のルート(直下の {characterId}/)を差し替える。
 const h = vi.hoisted(() => ({ appPath: process.cwd() }));
 vi.mock('electron', () => ({
   app: {
@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
 import { loadCharacterProfile } from '../../src/character/loader';
 
 beforeEach(() => {
-  h.appPath = process.cwd(); // 既定: 実際の characters/ene を読む
+  h.appPath = process.cwd(); // 既定: 実際の ene/ を読む
 });
 
 describe('character loader (設計書 §3.1)', () => {
@@ -26,7 +26,7 @@ describe('character loader (設計書 §3.1)', () => {
     expect(p.identity.name).toBe('魚川トリミ');
     expect(p.knowledgeDomains.fallback).toBe('medium');
     expect(p.fewshot.examples.tech_high.length).toBeGreaterThan(0);
-    expect(p.portraitPath).toContain(path.join('characters', 'ene', 'portrait.png'));
+    expect(p.portraitPath).toContain(path.join('ene', 'portrait.png'));
   });
 
   it('ファイルが欠けていれば例外を throw する', async () => {
@@ -36,7 +36,7 @@ describe('character loader (設計書 §3.1)', () => {
 
   it('characterId 不一致で例外を throw する', async () => {
     const base = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-mismatch-'));
-    const dir = path.join(base, 'characters', 'ene');
+    const dir = path.join(base, 'ene');
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(
       path.join(dir, 'identity.json'),

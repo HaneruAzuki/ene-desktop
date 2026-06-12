@@ -80,7 +80,7 @@ Desktop Character Agent(コードネーム:ENE)
 | ID | 要件 |
 |----|------|
 | F-ANIM-01 | キャラ表示は状態機械(activity: idle/thinking/talking, emotion, pose)で駆動する |
-| F-ANIM-02 | スプライト・状態→画像の対応・フレーム間隔は `characters/{id}/animation.json` で定義(コードにハードコードしない) |
+| F-ANIM-02 | スプライト・状態→画像の対応・フレーム間隔は `{id}/animation.json` で定義(コードにハードコードしない) |
 | F-ANIM-03 | idle 中は呼吸の微動(CSS)を再生し、長時間 idle で稀に寝そべり(sofa)へ遷移する(まばたきは 0.2 では未実装) |
 | F-ANIM-04 | 応答待ち(thinking)中は「考える」表示を出す(待ちの不安を和らげるもので、遅延を隠す演出にはしない。応答自体は常に最小化する・哲学 §1.4 軸②) |
 | F-ANIM-05 | 応答表示(talking)中は口パク(開閉交互)を再生。0.2 は時間ベース・メッセージ長に比例、0.3 で音声振幅ドリブンに差し替える |
@@ -198,7 +198,7 @@ OS Integration Layerにコマンド実行を委譲し、付随するキャラ応
 | F-CHAR-06 | 知識ドメインは5段階(high / medium / low / none / refuse)で管理する |
 | F-CHAR-07 | 各ドメインに対応するFew-shot応答例を保持する |
 | F-CHAR-08 | **一人の固定キャラ(魚川トリミ)**とする。キャラ依存値は JSON 外出しを維持するが、入れ替えUI・多キャラ対応は持たない(2026-06 方針転換) |
-| F-CHAR-09 | キャラは自身の人生記憶(canon)を `characters/{id}/life-memory.json` に持てる(任意・provenance:self・読取専用)。想起プールに統合し会話に織り交ぜる(実装済み・task_16) |
+| F-CHAR-09 | キャラは自身の人生記憶(canon)を `{id}/life-memory.json` に持てる(任意・provenance:self・読取専用)。想起プールに統合し会話に織り交ぜる(実装済み・task_16) |
 
 ### 2.7 知識ドメイン判定(Knowledge Router)
 
@@ -378,7 +378,7 @@ MVPでは Episodic Memory に `importance` を必須化することで、
 | ID | 要件 |
 |----|------|
 | F-VOICE-01 | 音声合成(TTS)は `TtsEngine` インターフェースで差し替え可能とする(§4.4 疎結合)。MVP 0.3 実装は AivisSpeech(VOICEVOX互換のローカル HTTP API・既定 `127.0.0.1:10101`)。音声を外部クラウドへ送らない(ローカル合成) |
-| F-VOICE-02 | emotion ラベル→スタイルID/合成パラメータの対応は `characters/{id}/voice.json` に外出しする(コードにハードコードしない・§4.5)。`neutral` を必須フォールバックとする。`pitchScale` は音質劣化のため使わない(声質はモデル選択＋スタイルで決める) |
+| F-VOICE-02 | emotion ラベル→スタイルID/合成パラメータの対応は `{id}/voice.json` に外出しする(コードにハードコードしない・§4.5)。`neutral` を必須フォールバックとする。`pitchScale` は音質劣化のため使わない(声質はモデル選択＋スタイルで決める) |
 | F-VOICE-03 | 応答は読み上げ用ひらがな `reading`(任意)を持てる。TTS は `reading` があればそれを、無ければ表示文 `message` を読む(漢字の誤読対策) |
 | F-VOICE-04 | 確定応答を文単位で合成し、文ごとに音声チャンク(WAV)を renderer へ送って逐次再生する(吹き出しは即時表示・音声は後追いで届く) |
 | F-VOICE-05 | 音声認識(STT)は完全ローカル(main プロセス・`onnxruntime-node`・既定 `whisper-small`・env `ENE_STT_MODEL_DIR` で `whisper-large-v3-turbo` 等に切替可・N-LAT-6)。録音音声は外部送信せず STT 入力にのみ使う。脳(Claude)へ送るのは確定テキストのみ |

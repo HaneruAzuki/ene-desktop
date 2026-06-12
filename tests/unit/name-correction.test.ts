@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { correctNameMishear } from '../../src/conversation/name-correction';
+import { correctNameMishear } from '../../src/voice/name-correction';
 
 // STT 名前誤認の保守補正(B-10 Part4)。**呼びかけ位置**(先頭/末尾、句読点・空白区切り)で自称へ置換。
 // 文中の正当語(取り見る/鳥見に行く 等)は触らない=過補正回避。

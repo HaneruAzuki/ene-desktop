@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reconcileVoiceConfig } from '../../src/conversation/voice-provisioner';
+import { reconcileVoiceConfig } from '../../src/voice/voice-provisioner';
 import type { TtsStyle } from '../../src/shared/types/voice';
 
 // task_17:音声の自動プロビジョニング(design-revision-voice §4.3)。

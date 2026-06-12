@@ -5,7 +5,7 @@ import { promises as fs } from 'node:fs';
 
 // 人生記憶 canon ローダ(task_16)。provenance:self 強制・ID=self/N・不在は空。
 const h = vi.hoisted(() => ({ dir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
   getLifeMemoryPath: (): string => `${h.dir}/life-memory.json`,
 }));

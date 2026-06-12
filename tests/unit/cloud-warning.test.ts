@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCloudSyncFolder } from '../../src/storage/cloud-warning';
+import { isCloudSyncFolder } from '../../src/shared/node/cloud-warning';
 
 describe('cloud-warning (設計書 §7.1)', () => {
   it('OneDrive 配下を検知する', () => {

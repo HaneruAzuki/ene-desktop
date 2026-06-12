@@ -5,14 +5,14 @@ import { promises as fs } from 'node:fs';
 
 // 想起エンジン(MemoryRetriever)の全パターン検証。API は使わない(純粋ロジック)。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
 }));
 

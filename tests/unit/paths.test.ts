@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
 
 // json-store をモックして refreshActiveCharacterId を制御
 const h = vi.hoisted(() => ({ readJson: vi.fn() }));
-vi.mock('../../src/storage/json-store', () => ({ readJson: h.readJson }));
+vi.mock('../../src/shared/node/json-store', () => ({ readJson: h.readJson }));
 
 import { app } from 'electron';
 import {
@@ -27,7 +27,7 @@ import {
   getMachineDataDir,
   setActiveCharacterId,
   refreshActiveCharacterId,
-} from '../../src/storage/paths';
+} from '../../src/shared/node/paths';
 
 function setPackaged(v: boolean): void {
   (app as unknown as { isPackaged: boolean }).isPackaged = v;

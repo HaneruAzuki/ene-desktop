@@ -4,7 +4,7 @@ import os from 'node:os';
 import { promises as fs } from 'node:fs';
 
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,

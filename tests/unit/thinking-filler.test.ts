@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldPlayThinkingFiller } from '../../src/conversation/thinking-filler';
+import { shouldPlayThinkingFiller } from '../../src/voice/thinking-filler';
 import type { RouterResult } from '../../src/shared/types/router';
 import type { DomainLevel } from '../../src/shared/types/character';
 

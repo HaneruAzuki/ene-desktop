@@ -6,14 +6,14 @@ import { promises as fs } from 'node:fs';
 // 想起エンジンのハイブリッド(語彙＋意味の RRF 合流)と、モデル不在時の語彙フォールバック検証。
 // 埋め込みはモック注入(API・実モデル不要)。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
 }));
 

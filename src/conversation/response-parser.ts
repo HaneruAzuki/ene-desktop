@@ -1,7 +1,7 @@
 import type { ConversationResponse } from '../shared/types/conversation';
 import type { OsAction } from '../shared/types/os';
 import { extractJsonObject, normalizeEmotion, VALID_OS_ACTIONS } from '../shared/llm-parse';
-import { stripRuby, rubyToReading } from './ruby';
+import { stripRuby, rubyToReading } from '../voice/ruby';
 
 // JSON 応答パースの三段構え(設計書 §3.4「パース成功率の三段構え」)。
 // zod 等は使わず手書きの型ガードで検証する。

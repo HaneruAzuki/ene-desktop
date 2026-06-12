@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { turnNodStrength } from '../../src/conversation/turn-nod';
+import { turnNodStrength } from '../../src/voice/turn-nod';
 import {
   TURN_NOD_LONG_THRESHOLD_MS,
   TURN_NOD_STRENGTH_SHORT,

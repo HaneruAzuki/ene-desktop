@@ -1,12 +1,12 @@
-import { getLifeMemoryPath, getActiveCharacterId } from '../storage/paths';
-import { readJson } from '../storage/json-store';
+import { getLifeMemoryPath, getActiveCharacterId } from '../shared/node/paths';
+import { readJson } from '../shared/node/json-store';
 import { migrateEpisodic } from './episodic';
 import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
 
 // 人生記憶 canon の読み込み(task_16・design-revision-character-heart §2)。
 //
 // canon = 作家が書いたキャラ自身の人生(provenance:'self')。キャラ資産として
-// characters/{id}/life-memory.json に同梱され、**読み取り専用・忘却外・supersede 外**。
+// {id}/life-memory.json に同梱され、**読み取り専用・忘却外・supersede 外**。
 // 想起プールには user episodic と統合して入るが、保存・更新・mood 導出の対象にはしない。
 
 /** canon 記録の ID。data/ の相対パスと衝突しないよう "self/" 名前空間にする。 */

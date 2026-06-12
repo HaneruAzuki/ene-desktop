@@ -42,7 +42,7 @@ export interface AnimationMap {
 export interface CharacterAnimation {
   characterId: string;
   frameSize: { width: number; height: number };
-  // フレーム名 → 画像ファイル名(characters/{id}/ 配下。task_13 D1: sprites/ サブdirは作らない)
+  // フレーム名 → 画像ファイル名({id}/ 配下。task_13 D1: sprites/ サブdirは作らない)
   frames: Record<string, string>;
   map: AnimationMap;
   timing?: AnimationTiming;

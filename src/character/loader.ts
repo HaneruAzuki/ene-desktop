@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { getCharacterDir, getCurrentStatePath } from '../storage/paths';
-import { readJson } from '../storage/json-store';
+import { getCharacterDir, getCurrentStatePath } from '../shared/node/paths';
+import { readJson } from '../shared/node/json-store';
 import type {
   CharacterIdentity,
   CharacterBackground,

@@ -64,8 +64,8 @@
 
 - 全25項目(5質問 × 5項目)が満たされたら **成功基準8 達成**
 - 1つでも満たされなかったら、該当箇所を修正してから再判定
-- 修正は (1) `characters/ene/identity.json` の personality 強化、
-  (2) `characters/ene/fewshot.json` の例追加、
+- 修正は (1) `ene/identity.json` の personality 強化、
+  (2) `ene/fewshot.json` の例追加、
   (3) AI自称防止の検知パターン強化(`src/conversation/ai-self-reference.ts` 等)のいずれかで対応する
 
 ---

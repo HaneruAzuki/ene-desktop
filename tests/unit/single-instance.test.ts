@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({ lock: vi.fn() }));
 vi.mock('electron', () => ({ app: { requestSingleInstanceLock: h.lock } }));
 
-import { acquireSingleInstanceLock } from '../../src/main/single-instance';
+import { acquireSingleInstanceLock } from '../../src/app/main/single-instance';
 
 beforeEach(() => h.lock.mockReset());
 

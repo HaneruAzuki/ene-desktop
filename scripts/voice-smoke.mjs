@@ -7,7 +7,7 @@
 //   1. AivisSpeech(または AivisSpeech-Engine の run.exe)を起動 → http://127.0.0.1:10101 が立つ
 //   2. torimi.aivmx を %APPDATA%\AivisSpeech-Engine\Models\ に配置
 //   3. node scripts/voice-smoke.mjs   (または npm run voice:smoke)
-//   4. voice-smoke-out/ の WAV を再生して声を確認。出力された styleId を characters/ene/voice.json に反映可。
+//   4. voice-smoke-out/ の WAV を再生して声を確認。出力された styleId を ene/voice.json に反映可。
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -67,7 +67,7 @@ async function main() {
     flat[0];
   const styleId = pick?.id ?? params.styleId ?? 0;
   console.log(`\n→ 使用 styleId: ${styleId}  (${pick?.name ?? '?'})`);
-  console.log('   ※ この styleId を characters/ene/voice.json の neutral.styleId に反映できます\n');
+  console.log('   ※ この styleId を ene/voice.json の neutral.styleId に反映できます\n');
 
   await mkdir(outDir, { recursive: true });
 

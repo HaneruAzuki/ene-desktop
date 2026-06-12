@@ -1,5 +1,5 @@
-import { getSemanticPath } from '../storage/paths';
-import { readJson, writeJson } from '../storage/json-store';
+import { getSemanticPath } from '../shared/node/paths';
+import { readJson, writeJson } from '../shared/node/json-store';
 import { validateSemantic } from './schema-validation';
 import type { SemanticMemory } from '../shared/types/memory';
 

@@ -5,9 +5,9 @@ import { promises as fs } from 'node:fs';
 
 // 逆引き索引(entity/keyword)の検証。派生キャッシュ＝JSON から再生成可能であることも確認。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,

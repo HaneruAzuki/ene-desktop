@@ -5,7 +5,7 @@ import { promises as fs } from 'node:fs';
 
 // データモデル v2(ID・マイグレーション・byId 読み書き・supersede 除外)の検証。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,

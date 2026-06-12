@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidKeyFormat, testApiKey } from '../../src/main/api-key-tester';
+import { isValidKeyFormat, testApiKey } from '../../src/app/main/api-key-tester';
 
 describe('isValidKeyFormat (設計書 §3.7 段階1)', () => {
   it('sk-ant- で始まり50文字以上なら true', () => {

@@ -15,8 +15,8 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { encryptAndSaveApiKey, loadAndDecryptApiKey } from '../../../src/storage/encryption';
-import { getApiKeyPath } from '../../../src/storage/paths';
+import { encryptAndSaveApiKey, loadAndDecryptApiKey } from '../../../src/shared/node/encryption';
+import { getApiKeyPath } from '../../../src/shared/node/paths';
 
 beforeEach(async () => {
   h.dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-acc-enc-'));

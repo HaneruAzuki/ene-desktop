@@ -1,5 +1,5 @@
-import { getConsolidationStatePath } from '../storage/paths';
-import { readJson, writeJson } from '../storage/json-store';
+import { getConsolidationStatePath } from '../shared/node/paths';
+import { readJson, writeJson } from '../shared/node/json-store';
 
 // 忘却機構の実行記録(§11.6)。最後にいつ統合(月次/年次)を回したかを残し、
 // 起動時に「未処理の期間があるか」を判定する材料にする(状態は最小・平文 JSON・§6.1)。

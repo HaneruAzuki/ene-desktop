@@ -3,12 +3,12 @@ import path from 'node:path';
 import os from 'node:os';
 import { promises as fs } from 'node:fs';
 
-// paths をモック: active-character.json は tmp、characters/ は実物(cwd)を使う。
+// paths をモック: active-character.json は tmp、キャラ定義は実物(cwd 直下の {id}/)を使う。
 const h = vi.hoisted(() => ({ acPath: '', dir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterPath: (): string => h.acPath,
-  getCharacterDir: (id: string): string => `${process.cwd()}/characters/${id}`,
-  getCurrentStatePath: (id: string): string => `${process.cwd()}/characters/${id}/current-state.json`,
+  getCharacterDir: (id: string): string => `${process.cwd()}/${id}`,
+  getCurrentStatePath: (id: string): string => `${process.cwd()}/${id}/current-state.json`,
   setActiveCharacterId: vi.fn(),
 }));
 

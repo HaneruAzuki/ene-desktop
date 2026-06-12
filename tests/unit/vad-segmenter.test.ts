@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VadSegmenter, type VadSegmenterConfig, type VadEvent } from '../../src/conversation/vad-segmenter';
+import { VadSegmenter, type VadSegmenterConfig, type VadEvent } from '../../src/voice/vad-segmenter';
 
 // VadSegmenter は純粋ロジック(確率列 → speech-start/end)。実機検証で 0.5 がクリーン分離だった
 // しきい値設計を、ヒステリシス・最小発話・最小無音・barge-in 厳格化の観点でテストする。

@@ -6,14 +6,14 @@ import { promises as fs } from 'node:fs';
 // 想起エンジンの心(mood バイアス)・開示ゲーティング・canon 統合の検証(task_16)。
 // 埋め込みは使わず(モデル不在=語彙のみ)、mood/familiarity/rng は deps 注入で決定化。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
 }));
 
@@ -26,7 +26,7 @@ function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {
 }
 
 async function writeCanon(entries: EpisodicMemory[]): Promise<void> {
-  const dir = `${h.memDir}/characters/ene`;
+  const dir = `${h.memDir}/ene`;
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(`${dir}/life-memory.json`, JSON.stringify(entries));
 }

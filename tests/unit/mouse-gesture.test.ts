@@ -3,7 +3,7 @@ import {
   exceedsDragThreshold,
   classifyGesture,
   computeWindowTopLeft,
-} from '../../src/renderer/mouse-gesture';
+} from '../../src/app/renderer/mouse-gesture';
 
 describe('mouse-gesture (設計書 §8.2)', () => {
   it('exceedsDragThreshold は 5px 以上で true', () => {

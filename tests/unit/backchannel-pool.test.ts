@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectBackchannel } from '../../src/conversation/backchannel-pool';
+import { selectBackchannel } from '../../src/voice/backchannel-pool';
 import type { BackchannelPoolData } from '../../src/shared/types/backchannel';
 
 // selectBackchannel は純粋ロジック(語プール＋型＋注入RNG → 語)。反復回避とフォールバックを検証する。

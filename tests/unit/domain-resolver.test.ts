@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDomain } from '../../src/router/domain-resolver';
+import { resolveDomain } from '../../src/knowledge/domain-resolver';
 import type { CharacterKnowledgeDomains, KnowledgeDomain } from '../../src/shared/types/character';
 
 function dom(behavior: string, fewshotKey: string): KnowledgeDomain {

@@ -5,7 +5,7 @@ import { promises as fs } from 'node:fs';
 
 // active-character.json の保存先のみ差し替える(json-store は実物を使う)。
 const h = vi.hoisted(() => ({ acPath: '', dir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterPath: (): string => h.acPath,
 }));
 

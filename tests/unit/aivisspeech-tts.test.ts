@@ -4,7 +4,7 @@ import {
   applyVoiceParams,
   parseSpeakers,
   type FetchLike,
-} from '../../src/conversation/aivisspeech-tts';
+} from '../../src/voice/aivisspeech-tts';
 
 // task_17:AivisSpeech(VOICEVOX互換)TTS クライアント(design-revision-voice §4.1)。
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateGreeting } from '../../src/main/greeting';
+import { generateGreeting } from '../../src/conversation/greeting';
 import { makeCharContext } from './fixtures';
 import type { ActiveCharacter, CharacterFewshot } from '../../src/shared/types/character';
 

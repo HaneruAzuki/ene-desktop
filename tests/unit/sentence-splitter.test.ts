@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitSentences, splitFirstChunk } from '../../src/conversation/sentence-splitter';
+import { splitSentences, splitFirstChunk } from '../../src/voice/sentence-splitter';
 
 // task_17 C3:ストリーミング TTS 用の日本語文分割(design-revision-voice §2)。
 

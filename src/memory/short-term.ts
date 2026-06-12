@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
-import { getShortTermPath } from '../storage/paths';
-import { readJson, writeJson } from '../storage/json-store';
+import { getShortTermPath } from '../shared/node/paths';
+import { readJson, writeJson } from '../shared/node/json-store';
 import { SHORT_TERM_MAX_ENTRIES } from '../shared/constants';
 import type { ShortTermEntry } from '../shared/types/memory';
 

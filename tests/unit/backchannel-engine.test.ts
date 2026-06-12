@@ -3,7 +3,7 @@ import {
   BackchannelEngine,
   frameRms,
   type BackchannelEngineConfig,
-} from '../../src/conversation/backchannel-engine';
+} from '../../src/voice/backchannel-engine';
 import type { BackchannelDecision } from '../../src/shared/types/backchannel';
 
 // BackchannelEngine は純粋ロジック(発話確率列 → 相槌スロット)。frameMs=32ms。

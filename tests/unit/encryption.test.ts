@@ -19,7 +19,7 @@ import {
   encryptAndSaveApiKey,
   loadAndDecryptApiKey,
   isApiKeyAvailable,
-} from '../../src/storage/encryption';
+} from '../../src/shared/node/encryption';
 
 beforeEach(async () => {
   h.dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-enc-'));

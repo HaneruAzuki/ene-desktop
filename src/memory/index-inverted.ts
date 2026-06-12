@@ -1,5 +1,5 @@
-import { getInvertedIndexPath } from '../storage/paths';
-import { readJson, writeJson } from '../storage/json-store';
+import { getInvertedIndexPath } from '../shared/node/paths';
+import { readJson, writeJson } from '../shared/node/json-store';
 import { loadRecallPool } from './recall-pool';
 import type { EpisodicMemory } from '../shared/types/memory';
 

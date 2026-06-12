@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decideEngineAction, waitHealthy } from '../../src/main/voice-engine';
+import { decideEngineAction, waitHealthy } from '../../src/app/main/voice-engine';
 
 // 副作用(spawn/fetch)を持たない純粋ロジックのみ検証する(N-17-12)。
 // 起動判断(decideEngineAction)とヘルス待機(waitHealthy・probe 注入)を対象にする。

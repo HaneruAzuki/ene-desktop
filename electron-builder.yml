@@ -12,7 +12,7 @@ directories:
 # ※ この同梱範囲は実機 `npm run package:portable` での起動確認が未了(手動テスト後に検証)。
 files:
   - 'out/**/*'
-  - 'characters/**/*' # 初期キャラ(JSON + portrait)を同梱
+  - 'ene/**/*' # 初期キャラ(JSON + portrait)を同梱
   - 'resources/**/*' # トレイアイコン等(実行時に nativeImage が読む・N-07-6)＋ Silero VAD モデル(task_17 Phase C)
   - '!node_modules/**/*'
   # 埋め込みランタイム(text 用途に必要な分のみ)
@@ -28,7 +28,7 @@ files:
   - 'node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node'
 asar: true
 asarUnpack:
-  - 'characters/**/*' # キャラ定義はユーザーがカスタマイズ可能なよう展開状態を維持
+  - 'ene/**/*' # キャラ定義はユーザーがカスタマイズ可能なよう展開状態を維持
   - 'node_modules/onnxruntime-node/bin/**/*' # native .dll/.node は asar 外でないとロードできない
   - 'resources/silero_vad.onnx' # VAD モデルは native onnxruntime-node が直接読む=asar 外が必須(task_17 Phase C)
 win:

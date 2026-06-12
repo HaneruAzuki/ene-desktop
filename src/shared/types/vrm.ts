@@ -3,7 +3,7 @@ import type { EmotionLabel } from './animation';
 // VRM 表示の型(F・3D化)。
 //
 // 立ち絵(animation.json)と同じく「キャラ依存値は JSON 外出し」原則(§4.5/§5.1)に従い、
-// 感情→表情プリセットの対応・初期表示パラメータ・モデルファイル名は characters/{id}/vrm.json に持つ。
+// 感情→表情プリセットの対応・初期表示パラメータ・モデルファイル名は {id}/vrm.json に持つ。
 // コードには「どの emotion がどの VRM 表情か」を一切ハードコードしない。
 
 /** emotion ラベル → VRM 表情プリセット名(happy/angry/sad/relaxed/surprised 等)の対応。 */
@@ -32,10 +32,10 @@ export const DEFAULT_VRM_DISPLAY: VrmDisplayParams = {
   armDownDeg: 62,
 };
 
-/** characters/{id}/vrm.json のスキーマ。 */
+/** {id}/vrm.json のスキーマ。 */
 export interface VrmConfig {
   characterId: string;
-  /** モデルファイル名(characters/{id}/ 配下。例 "torimi.vrm")。 */
+  /** モデルファイル名({id}/ 配下。例 "torimi.vrm")。 */
   model: string;
   expressionMap: VrmExpressionMap;
   display: VrmDisplayParams;

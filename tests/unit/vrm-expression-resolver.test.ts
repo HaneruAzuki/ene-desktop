@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { managedPresets, resolveExpressionWeights } from '../../src/renderer/vrm/expression-resolver';
+import { managedPresets, resolveExpressionWeights } from '../../src/app/renderer/vrm/expression-resolver';
 import type { VrmExpressionMap } from '../../src/shared/types/vrm';
 
 // vrm.json と同じ既定マップで検証する。

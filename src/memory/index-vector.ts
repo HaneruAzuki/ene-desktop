@@ -1,5 +1,5 @@
-import { getVectorIndexPath } from '../storage/paths';
-import { readJson, writeJson } from '../storage/json-store';
+import { getVectorIndexPath } from '../shared/node/paths';
+import { readJson, writeJson } from '../shared/node/json-store';
 import { EMBEDDING_DIM } from '../shared/constants';
 import type { Embedder } from './embedder';
 import type { EpisodicRecord } from '../shared/types/memory';

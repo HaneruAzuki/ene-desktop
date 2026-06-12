@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({ openExternal: vi.fn(), openPath: vi.fn(), spawn: v
 vi.mock('electron', () => ({ shell: { openExternal: h.openExternal, openPath: h.openPath } }));
 vi.mock('node:child_process', () => ({ spawn: h.spawn }));
 
-import { executeOsCommand } from '../../../src/os/executor';
+import { executeOsCommand } from '../../../src/app/main/os/executor';
 
 beforeEach(() => {
   h.openExternal.mockReset().mockResolvedValue(undefined);

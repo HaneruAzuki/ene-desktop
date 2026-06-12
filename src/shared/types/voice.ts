@@ -1,7 +1,7 @@
 import type { EmotionLabel } from './animation';
 
 // 音声(TTS)レイヤーの型定義(task_17 / design-revision-voice §4)。
-// キャラ依存値(声・スタイル・パラメータ)は characters/{id}/voice.json に外出し(§4.5)。
+// キャラ依存値(声・スタイル・パラメータ)は {id}/voice.json に外出し(§4.5)。
 
 /**
  * 1スタイル(感情)の合成パラメータ。
@@ -18,7 +18,7 @@ export interface VoiceStyleParams {
   accent?: number;
 }
 
-/** characters/{id}/voice.json のスキーマ。emotion ラベル→スタイル/パラメータ。 */
+/** {id}/voice.json のスキーマ。emotion ラベル→スタイル/パラメータ。 */
 export interface VoiceConfig {
   engine: string; // 'aivisspeech' 等(将来 VOICEVOX 等へ差し替え)
   baseUrl: string; // ローカル API(例 http://127.0.0.1:10101)

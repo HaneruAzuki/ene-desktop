@@ -9,7 +9,7 @@ import path from 'node:path';
 //
 // paths をモックして記憶ファイルを一時ディレクトリへ隔離する(実 data/ を汚さない)。
 const h = vi.hoisted(() => ({ base: '' }));
-vi.mock('../../../src/storage/paths', () => ({
+vi.mock('../../../src/shared/node/paths', () => ({
   getSemanticPath: (): string => `${h.base}/semantic.json`,
   getShortTermPath: (): string => `${h.base}/short-term.json`,
   getMemoryDir: (): string => h.base,
@@ -18,7 +18,7 @@ vi.mock('../../../src/storage/paths', () => ({
   getInvertedIndexPath: (): string => `${h.base}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.base}/index/vectors.json`,
   getModelsDir: (): string => `${h.base}/models`,
-  getLifeMemoryPath: (id: string): string => `${h.base}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.base}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
 }));
 

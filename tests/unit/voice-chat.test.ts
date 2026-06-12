@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runVoiceChat, speakText, type ModelStream } from '../../src/conversation/voice-chat';
+import { runVoiceChat, speakText, type ModelStream } from '../../src/voice/voice-chat';
 import type { TtsEngine, TtsOptions, VoiceConfig } from '../../src/shared/types/voice';
 
 // task_17:音声会話のストリーミング統合(C1/C2・design-revision-voice §2,§3)。

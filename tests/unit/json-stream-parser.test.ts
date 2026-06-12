@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createJsonStreamParser } from '../../src/conversation/json-stream-parser';
+import { createJsonStreamParser } from '../../src/voice/json-stream-parser';
 import type { EmotionLabel } from '../../src/shared/types/animation';
 import type { OsCommand } from '../../src/shared/types/os';
 

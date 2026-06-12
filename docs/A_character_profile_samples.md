@@ -7,7 +7,7 @@
 > 本サンプルは ENE(コードネーム:デフォルトキャラ)を題材としているが、
 > 構造とフィールドの使い方は他キャラにも共通する。
 >
-> Claude Code が実装着手時に `/characters/ene/` 配下にコピーして
+> Claude Code が実装着手時に `/ene/` 配下にコピーして
 > 初期キャラの定義として使用することを想定する。
 
 ---
@@ -44,7 +44,7 @@
 
 > ⚠️ 下のサンプルは初期プレースホルダ(父=ITエンジニア 等)。**2026-06 方針転換後の正典(canon)では
 > 「父は放置PC・トリミは完全独学・軽い確執」**で、本サンプルと食い違う。実際の
-> `characters/ene/background.json` を canon に合わせる作業は別途の**創作タスク**
+> `ene/background.json` を canon に合わせる作業は別途の**創作タスク**
 > (`docs/character-life-memory-canon-plan.md` を入力)で行う。
 
 ```json
@@ -294,7 +294,7 @@ ENE の知識範囲を5段階で定義する。
 - 形式:PNG(透過対応)
 - 推奨サイズ:**全身立ち絵 832 × 1281 程度**(縦長・透過)。表示は `object-fit: contain` で枠に合わせる(N-13-2)
   - 旧「240×320」は半身プレースホルダ前提の値。全身立ち絵では小さすぎ・縦横比も不一致のため改めた
-- 配置:`/characters/ene/portrait.png`(neutral・口閉じ兼フォールバック)。表情×口開閉の差分は A.7 の `animation.json` を参照
+- 配置:`/ene/portrait.png`(neutral・口閉じ兼フォールバック)。表情×口開閉の差分は A.7 の `animation.json` を参照
 - 注意:キャラ画像はライセンスに留意して用意すること
 
 ---
@@ -302,7 +302,7 @@ ENE の知識範囲を5段階で定義する。
 ## A.6 ファイル配置まとめ
 
 ```
-/characters/ene/
+/ene/
 ├── identity.json              ← A.1(人格コア)
 ├── background.json            ← A.2(背景設定)
 ├── knowledge_domains.json     ← A.3(知識ドメイン)
@@ -325,7 +325,7 @@ ENE の知識範囲を5段階で定義する。
 ## A.7 animation.json(任意・task_13 アニメ基盤)
 
 状態(emotion/口開閉/考え中/寝そべり)→ スプライトの対応を定義する。`frames` は
-`characters/{id}/` 直下の立ち絵ファイル名(N-13-1: sprites/ サブdirは作らない)。
+`{id}/` 直下の立ち絵ファイル名(N-13-1: sprites/ サブdirは作らない)。
 無い/不正なら単一 portrait 表示にフォールバック(F-ANIM-11)。
 
 ```jsonc

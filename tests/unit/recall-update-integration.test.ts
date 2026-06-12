@@ -6,7 +6,7 @@ import { promises as fs } from 'node:fs';
 // task_15 ショーケースの結合検証(retriever → extractor → update の persist フロー)。
 // LLM は注入モックで代替するため API は使わない。
 const h = vi.hoisted(() => ({ memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getShortTermPath: (): string => `${h.memDir}/short-term.json`,
   getSemanticPath: (): string => `${h.memDir}/semantic.json`,
   getMemoryDir: (): string => h.memDir,
@@ -15,7 +15,7 @@ vi.mock('../../src/storage/paths', () => ({
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
-  getLifeMemoryPath: (id: string): string => `${h.memDir}/characters/${id}/life-memory.json`,
+  getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getActiveCharacterId: (): string => 'ene',
 }));
 
@@ -23,7 +23,7 @@ import { saveEpisodic, loadEpisodicById, episodicId } from '../../src/memory/epi
 import { indexEpisodic, queryInverted } from '../../src/memory/index-inverted';
 import { retrieve } from '../../src/memory/retriever';
 import { extractFromShortTerm } from '../../src/memory/extraction-trigger';
-import { writeJson } from '../../src/storage/json-store';
+import { writeJson } from '../../src/shared/node/json-store';
 import type { EpisodicMemory, ShortTermEntry } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {

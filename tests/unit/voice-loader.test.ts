@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateVoiceConfig, resolveStyle } from '../../src/character/voice-loader';
+import { validateVoiceConfig, resolveStyle } from '../../src/voice/voice-loader';
 import type { VoiceConfig } from '../../src/shared/types/voice';
 
 // task_17:voice.json の検証とスタイル解決(design-revision-voice §4.2)。

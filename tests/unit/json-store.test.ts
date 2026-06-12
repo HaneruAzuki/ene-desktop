@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readJson, writeJson, listJsonFiles } from '../../src/storage/json-store';
+import { readJson, writeJson, listJsonFiles } from '../../src/shared/node/json-store';
 
 let dir: string;
 

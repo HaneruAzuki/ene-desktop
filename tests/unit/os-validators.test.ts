@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { validateUrl, validatePath } from '../../src/os/validators';
+import { validateUrl, validatePath } from '../../src/app/main/os/validators';
 
 describe('validateUrl (設計書 §3.5)', () => {
   it('http/https を許可する', () => {

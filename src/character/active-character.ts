@@ -1,5 +1,5 @@
-import { getActiveCharacterPath } from '../storage/paths';
-import { readJson, writeJson } from '../storage/json-store';
+import { getActiveCharacterPath } from '../shared/node/paths';
+import { readJson, writeJson } from '../shared/node/json-store';
 import { nowLocalIso } from '../shared/datetime';
 import type { ActiveCharacter } from '../shared/types/character';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveFrame } from '../../src/renderer/resolve-frame';
+import { resolveFrame } from '../../src/app/renderer/resolve-frame';
 import type { CharacterAnimationData, CharacterState } from '../../src/shared/types/animation';
 
 // フレーム解決(task_13・F-ANIM)の純粋ロジック検証。

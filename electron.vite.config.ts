@@ -9,7 +9,7 @@ export default defineConfig({
     build: {
       outDir: 'out/main',
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') },
+        input: { index: resolve(__dirname, 'src/app/main/index.ts') },
         // 埋め込みランタイムは ESM＋ネイティブ依存(onnxruntime-node の .node)を含むため
         // バンドルせず外部化する。実行時に node_modules から解決し、native は asarUnpack で同梱する
         // (electron-builder.yml)。Phase B(task_15)。
@@ -25,22 +25,22 @@ export default defineConfig({
       outDir: 'out/preload',
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/preload/index.ts'),
+          index: resolve(__dirname, 'src/app/preload/index.ts'),
           // APIキーダイアログ専用 preload(out/preload/api-key-dialog.js)
-          'api-key-dialog': resolve(__dirname, 'src/preload/api-key-dialog-preload.ts'),
+          'api-key-dialog': resolve(__dirname, 'src/app/preload/api-key-dialog-preload.ts'),
         },
       },
     },
   },
   renderer: {
-    root: 'src/renderer',
+    root: 'src/app/renderer',
     build: {
       outDir: 'out/renderer',
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/renderer/index.html'),
+          index: resolve(__dirname, 'src/app/renderer/index.html'),
           // APIキーダイアログ専用ページ(out/renderer/api-key-dialog/index.html)
-          apiKeyDialog: resolve(__dirname, 'src/renderer/api-key-dialog/index.html'),
+          apiKeyDialog: resolve(__dirname, 'src/app/renderer/api-key-dialog/index.html'),
         },
       },
     },

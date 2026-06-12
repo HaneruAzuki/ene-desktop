@@ -1,4 +1,4 @@
-import { setActiveCharacterId } from '../storage/paths';
+import { setActiveCharacterId } from '../shared/node/paths';
 import { todayLocalYmd } from '../shared/datetime';
 import { loadCharacterProfile } from './loader';
 import { loadOrCreateActiveCharacter } from './active-character';

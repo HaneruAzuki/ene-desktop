@@ -5,12 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 
 const h = vi.hoisted(() => ({ dataDir: '', memDir: '' }));
-vi.mock('../../src/storage/paths', () => ({
+vi.mock('../../src/shared/node/paths', () => ({
   getPortableDataDir: (): string => h.dataDir,
   getMemoryDir: (): string => h.memDir,
 }));
 
-import { ensureMemoryDirectories } from '../../src/main/init-directories';
+import { ensureMemoryDirectories } from '../../src/app/main/init-directories';
 
 beforeEach(async () => {
   h.dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-init-'));

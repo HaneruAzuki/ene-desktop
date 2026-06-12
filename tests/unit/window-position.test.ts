@@ -5,7 +5,7 @@ vi.mock('electron', () => ({
   screen: { getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }), getAllDisplays: () => [] },
 }));
 
-import { calculateDefaultPosition, clampToVisible } from '../../src/main/window-position';
+import { calculateDefaultPosition, clampToVisible } from '../../src/app/main/window-position';
 
 const WIN = { width: 240, height: 320 };
 

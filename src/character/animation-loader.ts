@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
-import { getAnimationPath, getCharacterAssetPath } from '../storage/paths';
-import { readJson } from '../storage/json-store';
+import { getAnimationPath, getCharacterAssetPath } from '../shared/node/paths';
+import { readJson } from '../shared/node/json-store';
 import { log } from '../shared/logger';
 import type {
   CharacterAnimation,

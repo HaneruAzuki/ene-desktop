@@ -3,7 +3,7 @@ import {
   VoiceTurnCoordinator,
   clampWindow,
   type VoiceTurnDeps,
-} from '../../src/main/voice-turn-coordinator';
+} from '../../src/app/main/voice-turn-coordinator';
 import {
   VAD_PROVISIONAL_SILENCE_MS,
   COALESCE_WINDOW_MIN_MS,

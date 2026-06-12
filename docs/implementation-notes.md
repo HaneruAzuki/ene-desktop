@@ -954,6 +954,21 @@
 - **コアレッシングの“間”との関係(設計判断・案A採用)**: ON 時 `endTurn` は暫定無音(`VAD_PROVISIONAL_SILENCE_MS`)で通るため、文中の長い間でも一度うなずく。これは「窓が閉じた=続けたいなら今喋って」というリズム提示として**許容**(案A)。深いうなずきは長文後=ほぼ本物の終端なので誤爆しにくい。**フィラー音声は据え置き**(`playFiller:false` のまま)。なお無音窓を一時 700ms/下限600 へ広げて試したが、適応(400–1200)に任せる方針でユーザー判断により元(500/400–1200)へ戻した。
 - §6.2: ログは ms と深さ(数値)のみ・本文なし。テスト=`tests/unit/turn-nod.test.ts`。
 
+### N-ARCH-1 🟢 ソースのフォルダ再編=ドメイン名詞をトップへ(Screaming Architecture・2026-06-12)
+- **狙い**: 公開リポジトリを cold-read する開発者に構成が一目で伝わる工学的クリーンさ。`src/` 直下を
+  プロセス・役割名(main/preload/renderer/router/storage/os)から**ドメイン名詞+土台**へ再編(振る舞い不変):
+  - `src/app/{main,preload,renderer}`=土台(Electron 配線・UI)。旧 `src/os/` は `app/main/os/` へ(OS統合は main の配線)。
+  - `src/knowledge/`=旧 `src/router/`(Knowledge Router。「router」は手段名でありドメイン名でないため改名)。
+  - `src/voice/`=conversation/character/main に散っていた声系(TTS/STT/VAD/相槌/ルビ 等)を集約。greeting は main → conversation へ。
+  - `src/shared/node/`=旧 `src/storage/`(Node 専用基盤。encryption/paths/json-store は「保存」より広い基盤のため)。
+  - キャラ定義 `characters/ene/` → **ルート直下 `ene/`**(characterId=ディレクトリ名。1キャラ固定なので `characters/` の階層は冗長。`paths.ts` は `app.getAppPath()` 直下を解決)。
+- **哲学との対応**: 四つのあり方と1:1(① `character` / ② `knowledge` / ③ `memory` / ④ `conversation`+`voice`)+土台(`app`/`shared`)。
+  軸はフォルダにしない(同一器官の断裂回避)。対応表・1ターン流れ図は新設 **`docs/05_architecture.md`**。
+- **連動した正本訂正**: 設計書 §2 ツリー全面更新。死蔵コード削除(e392674)で消えた旧 Haiku Router・旧 sentinel
+  stream-parser への「legacy 温存」記述(§3.2/§3.4)を「削除済み・git 履歴から復元可」に訂正(設計書の追従漏れ)。
+  B-06 ストリーミング音声(`ENE_VOICE_STREAMING=1` オプトイン)の現状も §3.4 に反映。
+- **検証**: typecheck / lint / 単体+受入 426 テスト / electron-vite build 全グリーン。
+
 ---
 
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動

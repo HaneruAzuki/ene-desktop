@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripRuby, rubyToReading } from '../../src/conversation/ruby';
+import { stripRuby, rubyToReading } from '../../src/voice/ruby';
 
 // 青空文庫式ルビの解決(Claude振り仮名方式)。
 
