@@ -33,9 +33,8 @@ export const SHORT_TERM_HARD_MAX = 80;
 export const FORGETTING_ENABLED_ENV = 'ENE_FORGETTING';
 
 /**
- * 音声ストリーミング(B-06・第一声短縮)を有効化する環境変数名(値 "1" で ON)。
- * 既定は無効(安全側)=従来の非ストリーミング合成。会話の最重要パスのため、
- * 実機(実 Claude streaming＋TTS＋renderer)での検証後に既定 ON へ切り替える。
+ * 音声ストリーミング(B-06・第一声短縮)の制御環境変数名。
+ * **既定オン**(2026-06-13・ユーザ試聴判定で既定 ON 化)。`ENE_VOICE_STREAMING=0` で無効化。
  * ストリーミングが失敗した場合は非ストリーミング経路へフォールバックする(配線は壊れない)。
  */
 export const VOICE_STREAMING_ENABLED_ENV = 'ENE_VOICE_STREAMING';
@@ -131,8 +130,8 @@ export const LOCAL_ROUTER_SIM_THRESHOLD = 0.55;
 // --- 二段生成(B-15b・雑談=Haiku/難題=Sonnet) ---
 
 /**
- * 二段生成を有効化する環境変数名(値 "1" で ON)。**既定オフ**=従来どおり全て Sonnet 生成。
- * キャラ一貫性(成功基準8)の試聴判定が要るため、検証用に env で切替える(承認後に既定 ON 判断)。
+ * 二段生成の制御環境変数名。**既定オン**(2026-06-13・ユーザ試聴判定でキャラ一貫性OKを確認し既定 ON 化)。
+ * `ENE_TWO_TIER=0` で無効化=全て Sonnet 生成に戻す。
  */
 export const TWO_TIER_ENABLED_ENV = 'ENE_TWO_TIER';
 /** これより長い発話は「複雑」とみなし Sonnet 生成へ(短い雑談のみ Haiku に回す)。 */

@@ -63,18 +63,20 @@ export async function generateResponse(
   const routerResult = await classifyTopicLocal(text, charContext.knowledgeDomains);
   const tMem1 = performance.now();
 
-  // 二段生成(B-15b・既定オフ ENE_TWO_TIER=1): 雑談=Haiku/難題=Sonnet。迷ったら Sonnet。
-  const twoTier = process.env[TWO_TIER_ENABLED_ENV] === '1';
+  // 二段生成(B-15b・**既定オン**・ENE_TWO_TIER=0 で無効化): 雑談=Haiku/難題=Sonnet。迷ったら Sonnet。
+  // 既定ON はユーザ試聴判定の結果(2026-06-13・キャラ一貫性OKを確認)。
+  const twoTier = process.env[TWO_TIER_ENABLED_ENV] !== '0';
   const tier = twoTier ? chooseModelTier(routerResult, text) : 'sonnet';
   const model = tier === 'haiku' ? MODEL_HAIKU : MODEL_SONNET;
 
   // 思考フィラー(設計憲法・問いの性質で判定)。投機経路では出さない(コミット前のちらつき回避・opts.playFiller)。
   if (opts.playFiller && shouldPlayThinkingFiller(routerResult, text)) runtime.playThinkingFiller?.();
 
-  // 本会話。音声＋ストリーミング ON(ENE_VOICE_STREAMING=1)なら文単位で第一声を早める(B-06)。失敗時は非ストリーミングへ。
+  // 本会話。音声があれば**既定でストリーミング**(文単位で第一声を早める・B-06)。ENE_VOICE_STREAMING=0 で無効化。
+  // 失敗時は非ストリーミングへフォールバック。既定ON はユーザ試聴判定の結果(2026-06-13)。
   const { tts, voiceConfig } = runtime;
   const streamingOn =
-    Boolean(tts && voiceConfig) && process.env[VOICE_STREAMING_ENABLED_ENV] === '1';
+    Boolean(tts && voiceConfig) && process.env[VOICE_STREAMING_ENABLED_ENV] !== '0';
   let response: ConversationResponse;
   let audioStreamed = false;
   if (streamingOn && tts && voiceConfig) {
