@@ -1,8 +1,8 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { exceedsDragThreshold, classifyGesture, computeWindowTopLeft } from '../mouse-gesture';
 import { resolveFrame } from '../resolve-frame';
 import { MOUTH_FLAP_MS } from '../constants';
 import { VrmRenderer } from '../vrm-renderer';
+import { useWindowDrag } from '../use-window-drag';
 import type { CharacterAnimationData, CharacterState } from '../../../shared/types/animation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../../shared/types/vrm';
 
@@ -38,15 +38,6 @@ interface Props {
 /** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる・PNG モード用)。1.5倍ゆっくりに(2026-06-12)。 */
 const NOD_MS = 830;
 
-interface PressState {
-  startX: number;
-  startY: number;
-  startTime: number;
-  grabX: number;
-  grabY: number;
-  isDragging: boolean;
-}
-
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
   function CharacterDisplay(
     { portraitUrl, animation, state, nodKey, nodStrength = 1, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true },
@@ -56,13 +47,7 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     const alphaCanvasRef = useRef<HTMLCanvasElement | null>(null); // PNG alpha 読取用(2D)
     const glCanvasRef = useRef<HTMLCanvasElement>(null); // VRM 描画用(WebGL)
     const rendererRef = useRef<VrmRenderer | null>(null);
-    const onClickRef = useRef(onClick);
     const stateRef = useRef(state);
-    const rafRef = useRef<number | null>(null);
-    const pendingPosRef = useRef<{ x: number; y: number } | null>(null);
-    // ドラッグ中(押下中)に window へ張った mousemove/mouseup ハンドラ。アンマウント時に確実に外すため保持する
-    // (通常は mouseup 内で外れるが、ドラッグ途中のアンマウントでは外れず漏れる)。
-    const dragHandlersRef = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
 
     // 口パク(PNG モードの talking 中のみ開閉トグル)。
     const [flapOpen, setFlapOpen] = useState(false);
@@ -73,9 +58,9 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
 
     const vrmMode = !!(vrmConfig && vrmModel && !vrmFailed);
 
-    useEffect(() => {
-      onClickRef.current = onClick;
-    }, [onClick]);
+    // ドラッグ移動(押下→閾値超えで移動 / 閾値内ならクリック)は専用フックへ分離(振る舞い不変)。
+    const { onMouseDown } = useWindowDrag(rendererRef, onClick);
+
     useEffect(() => {
       stateRef.current = state;
     }, [state]);
@@ -222,72 +207,6 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
       }),
       [],
     );
-
-    function flushMove(): void {
-      rafRef.current = null;
-      const pos = pendingPosRef.current;
-      if (pos) {
-        void window.ene.moveWindow(pos.x, pos.y);
-        pendingPosRef.current = null;
-      }
-    }
-    function scheduleMove(x: number, y: number): void {
-      pendingPosRef.current = { x, y };
-      if (rafRef.current === null) {
-        rafRef.current = requestAnimationFrame(flushMove);
-      }
-    }
-
-    function onMouseDown(e: React.MouseEvent): void {
-      const press: PressState = {
-        startX: e.screenX,
-        startY: e.screenY,
-        startTime: Date.now(),
-        grabX: e.clientX,
-        grabY: e.clientY,
-        isDragging: false,
-      };
-      const onMove = (ev: MouseEvent): void => {
-        if (!press.isDragging && exceedsDragThreshold(ev.screenX - press.startX, ev.screenY - press.startY)) {
-          press.isDragging = true;
-          rendererRef.current?.setDragging(true); // ドラッグ中は VRM 描画を止めて移動を滑らかに
-        }
-        if (press.isDragging) {
-          const pos = computeWindowTopLeft(ev.screenX, ev.screenY, press.grabX, press.grabY);
-          scheduleMove(pos.x, pos.y);
-        }
-      };
-      const onUp = (): void => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        dragHandlersRef.current = null;
-        if (press.isDragging) rendererRef.current?.setDragging(false);
-        const gesture = classifyGesture(Date.now() - press.startTime, press.isDragging);
-        if (gesture === 'click') {
-          onClickRef.current();
-        }
-      };
-      dragHandlersRef.current = { move: onMove, up: onUp };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    }
-
-    // アンマウント時のクリーンアップ: ドラッグ途中(mouseup 未到来)でも window リスナーを外し、
-    // 予約済みの位置反映 rAF をキャンセルする(リーク防止)。
-    useEffect(() => {
-      return () => {
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-        const handlers = dragHandlersRef.current;
-        if (handlers) {
-          window.removeEventListener('mousemove', handlers.move);
-          window.removeEventListener('mouseup', handlers.up);
-          dragHandlersRef.current = null;
-        }
-      };
-    }, []);
 
     function onContextMenu(e: React.MouseEvent): void {
       e.preventDefault();

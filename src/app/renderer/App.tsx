@@ -8,6 +8,7 @@ import { enqueueAudio, stopPlayback, setPlaybackHandlers, setSentenceHandler, ge
 import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
+import { useClickThrough } from './use-click-through';
 import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
 import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
@@ -21,12 +22,6 @@ import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
 // task_17: マイクは「入力欄の下・中央」の単一ボタンに統合。設定(右クリックメニュー)で
 //   Push-to-Talk(押している間録音) / ハンズフリー(VAD自動) を切替える。
 //   ボタンは ON(リッスン中)/OFF だけ示す。状態テキストは出さない(聞き取り中はキャラは neutral)。
-
-function rectContains(el: HTMLElement | null, x: number, y: number): boolean {
-  if (!el) return false;
-  const r = el.getBoundingClientRect();
-  return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
-}
 
 /** これ未満の長さ(秒)の push-to-talk 録音は誤タップ扱いで無視する。 */
 const MIN_RECORDING_SEC = 0.3;
@@ -62,7 +57,6 @@ export function App(): React.ReactElement | null {
   const gearRef = useRef<HTMLButtonElement>(null);
   const vrmPanelRef = useRef<HTMLDivElement>(null);
   const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastIgnoreRef = useRef<boolean | null>(null);
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
@@ -221,39 +215,9 @@ export function App(): React.ReactElement | null {
     return () => clearTimeout(id);
   }, [charState.activity, charState.pose]);
 
-  // クリックスルー(§8.6): キャラ不透明 OR 吹き出し OR 入力欄 OR マイク OR 歯車 OR パネル の上なら不透過。
-  // 判定には VRM のレイキャスト(やや重い)が含まれるため、mousemove ごとでなく rAF で1フレーム1回に間引く
-  // (ドラッグ中の連続 mousemove でレイキャストが詰まり移動がカクつくのを防ぐ)。
-  useEffect(() => {
-    let pending = false;
-    let mx = 0;
-    let my = 0;
-    const evaluate = (): void => {
-      pending = false;
-      const interactive =
-        (charRef.current?.isOpaqueAt(mx, my) ?? true) ||
-        rectContains(bubbleRef.current, mx, my) ||
-        rectContains(inputRef.current, mx, my) ||
-        rectContains(micButtonRef.current, mx, my) ||
-        rectContains(gearRef.current, mx, my) ||
-        rectContains(vrmPanelRef.current, mx, my);
-      const ignore = !interactive;
-      if (lastIgnoreRef.current !== ignore) {
-        lastIgnoreRef.current = ignore;
-        void window.ene.setIgnoreMouseEvents(ignore);
-      }
-    };
-    const onMove = (e: MouseEvent): void => {
-      mx = e.clientX;
-      my = e.clientY;
-      if (!pending) {
-        pending = true;
-        requestAnimationFrame(evaluate);
-      }
-    };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
+  // クリックスルー(§8.6): キャラ不透明や各 UI 要素の上なら不透過、それ以外は下の窓へ通す。
+  // 当たり判定の配線(rAF 間引き含む)は専用フックへ分離(振る舞い不変)。
+  useClickThrough({ charRef, bubbleRef, inputRef, micButtonRef, gearRef, vrmPanelRef });
 
   // 【開発用】数字キー 1〜6 で表情を強制切替し、VRM の表情レンダリングを会話なしで単体確認する。
   // dev ビルドのみ有効(本番では無効・キーマップは neutral/joy/anger/sorrow/surprise/embarrassed)。

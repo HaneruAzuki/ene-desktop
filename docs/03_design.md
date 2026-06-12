@@ -229,7 +229,8 @@ ene-desktop/
 │   │   │   ├── single-instance.ts     ← 多重起動防止
 │   │   │   ├── init-directories.ts    ← data/ 配下の初期化
 │   │   │   ├── app-runtime.ts         ← AppRuntime 型(起動時状態・main 各所で共有・ipc 逆依存回避 N-ARCH-2)
-│   │   │   ├── ipc.ts                 ← IPCハンドラ集約・send-message オーケストレーション
+│   │   │   ├── ipc.ts                 ← IPCハンドラ集約・配線(ターン司令塔は turn-engine へ分離・N-ARCH-3)
+│   │   │   ├── turn-engine.ts         ← 1ターンの司令塔 generateResponse/commitTurn/handleSendMessage(N-ARCH-3)
 │   │   │   ├── lifecycle.ts           ← 起動シーケンス(runStartupSequence)
 │   │   │   ├── shutdown.ts            ← 終了シーケンス(runShutdownSequence)
 │   │   │   ├── api-key-dialog.ts      ← APIキーダイアログ表示 + 専用IPC統合(N-09-1)
@@ -255,6 +256,8 @@ ene-desktop/
 │   │       ├── App.tsx                ← ルートコンポーネント
 │   │       ├── constants.ts           ← Renderer 用定数
 │   │       ├── mouse-gesture.ts       ← クリック/ドラッグ/長押し判別(純粋ロジック・単体テスト対象)
+│   │       ├── use-window-drag.ts     ← キャラのドラッグ移動フック(mouse-gesture を配線・N-ARCH-3)
+│   │       ├── use-click-through.ts   ← クリックスルー当たり判定フック(rAF 間引き・§8.6・N-ARCH-3)
 │   │       ├── resolve-frame.ts       ← 状態→フレーム名の解決(task_13・純粋関数)
 │   │       ├── sound.ts               ← UI 効果音(Web Audio 合成・task_13)
 │   │       ├── audio-player.ts        ← 音声チャンク(WAV)の逐次再生・barge-in 即停止(task_17)

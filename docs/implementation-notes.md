@@ -983,6 +983,22 @@
 - **両ガードの実効性を確認**: 一時プローブ(ドメイン層に `'ツンデレ'` リテラル＋app への import)で両 lint が error を出すことを検証後に撤去。
 - **検証**: typecheck / lint / lint:deps(違反0・139 modules）/ 426 テスト 全グリーン。
 
+### N-ARCH-3 🟢 巨大 glue ファイルの分割(粒度監査の hub 抽出・2026-06-13)
+- **狙い**: 1ファイル300行目安(CLAUDE.md §8.5)を超える「複数責務の glue」を凝集した単位へ分離(振る舞い不変)。
+- **ipc.ts(458→266行)**: 「IPC 登録」と「1ターンの司令塔」を分離 → 新規 `turn-engine.ts`
+  (generateResponse=副作用なし/投機可・commitTurn=副作用・handleSendMessage=直列統合フロー＋定数)。
+  coordinator は引き続き turn-engine の generate/commit を駆動。**main プロセス=typecheck＋テストで検証可**。
+- **CharacterDisplay.tsx(307→248行)**: 凝集した「窓ドラッグ」関心 → 新規フック `use-window-drag.ts`
+  (入力=rendererRef/onClick、出力=onMouseDown。専用 ref=raf/pendingPos/dragHandlers は内部へ)。**コードを変えず移設**=構造的に振る舞い不変。
+- **App.tsx(511→481行)**: 自己完結した「クリックスルー当たり判定」→ 新規フック `use-click-through.ts`
+  (rectContains＋rAF 間引き＋lastIgnoreRef を内包)。**会話/音声 state には触れない独立 DOM 関心**のみ抽出。
+- **未実施(意図的)**: App.tsx の**音声/会話ステートマシン**(respond/applyResponseUI/handleBargeIn＋voice IPC 効果群)は
+  state・refs・ハンドラが横断密結合で**綺麗な分離面が無い**(use-voice-input にすると ~10引数の広い seam=“移動しただけ”)。
+  かつ renderer 実行時挙動(音声往復・barge-in・ドラッグ・クリックスルー)は**自動テスト範囲外=実機 smoke が要る**。
+  無理な分割は最重要 UI 経路の回帰リスクのため見送り、App.tsx は会話オーケストレーションの cohesive な本体として残す。
+- **検証**: typecheck / lint / lint:deps(違反0・142 modules）/ build / 426 テスト 全グリーン。
+  ⚠️ renderer 2フックは「同一コードの移設」で構造的に不変だが、**ドラッグ移動・クリックスルー・音声入出力の実機 smoke を一度推奨**(本環境では Electron 実行不可のため未実施)。
+
 ---
 
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
