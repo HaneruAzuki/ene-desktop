@@ -5,8 +5,12 @@
 export const DAY_MS = 86_400_000;
 
 // --- 記憶レイヤー ---
-/** 短期記憶の最大保持件数(超過時に抽出→トリム)。設計書 §3.3。 */
-export const SHORT_TERM_MAX_ENTRIES = 20;
+/**
+ * 短期記憶の最大保持件数(超過時に抽出→トリム)。設計書 §3.3。
+ * 20→40(2026-06-13・存在感改修): 長い会話の序盤を「さっき言ったのに忘れる」違和感(#6)の緩和。
+ * 履歴は task_14 で増分キャッシュ済みのため、件数増のコスト増は小さい。
+ */
+export const SHORT_TERM_MAX_ENTRIES = 40;
 
 /**
  * 記憶抽出をバッチ発火する未抽出エントリ数のしきい値(B-02)。
@@ -319,3 +323,81 @@ export const WINDOW_WIDTH = 260;
 export const WINDOW_HEIGHT = 520;
 /** 画面端からの既定マージン(初回配置・右下)。 */
 export const WINDOW_EDGE_MARGIN = 20;
+
+// =============================================================================
+// 存在感の改修(2026-06-13・「人間との違和感」解消パック・docs/implementation-notes N-PRES-*)
+// =============================================================================
+
+// --- P1: 「いま」の注入(時間の中に置く・違和感 #9/#10) ---
+// 揮発コンテキストに現在日時+前回会話からの経過を一行注入する。すべてキャッシュ境界より後ろ。
+
+/**
+ * 時間帯ラベルの境界(時:0-23 を 朝/昼/夕方/夜/深夜 に割る)。値は素朴な生活感覚。
+ * [開始時, ラベル] の昇順。最初に hour >= 開始時 を満たす最大のものを採用(深夜は跨ぎを別扱い)。
+ */
+export const TIME_OF_DAY_BANDS: ReadonlyArray<{ from: number; label: string }> = [
+  { from: 5, label: '朝' },
+  { from: 11, label: '昼' },
+  { from: 16, label: '夕方' },
+  { from: 19, label: '夜' },
+  { from: 23, label: '深夜' },
+];
+/** 0〜4時台は「深夜」(上の表で拾えない早朝帯)。 */
+export const TIME_OF_DAY_LATE_NIGHT = '深夜';
+/** 「久しぶり」とみなす最終会話からの経過日数(これ以上で長期不在の挨拶/言及)。 */
+export const LONG_ABSENCE_DAYS = 7;
+
+// --- P3: オフスクリーンライフ(会っていない間も生きている・違和感 #3/#11) ---
+
+/** 生成した「暮らしの断片」を保存する episodic カテゴリ(canon と区別し、忘却対象にする)。 */
+export const DAILY_LIFE_CATEGORY = 'daily-life';
+/** 暮らしの断片の importance(平凡な日は本人も忘れる=低めにして月次忘却で薄れさせる)。 */
+export const DAILY_LIFE_IMPORTANCE = 2;
+/** 起動時の挨拶/暮らし生成を待つ上限(ms)。超過/失敗は定型文フォールバック(オフラインでも壊れない)。 */
+export const GREETING_GENERATION_TIMEOUT_MS = 4000;
+
+// --- P4: 気にかけエンジン(open loops・自発的想起/約束追跡・違和感 #4/#5/#20) ---
+
+/** 未解決の「気にかけ」を想起プールから探す対象期間(日)。古すぎる未解決は掘り起こさない。 */
+export const OPEN_LOOP_LOOKBACK_DAYS = 60;
+/** 1ターンの揮発コンテキストに載せる「気にかけ」の最大件数(尋問化を防ぐ)。 */
+export const OPEN_LOOP_SURFACE_MAX = 2;
+/** 同じ気にかけを再び注入するまで空ける日数(しつこさ防止・注入後この日数は再注入しない)。 */
+export const OPEN_LOOP_COOLDOWN_DAYS = 3;
+
+// --- P5: ユーザー属性スロット + 知識ギャップ(名前/誕生日/好きなもの・違和感 #7/#20) ---
+
+/** 本人属性(名前・誕生日など identity 級の事実)を抽出した episodic に付ける importance(忘却で消えない)。 */
+export const USER_ATTRIBUTE_IMPORTANCE = IMPORTANCE_MAX;
+/**
+ * 知識ギャップ(まだ知らない相手の属性)を聞いてよくなる親しさ段階。
+ * 名前は初対面から、読み・好きなものは少し慣れてから、誕生日はある程度親しくなってから。
+ * 段階(familiarityStage)は接触の事実から導出される(FAMILIARITY_THRESHOLDS)。
+ */
+export const KNOWLEDGE_GAP_GATES: ReadonlyArray<{ slot: string; label: string; minStage: number }> = [
+  { slot: 'userName', label: '相手の名前', minStage: 1 },
+  { slot: 'userNameReading', label: '相手の名前の読み(かな)', minStage: 2 },
+  { slot: 'likes', label: '相手の好きなもの', minStage: 2 },
+  { slot: 'userBirthday', label: '相手の誕生日', minStage: 3 },
+];
+/** 1ターンに注入する知識ギャップは1件まで(会話に偽装したフォームにしない)。 */
+export const KNOWLEDGE_GAP_SURFACE_MAX = 1;
+
+// --- P7: 自発発話(アイドル時)+ 有限性(トーン=発言内容のみ) ---
+
+/** アイドル発話の制御環境変数(将来のオフ切替・設定UIと併用)。 */
+export const IDLE_TALK_ENABLED_ENV = 'ENE_IDLE_TALK';
+/** アイドル発話を検討する間隔(ms・タイマー周期)。 */
+export const IDLE_TALK_CHECK_INTERVAL_MS = 60_000;
+/** 直近の会話からこの時間(ms)以上空いたらアイドル発話の候補にする。 */
+export const IDLE_TALK_MIN_SILENCE_MS = 8 * 60_000;
+/** OS のアイドル時間(秒)がこれ未満=「在席して作業中」とみなす(離席中の独り言を防ぐ)。 */
+export const IDLE_TALK_PRESENCE_MAX_IDLE_SEC = 90;
+/** アイドル発話の1日あたり上限(low=既定)。 */
+export const IDLE_TALK_DAILY_MAX = 3;
+/** アイドル発話どうしの最小間隔(ms)。 */
+export const IDLE_TALK_MIN_INTERVAL_MS = 90 * 60_000;
+/** アイドル発話を控える静音時間帯 [開始時, 終了時)(深夜〜早朝は黙る)。 */
+export const IDLE_TALK_QUIET_HOURS = { from: 23, to: 8 } as const;
+/** 1セッションのやりとりがこの回数を超えたら「長く話して少し疲れた」トーンを許可する(有限性・発言内容のみ)。 */
+export const FATIGUE_TURN_THRESHOLD = 60;

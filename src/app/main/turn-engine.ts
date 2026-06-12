@@ -11,7 +11,14 @@ import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../conversa
 import { chooseModelTier } from '../../conversation/model-selector';
 import { shouldPlayThinkingFiller } from '../../voice/thinking-filler';
 import { executeOsCommand } from './os/executor';
-import { recordBirthdayCelebrated, recordConversationTurn } from '../../character/active-character';
+import {
+  recordBirthdayCelebrated,
+  recordConversationTurn,
+  recordUserBirthdayCelebrated,
+  loadOrCreateActiveCharacter,
+} from '../../character/active-character';
+import { getSemantic } from '../../memory/semantic';
+import { isUserBirthdayToday } from '../../memory/user-birthday';
 import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse, streamVoiceChat } from './voice-runtime';
 import type { ConversationResponse } from '../../shared/types/conversation';
@@ -124,6 +131,7 @@ export async function commitTurn(
   // 1. user を短期記憶へ ＋ 関係の事実を記録(ターンが確定したら=コミット時・task_16)。
   await appendShortTerm({ role: 'user', text, timestamp: nowLocalIso(), extracted: false });
   await recordConversationTurn();
+  runtime.lastActivityMs = Date.now(); // 自発発話の沈黙判定(P7)。直近のやりとり時刻を更新。
 
   // 5. assistant を短期記憶へ
   await appendShortTerm({ role: 'assistant', text: response.message, timestamp: nowLocalIso(), extracted: false });
@@ -151,6 +159,22 @@ export async function commitTurn(
     if (keywords.some((w) => text.includes(w))) {
       await recordBirthdayCelebrated(todayLocalYmd().year);
     }
+  }
+
+  // 7b. 相手(ユーザー)の誕生日当日なら、祝った事実を記録する(P5・当日中の祝い直し防止)。
+  //     誕生日ヒントは当日の最初のターンの揮発文脈に載る(=ここで祝う)。記録後は当年は再注入しない。
+  //     best-effort:失敗しても会話に影響させない。userBirthday 未設定なら何もしない(短絡)。
+  try {
+    const semantic = await getSemantic();
+    if (semantic.userBirthday) {
+      const active = await loadOrCreateActiveCharacter();
+      const today = todayLocalYmd();
+      if (isUserBirthdayToday(semantic.userBirthday, active, today)) {
+        await recordUserBirthdayCelebrated(today.year);
+      }
+    }
+  } catch {
+    // 記録失敗は無視(次ターンで再試行される)。
   }
 
   // 8. 非ストリーミング経路のみ、ここで確定応答を喋る(ストリーミングは送出済み・読みはルビ解決済)。

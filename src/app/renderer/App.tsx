@@ -179,6 +179,8 @@ export function App(): React.ReactElement | null {
     // コアレッシング(ENE_COALESCE)時は main で生成が完結し、確定応答だけが届く(投機キャンセルは届かない)。
     // 吹き出しは文の再生に同期して伸ばす(setSentenceHandler)ので、ここでは**全文をセットしない**(表情/口パクのみ)。
     window.ene.onVoiceResponse((response) => applyResponseUI(response, false));
+    // 自発発話(P7): main がアイドル判定で生成した一言を吹き出し/表情へ反映する(音声なし v1=全文表示)。
+    window.ene.onProactiveMessage((response) => applyResponseUI(response, true));
     window.ene.onVoiceBargeIn(() => handleBargeIn());
   }, []);
 

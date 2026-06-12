@@ -77,3 +77,21 @@ export async function recordBirthdayCelebrated(year: number): Promise<void> {
   }
   await saveActiveCharacter(active);
 }
+
+/**
+ * キャラが相手(ユーザー)の誕生日を祝った事実を記録する(P5・キャラ誕生日 recordBirthdayCelebrated の鏡像)。
+ * 当年を celebrated にして、誕生日当日に毎ターン祝い直す事態を防ぐ。
+ */
+export async function recordUserBirthdayCelebrated(year: number): Promise<void> {
+  const active = await loadOrCreateActiveCharacter();
+  const history = active.userBirthdayHistory ?? [];
+  const entry = history.find((h) => h.year === year);
+  if (entry) {
+    entry.celebrated = true;
+    entry.celebratedAt = nowLocalIso();
+  } else {
+    history.push({ year, celebrated: true, celebratedAt: nowLocalIso() });
+  }
+  active.userBirthdayHistory = history;
+  await saveActiveCharacter(active);
+}

@@ -5,7 +5,7 @@ import { getPortableDataDir, getLogsDir } from '../../shared/node/paths';
 import { isCloudSyncFolder } from '../../shared/node/cloud-warning';
 import { loadAndDecryptApiKey } from '../../shared/node/encryption';
 import { loadAppSettings } from '../../shared/node/app-settings';
-import { todayLocalYmd } from '../../shared/datetime';
+import { todayLocalYmd, nowLocalIso } from '../../shared/datetime';
 import { loadOrCreateActiveCharacter, markFirstLaunchCompleted } from '../../character/active-character';
 import { buildCharacterContext } from '../../character/context-builder';
 import { checkBirthday } from '../../character/birthday-checker';
@@ -16,11 +16,14 @@ import { warmEmbedder } from '../../memory/embedder';
 import { warmStt } from '../../voice/stt-transcriber';
 import { warmLocalRouter } from '../../knowledge/local-classifier';
 import { makeLlmComplete } from '../../conversation/client';
+import { generateOffscreenLife } from '../../conversation/offscreen-life';
+import { describeElapsed, timeOfDayLabel } from '../../shared/moment';
 import { openApiKeyDialog } from './api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';
 import { createMainWindow } from './window';
 import { createTray } from './tray';
 import { registerIpcHandlers } from './ipc';
+import { IdleTalkManager } from './idle-talk-manager';
 import type { AppRuntime } from './app-runtime';
 import { initVoice } from './voice-runtime';
 import { ensureVoiceEngine } from './voice-engine';
@@ -160,6 +163,13 @@ export async function runStartupSequence(
   registerIpcHandlers(mainWindow, runtime);
   createTray(mainWindow);
 
+  // 自発発話(P7): アイドル監視を開始(best-effort・既定 low・ENE_IDLE_TALK=0 で無効・v1 はテキストのみ)。
+  // 初回 tick は IDLE_TALK_CHECK_INTERVAL_MS 後=起動直後には鳴らない。失敗しても起動に影響しない。
+  const idleTalk = new IdleTalkManager(mainWindow, runtime);
+  idleTalk.start();
+  runtime.triggerIdleTalk = () => void idleTalk.triggerNow(); // dev メニューの手動トリガ用
+  mainWindow.on('closed', () => idleTalk.stop());
+
   // 準備完了(音声エンジンのヘルス到達＋埋め込みウォーム)を背景で待ち、整ったら renderer に通知する。
   // それまで renderer は「ちょっと待って、」を表示する(=まだ話しかけない状況の明示)。
   // ここは await しない(ウィンドウ表示・挨拶準備をブロックしない)。
@@ -183,9 +193,23 @@ export async function runStartupSequence(
   runtime.tts = voice?.tts ?? null;
   runtime.voiceConfig = voice?.voiceConfig ?? null;
 
-  // Step 11: 起動挨拶を用意(Renderer が getInitialGreeting で取得・pull 方式)
+  // Step 11: 起動挨拶を用意(Renderer が getInitialGreeting で取得・pull 方式)。
+  // フォールバック=定型文(棚分け・即用意)。本命=オフスクリーンライフ(LLM)を背景生成し、
+  // get-initial-greeting が最大 GREETING_GENERATION_TIMEOUT_MS 待って差し替える(P3・N-PRES-3)。
   runtime.initialGreeting = generateGreeting(active, charContext);
-  if (!active.firstLaunchCompleted) {
+  if (active.firstLaunchCompleted) {
+    const today = nowLocalIso().slice(0, 10);
+    const elapsedLabel = describeElapsed(active.relationship?.lastConversationDate, today);
+    const timeOfDay = timeOfDayLabel(new Date().getHours());
+    runtime.greetingPromise = generateOffscreenLife(
+      charContext,
+      active,
+      elapsedLabel,
+      timeOfDay,
+      makeLlmComplete(apiKey),
+    );
+  } else {
+    runtime.greetingPromise = null;
     await markFirstLaunchCompleted();
   }
 

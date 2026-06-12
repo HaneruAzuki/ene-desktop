@@ -6,6 +6,7 @@ import {
   WINDOW_HEIGHT,
   COALESCE_ENABLED_ENV,
   VAD_PROVISIONAL_SILENCE_MS,
+  GREETING_GENERATION_TIMEOUT_MS,
 } from '../../shared/constants';
 import { replaceLastAssistantText } from '../../memory/short-term';
 import { correctNameMishear } from '../../voice/name-correction';
@@ -208,7 +209,20 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   mainWindow.on('restore', () => notifyVisibility(true));
 
   // 起動挨拶を1回だけ返す(pull 方式。取得後はクリアして再表示しない)。
+  // P3: オフスクリーンライフ(LLM)生成を最大 GREETING_GENERATION_TIMEOUT_MS 待ち、間に合えば差し替える。
+  // 超過/失敗/初回は定型文フォールバック(initialGreeting)。オフラインでも壊れない。
   ipcMain.handle('ene:get-initial-greeting', async (): Promise<string | null> => {
+    const promise = runtime.greetingPromise;
+    if (promise) {
+      runtime.greetingPromise = null;
+      const generated = await Promise.race([
+        promise.catch(() => null),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), GREETING_GENERATION_TIMEOUT_MS),
+        ),
+      ]);
+      if (generated) runtime.initialGreeting = generated;
+    }
     const greeting = runtime.initialGreeting;
     runtime.initialGreeting = null;
     return greeting;

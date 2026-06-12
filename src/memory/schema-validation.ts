@@ -1,4 +1,4 @@
-import type { SemanticMemory, ExtraValue } from '../shared/types/memory';
+import type { SemanticMemory, ExtraValue, UserBirthday } from '../shared/types/memory';
 
 // SemanticMemory のスキーマ検証(設計書 §3.3「SemanticMemory のスキーマ検証方針」)。
 // 手書きの型ガードで実装する(zod 等は使わない・task_03 禁止事項)。
@@ -40,12 +40,29 @@ function pickExtra(v: unknown): Record<string, ExtraValue> | undefined {
   return Object.keys(valid).length > 0 ? valid : undefined;
 }
 
+/** 相手の誕生日(月日は 1-12 / 1-31 の整数・年は任意の正整数)。不正は undefined。 */
+function pickUserBirthday(v: unknown): UserBirthday | undefined {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  const month = o.month;
+  const day = o.day;
+  if (typeof month !== 'number' || typeof day !== 'number') return undefined;
+  if (!Number.isInteger(month) || month < 1 || month > 12) return undefined;
+  if (!Number.isInteger(day) || day < 1 || day > 31) return undefined;
+  const birthday: UserBirthday = { month, day };
+  if (typeof o.year === 'number' && Number.isInteger(o.year) && o.year > 0) birthday.year = o.year;
+  return birthday;
+}
+
 /** 既知のコアフィールドのみを型チェックして抜き出す(version は付与しない)。 */
 export function validateSemanticPatch(raw: unknown): Partial<SemanticMemory> {
   const result: Partial<SemanticMemory> = {};
   if (typeof raw !== 'object' || raw === null) return result;
   const o = raw as Record<string, unknown>;
   if (typeof o.userName === 'string') result.userName = o.userName;
+  if (typeof o.userNameReading === 'string') result.userNameReading = o.userNameReading;
+  const birthday = pickUserBirthday(o.userBirthday);
+  if (birthday) result.userBirthday = birthday;
   if (isStringRecord(o.preferences)) result.preferences = o.preferences;
   if (isStringArray(o.longTermGoals)) result.longTermGoals = o.longTermGoals;
   if (isStringArray(o.personality)) result.personality = o.personality;

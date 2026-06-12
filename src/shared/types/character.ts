@@ -71,7 +71,12 @@ export interface CharacterFewshot {
     forgotten: FewshotExample[];
   };
   firstLaunchGreeting?: FewshotExample[];
+  /** 同日2回目以降の起動の挨拶(P3・棚分けフォールバック)。 */
+  sameDayGreeting?: FewshotExample[];
+  /** 1〜6日ぶりの起動の挨拶(通常)。 */
   normalGreeting?: FewshotExample[];
+  /** 7日以上(LONG_ABSENCE_DAYS)ぶりの起動の挨拶(P3・棚分けフォールバック)。 */
+  longAbsenceGreeting?: FewshotExample[];
 }
 
 // --- active-character.json(設計書 §5.4・最小状態管理) ---
@@ -98,6 +103,8 @@ export interface ActiveCharacter {
   characterId: string; // 現在使用中のキャラ ID
   selectedAt: string; // 切り替えた日時(ローカルTZ込み ISO 8601)
   birthdayHistory: BirthdayHistoryEntry[];
+  /** 相手(ユーザー)の誕生日を祝った事実(P5・キャラ誕生日 birthdayHistory の鏡像)。同年に祝い直しを繰り返さないため。 */
+  userBirthdayHistory?: BirthdayHistoryEntry[];
   firstLaunchCompleted: boolean; // 初回起動の操作案内表示済みフラグ(§8.7)
   relationship?: RelationshipFacts; // ★task_16 開示ゲーティングの素(事実のみ)
 }

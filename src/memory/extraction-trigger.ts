@@ -1,9 +1,11 @@
 import { log } from '../shared/logger';
+import { nowLocalIso } from '../shared/datetime';
 import { getUnextractedEntries, markAsExtracted } from './short-term';
-import { saveEpisodic } from './episodic';
+import { saveEpisodic, loadAllEpisodicFiles } from './episodic';
 import { indexEpisodic } from './index-inverted';
 import { retrieveRecords } from './retriever';
 import { applyCorrections } from './update';
+import { resolveOpenLoop } from './open-loops';
 import { updateSemantic } from './semantic';
 import { extractMemoryFromConversation, type LlmComplete } from './extractor';
 
@@ -33,10 +35,18 @@ export async function extractFromShortTerm(
     .join('\n');
   const relevantMemories = await retrieveRecords({ text: conversationText });
 
-  const { episodic, semanticPatch, corrections } = await extractMemoryFromConversation(
+  // P4: 現在「気にかけている」未解決の事柄を抽出器に見せ、結末が会話に出たら閉じてもらう。
+  // 想起(話題依存)では拾えない未解決ループも閉じられるよう、全件から未解決を直接集める(canon に openLoop は無い)。
+  const allRecords = await loadAllEpisodicFiles();
+  const openLoopRecords = allRecords.filter(
+    (r) => r.memory.openLoop && !r.memory.openLoop.resolvedAt,
+  );
+
+  const { episodic, semanticPatch, corrections, loopClosures } = await extractMemoryFromConversation(
     unextracted,
     relevantMemories,
     complete,
+    openLoopRecords,
   );
 
   // 先に新記録を保存して ID を得る(supersede の置換先に使う)。
@@ -47,6 +57,17 @@ export async function extractFromShortTerm(
   }
   if (corrections && corrections.length > 0) {
     await applyCorrections(corrections, newRecordId);
+  }
+  // P4: 結末が出た「気にかけ」を閉じる(resolvedAt を立てる・非破壊更新)。best-effort。
+  if (loopClosures && loopClosures.length > 0) {
+    const resolvedAt = nowLocalIso();
+    for (const closure of loopClosures) {
+      try {
+        await resolveOpenLoop(closure.targetFile, resolvedAt);
+      } catch (e) {
+        log.warn('open-loop closure failed', { name: (e as Error).name });
+      }
+    }
   }
   if (semanticPatch) {
     await updateSemantic(semanticPatch);

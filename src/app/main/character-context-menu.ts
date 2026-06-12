@@ -60,6 +60,14 @@ export function showCharacterContextMenu(window: BrowserWindow, runtime: AppRunt
         });
       },
     },
+    // 開発時のみ(packaged exe には出さない):自発発話を手動で今すぐ発火し、実機の吹き出し/音声/
+    // ハンズフリー自己トリガを確認する(P7・N-PRES-7 の実機 smoke 用)。
+    ...(!app.isPackaged && runtime.triggerIdleTalk
+      ? [
+          { type: 'separator' as const },
+          { label: '（開発）自発発話を今すぐ', click: (): void => runtime.triggerIdleTalk?.() },
+        ]
+      : []),
     { type: 'separator' },
     { label: 'じゃあね...', click: () => app.quit() },
   ]);

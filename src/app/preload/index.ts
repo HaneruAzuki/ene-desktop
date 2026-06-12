@@ -41,6 +41,11 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:voice-response');
     ipcRenderer.on('ene:voice-response', (_event, response: ConversationResponse) => cb(response));
   },
+  onProactiveMessage: (cb) => {
+    // 自発発話(P7)。二重登録防止で単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:proactive-message');
+    ipcRenderer.on('ene:proactive-message', (_event, response: ConversationResponse) => cb(response));
+  },
   onVoiceBargeIn: (cb) => {
     ipcRenderer.removeAllListeners('ene:voice-barge-in');
     ipcRenderer.on('ene:voice-barge-in', () => cb());

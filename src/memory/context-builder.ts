@@ -5,10 +5,22 @@ import { loadLifeMemory } from './life-memory';
 import { retrieve, type RetrieverDeps } from './retriever';
 import { deriveMood } from './mood';
 import { deriveFamiliarityStage } from './familiarity';
+import { selectOpenLoops, loadOpenLoopState, saveOpenLoopState } from './open-loops';
+import { selectKnowledgeGaps } from './knowledge-gaps';
+import { checkUserBirthdayToday } from './user-birthday';
 import { loadOrCreateActiveCharacter } from '../character/active-character';
 import { log } from '../shared/logger';
+import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
+import { timeOfDayLabel, describeElapsed, finitenessHint } from '../shared/moment';
 import { RECALL_DEBUG_ENV } from '../shared/constants';
-import type { MemoryContext, RetrievalQuery, EpisodicRecord } from '../shared/types/memory';
+import type {
+  MemoryContext,
+  RetrievalQuery,
+  EpisodicRecord,
+  ConversationMoment,
+  SemanticMemory,
+} from '../shared/types/memory';
+import type { ActiveCharacter } from '../shared/types/character';
 
 // MemoryContext の組み立て(設計書 §3.3 / task_15 / task_16)。
 // 長期(semantic)+ 短期(shortTerm)+ 関連する中期(retriever)を統合する。
@@ -38,8 +50,13 @@ export async function buildMemoryContext(
  *
  * now はここで確定(`Date.now()`)。テストは buildMemoryContext に deps を直接渡して決定化する。
  */
+// セッション内のターン概算(有限性トーン P7 用)。プロセス寿命≈アプリ起動セッション=起動でリセット。
+// 投機生成(コアレッシング)で多少過大計上しうるが、疲労は曖昧シグナルなので許容(N-PRES-7)。
+let sessionTurnCount = 0;
+
 export async function buildConversationMemory(query: RetrievalQuery): Promise<MemoryContext> {
   const now = Date.now();
+  sessionTurnCount += 1;
   const [userRecords, canon, active] = await Promise.all([
     loadAllEpisodicFiles(),
     loadLifeMemory(),
@@ -53,8 +70,50 @@ export async function buildConversationMemory(query: RetrievalQuery): Promise<Me
     recallPool: [...userRecords, ...canon],
   };
   const result = await buildMemoryContext(query, deps);
+  result.moment = await buildMoment(userRecords, result.semantic, active, stage, sessionTurnCount);
   logRecallDiag(stage, canon, result.relevantEpisodic);
   return result;
+}
+
+/**
+ * 「いま」の存在文脈を組み立てる(P1/P4/P5/P7・N-PRES-*)。会話経路でのみ呼ぶ(now は実時刻)。
+ * 各要素は best-effort:失敗しても会話を止めない(揮発文脈が一部欠けるだけ)。
+ */
+async function buildMoment(
+  userRecords: EpisodicRecord[],
+  semantic: SemanticMemory,
+  active: ActiveCharacter,
+  stage: number,
+  sessionTurns: number,
+): Promise<ConversationMoment> {
+  const d = new Date();
+  const nowIso = nowLocalIso();
+  const todayYmd = nowIso.slice(0, 10);
+
+  // P4: 気にかけ(クールダウン付き選択 → 注入分のみ state に記録)。失敗は握りつぶす。
+  let openLoops: string[] = [];
+  try {
+    const state = await loadOpenLoopState();
+    const sel = selectOpenLoops(userRecords, state, d.getTime(), nowIso);
+    openLoops = sel.notes;
+    if (sel.notes.length > 0) await saveOpenLoopState({ surfaced: sel.surfaced });
+  } catch (e) {
+    log.warn('open-loop selection failed', { name: (e as Error).name });
+  }
+
+  const knowledgeGaps = selectKnowledgeGaps(semantic, stage);
+  const moment: ConversationMoment = {
+    nowIso,
+    timeOfDay: timeOfDayLabel(d.getHours()),
+    userBirthdayToday: checkUserBirthdayToday(semantic, active, todayLocalYmd()),
+  };
+  const elapsed = describeElapsed(active.relationship?.lastConversationDate, todayYmd);
+  if (elapsed) moment.elapsedLabel = elapsed;
+  if (openLoops.length > 0) moment.openLoops = openLoops;
+  if (knowledgeGaps.length > 0) moment.knowledgeGaps = knowledgeGaps;
+  const fin = finitenessHint(d.getHours(), sessionTurns);
+  if (fin) moment.finitenessHint = fin;
+  return moment;
 }
 
 /**

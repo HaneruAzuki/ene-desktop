@@ -134,6 +134,11 @@ export function getConsolidationStatePath(): string {
   return path.join(getMemoryDir(), 'consolidation-state.json');
 }
 
+/** data/memory/{activeCharacterId}/open-loop-state.json(気にかけ注入のクールダウン記録・P4・派生状態)。 */
+export function getOpenLoopStatePath(): string {
+  return path.join(getMemoryDir(), 'open-loop-state.json');
+}
+
 // --- 派生キャッシュ(真実の源ではない・JSON から再生成可能・design-revision-memory-v2 §1.3) ---
 
 /** data/memory/{activeCharacterId}/index/(逆引き・ベクトル索引の置き場)。 */

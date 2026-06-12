@@ -79,6 +79,8 @@ export interface EneAPI {
   // コアレッシング(段階①・ENE_COALESCE)の確定応答(main → renderer)。生成は main 側で完結し、
   // renderer は受け取った応答を吹き出し/表情へ反映するだけ(音声は ene:voice-chunk で別途到着済み)。
   onVoiceResponse(callback: (response: ConversationResponse) => void): void;
+  // 自発発話(アイドル時・P7)。main がタイマー判定で生成し、renderer は吹き出し/表情へ反映する(音声なし v1)。
+  onProactiveMessage(callback: (response: ConversationResponse) => void): void;
   // ENE 発話中の割り込み検出(main → renderer)。renderer は再生を止める。
   onVoiceBargeIn(callback: () => void): void;
   // barge-in 時に「実際に聞かせた発言(再生済みの文を連結)」を main へ報告する(renderer → main・Phase B)。

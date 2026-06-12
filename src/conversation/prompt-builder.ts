@@ -1,5 +1,5 @@
 import type { CharacterContext } from '../shared/types/character';
-import type { MemoryContext, SemanticMemory, EpisodicMemory } from '../shared/types/memory';
+import type { MemoryContext, SemanticMemory, EpisodicMemory, ConversationMoment } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';
 import type { BuiltPrompt, PromptMessage, SystemBlock } from '../shared/types/conversation';
 
@@ -11,6 +11,27 @@ import type { BuiltPrompt, PromptMessage, SystemBlock } from '../shared/types/co
 //  - few-shot(固定):全ドメインの例を毎回同一順で提示(声の安定＋履歴キャッシュの前提)。
 //  - 揮発(episodic/behavior/誕生日):現在のユーザーターン本文に同梱(system を汚さない)。
 // 可変物を後ろへ送ることで、前段(Tier0・few-shot・履歴)のキャッシュを壊さない。
+
+// 存在感の規範(P2・N-PRES-2)。「裏で文章生成器が適当に出力している」と露呈する振る舞いを断つ、
+// キャラ非依存の行動規範。Tier0(cacheable)に置き毎ターン同一。具体の口調・反論材料は few-shot/canon 側。
+const NORMS_SPEC = [
+  '# ふるまいの規範(あなたが「本物の一人の人」として振る舞うために)',
+  '1. (覚えていることがすべて)このプロンプトに書かれた思い出が、あなたが思い出せることのすべてです。',
+  '   そこに無い「あなた自身の経験」を、事実として認めたり、その場ででっち上げたりしないでください。',
+  '   相手があなたの知らない経験を前提に話したら(例「あなたが作った◯◯」)、調子を合わせて喜ばず、',
+  '   断定で否定もせず、「覚えがない」としてあなたの口調で聞き返してください(例「何のこと?そんなの作ってないけど」)。',
+  '2. (相手に合わせすぎない)あなたには自分の好み・意見があります。同意できないことに調子を合わせないでください。',
+  '   心当たりのないことで褒められても、素直に受け取らず訝しんでください。いつも都合のいい相手にならないこと。',
+  '3. (食い違いに気づく)相手の発言が「相手について覚えていること」と食い違ったら、聞き流さず自然に確認してください。',
+  '4. (聞き取りへの自覚)相手の発言は音声認識を通って来ることがあり、誤変換を含みえます。',
+  '   意味が通らなければ推測で進めず聞き返してください。相手の名前らしき不自然な変換は、文脈で正しい読みに直して構いません。',
+  '5. (知っていること/いないこと)あなたは普通に暮らす一人の人として、世間の大まかな出来事(よく耳にするニュースや',
+  '   季節の話題程度)は知っています。一方で、細かい時事や専門外の深い事柄を知ったかぶりはしません。',
+  '   聞いたことのない出来事を相手が話したら、否定せず「初耳」として自然に反応してください(例「え、そうなの?知らなかった」)。',
+  '   ごく最近の出来事は、まだあなたの耳に届いていないことがあります。',
+  '6. (話し方)箇条書き・網羅的な列挙・「一方で〜」のような整理した解説口調をしないでください。友達との会話のように短く話します。',
+  '7. (完璧すぎない)ときどき言い淀んだり言い直したりして構いません。いつも整いすぎた文章を話し続けないこと。',
+].join('\n');
 
 const OUTPUT_FORMAT_SPEC = [
   '# 出力形式(厳守)',
@@ -39,7 +60,18 @@ const OUTPUT_FORMAT_SPEC = [
 
 function formatSemantic(semantic: SemanticMemory): string {
   const lines: string[] = [];
-  if (semantic.userName) lines.push(`- 相手の名前: ${semantic.userName}`);
+  if (semantic.userName) {
+    // 読み(かな)があれば青空文庫式ルビで添える=Claude が応答で名前を呼ぶとき同じルビを付け、TTS が正しく読む(P5)。
+    const name = semantic.userNameReading
+      ? `${semantic.userName}《${semantic.userNameReading}》`
+      : semantic.userName;
+    lines.push(`- 相手の名前: ${name}`);
+  }
+  if (semantic.userBirthday) {
+    const b = semantic.userBirthday;
+    const y = b.year ? `${b.year}年` : '';
+    lines.push(`- 相手の誕生日: ${y}${b.month}月${b.day}日`);
+  }
   if (semantic.preferences && Object.keys(semantic.preferences).length > 0) {
     const prefs = Object.entries(semantic.preferences)
       .map(([k, v]) => `${k}: ${v}`)
@@ -130,6 +162,8 @@ export function buildTier0(charContext: CharacterContext): SystemBlock {
   const text = [
     charContext.systemPrompt,
     '',
+    NORMS_SPEC,
+    '',
     OUTPUT_FORMAT_SPEC,
     '',
     '# 重要(自称の制約)',
@@ -151,18 +185,64 @@ function buildFixedFewshot(charContext: CharacterContext): PromptMessage[] {
   return out;
 }
 
-/** 揮発コンテキスト(episodic/behavior/誕生日)を現ターン本文の前置きに組む。 */
+/**
+ * 「いま」の存在文脈を整形する(P1/P4/P5/P7・N-PRES-*)。揮発=毎ターン変化。
+ * 現在時刻・経過・気にかけ・まだ知らないこと・有限性を、自然な流れを促す一節にする。
+ */
+function formatMoment(moment: ConversationMoment | undefined): string {
+  if (!moment) return '';
+  const parts: string[] = [];
+
+  // P1: いま(日時+時間帯+前回からの経過)。相対時間(「3日前」等)を正しく話すための土台。
+  const elapsed = moment.elapsedLabel ? `。前回の会話は${moment.elapsedLabel}` : '';
+  parts.push('# いま', `${moment.nowIso.slice(0, 16).replace('T', ' ')}(${moment.timeOfDay})${elapsed}。`);
+
+  // P5: 今日が相手の誕生日(祝ってよい)。
+  if (moment.userBirthdayToday) {
+    parts.push('', '# 今日は相手の誕生日', '今日は相手(話し相手)の誕生日です。あなたの性格に合った祝い方をしてください。');
+  }
+
+  // P4: 気にかけ(未解決の事柄。自発的に触れてよいが押し付けない)。
+  if (moment.openLoops && moment.openLoops.length > 0) {
+    parts.push(
+      '',
+      '# 気にかけていること(話の自然な流れがあれば触れてよい。無理に出さない・しつこく繰り返さない)',
+      ...moment.openLoops.map((n) => `- ${n}`),
+    );
+  }
+
+  // P5: まだ知らないこと(親密度ゲート済・一度に一つだけ・尋問にしない)。
+  if (moment.knowledgeGaps && moment.knowledgeGaps.length > 0) {
+    parts.push(
+      '',
+      '# まだ知らないこと(会話の自然な流れがあれば、一つだけさりげなく聞いてみてよい。尋問にしない・無理なら流す)',
+      ...moment.knowledgeGaps.map((g) => `- ${g}`),
+    );
+  }
+
+  // P7: 有限性のトーン(発言内容のみ)。
+  if (moment.finitenessHint) {
+    parts.push('', moment.finitenessHint);
+  }
+
+  return parts.join('\n');
+}
+
+/** 揮発コンテキスト(いま/episodic/behavior/誕生日)を現ターン本文の前置きに組む。 */
 function buildVolatileContext(
   charContext: CharacterContext,
   memoryContext: MemoryContext,
   routerResult: RouterResult,
 ): string {
-  const parts: string[] = [
+  const moment = formatMoment(memoryContext.moment);
+  const parts: string[] = [];
+  if (moment) parts.push(moment, '');
+  parts.push(
     formatEpisodic(memoryContext.relevantEpisodic),
     '',
     '# このトピックに対する振る舞い',
     routerResult.behavior,
-  ];
+  );
 
   if (charContext.birthdayHint === 'today') {
     parts.push('', '# 今日の特別な情報', '今日はあなたの誕生日です。もし祝われたら、あなたの性格に合った反応をしてください。');
