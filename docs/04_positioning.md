@@ -53,7 +53,7 @@
 道具は「摩擦・有限・追憶」を欠点として消そうとする。ENE はそれを**内面の三点支持**として設計する。
 
 > 公開時の温かい言い換え:**彼女に「内側」がある、三つの証(あかし)**。
-> (実装根拠は `00_philosophy.md` §1.4 各軸ルール / 心の導出は CLAUDE.md §5.3・`archive/design-revision-character-heart.md`)
+> (実装根拠は `00_philosophy.md` §1.4 あり方ごとのルール / 心の導出は CLAUDE.md §5.3・`archive/design-revision-character-heart.md`)
 
 ---
 

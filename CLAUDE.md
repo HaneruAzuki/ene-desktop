@@ -135,7 +135,7 @@
 
 ### 4.5 明示的 > 暗黙的 (Vision §5.5)
 - キャラ属性・知識ドメイン・記憶ルールは**コードに埋め込まない**
-- すべて `/characters/{id}/*.json` などの設定ファイルで管理する
+- すべて `/{id}/*.json`(ルート直下のキャラ定義ディレクトリ。例 `ene/`)などの設定ファイルで管理する
 - マジックナンバー・ハードコードされた閾値を避ける
 
 ---
@@ -369,7 +369,7 @@
 | IPC通信プロトコル | `docs/03_design.md` §4 |
 | エラーハンドリング方針 | `docs/03_design.md` §6 |
 | 起動・終了フロー | `docs/03_design.md` §7 |
-| キャラクター属性 | `/characters/{id}/*.json` |
+| キャラクター属性 | `/{id}/*.json`(ルート直下・例 `ene/`) |
 | プロダクトの更新運用 | `docs/03_design.md` §11.8 |
 | 将来拡張の方針(忘却・マルチプロバイダ等) | `docs/03_design.md` §11 |
 | リリース段階・ロードマップ | `docs/01_vision.md` §6 |
@@ -378,7 +378,9 @@
 | 人生記憶 canon の内容計画 | `docs/character-life-memory-canon-plan.md` |
 | 過去の経緯(マージ済み改訂・草案) | `docs/archive/`(現行ではない・対応表は archive/README) |
 | プロダクトの本質・判断基準 | `docs/01_vision.md` |
-| プロダクトの思想・なぜこの形か | `docs/00_philosophy.md` |
+| プロダクトの思想・なぜこの形か(四つのあり方＋関係) | `docs/00_philosophy.md` |
+| 外向き(市場・系譜・コピー・配布・収益) | `docs/04_positioning.md` |
+| アーキテクチャ対応(体=フォルダ × 魂=哲学・流れ図) | `docs/05_architecture.md` |
 | 開発規約・禁止事項 | このファイル(CLAUDE.md) |
 
 CLAUDE.md は「規約」、設計書は「設計の正解」、要件は「機能の正解」、
