@@ -1001,6 +1001,43 @@
 
 ---
 
+### N-PRES-* 🟢 存在感の改修(「人間との会話の違和感」解消パック・2026-06-13)
+- **背景**: ユーザー指摘「裏で文章生成器が適当に出力していると露呈する」違和感を洗い出し(#1〜#22)、
+  致命/全件を解決するプランを合意(P1〜P7、P6 音声の身体性は却下、有限性=発言内容のみ)。対応表は
+  `docs/test-scenarios-presence.md`。**統合の背骨=MemoryContext に `moment`(揮発)を足し、
+  buildConversationMemory が毎ターン算出 → prompt-builder が整形**(text/voice 両経路が同一 buildPrompt を通る seam)。
+- **N-PRES-1(P1 いま)**: `src/shared/moment.ts`(純粋・時間帯/経過/有限性)。揮発文脈の先頭に「# いま」を注入。
+  shared に置いた理由=純粋な時間 util(datetime.ts と同層)で memory→shared の正方向で参照できる。
+- **N-PRES-2(P2 規範)**: `prompt-builder.ts: NORMS_SPEC` を Tier0(cacheable)に追加(閉世界・反同調・矛盾指摘・
+  聞き取り自覚・知識の輪郭・話し方・不完全さ)。**規範1は「断定否定でなく聞き返す」**=想起 top-5 で canon が
+  載らないターンに自分の過去を否定する事故を避ける。口調はキャラ依存=`ene/fewshot.json` の guardrail_* 例に外出し。
+- **N-PRES-3(P3 オフスクリーンライフ)**: 起動時 LLM で {greeting, life} 生成。**life を provenance:'self'・
+  category:'daily-life'・importance 2 で保存**=作話を許す代わりに固定(次回の連続性)。挨拶は経過で棚分け
+  (同日/1〜6日/7日以上)、生成は get-initial-greeting が最大4秒待って差し替え・失敗は定型文(オフライン安全)。
+  ⚠️ **忘却×daily-life は v1 未着手**(forgetting 既定オフ・provenance を保った縮退は有効化時にセットで)。
+- **N-PRES-4(P4 気にかけ)**: `EpisodicMemory.openLoop{kind,note,resolvedAt}`。選択は純粋(`open-loops.ts`)+
+  クールダウン state(`open-loop-state.json`・注入後3日)。抽出器が openLoop 付与＋loopClosures で結末を閉じる。
+  想起(話題依存)とは別経路で「結末未了」を自発的に持ち出す。
+- **N-PRES-5(P5 属性スロット)**: `SemanticMemory` に `userNameReading`(ルビ機構で発声)・
+  `userBirthday{month,day,year?}`(一級フィールド=祝い/矛盾指摘が機械判定可能)。知識ギャップは親密度ゲート
+  (名前=段1/読み・好み=段2/誕生日=段3・一度に1件)。本人属性は importance 5(忘却で消えない)＋
+  矛盾は本人が訂正を認めた時だけ supersede(抽出プロンプトで明示)。ユーザー誕生日は commitTurn で当年祝い済みを記録。
+- **N-PRES-7(P7 自発発話/有限性)**: 判定は純粋(`idle-talk.ts: shouldSpeakIdle` 多重ガード)、配線は
+  `idle-talk-manager.ts`(powerMonitor 在席検知・タイマー・best-effort)。**音声あり**=吹き出し＋通常応答と同じ
+  `speakResponse`→voice-chunk 経路で喋る(push-to-talk はマイク押下中のみ=自声を拾わず安全/ハンズフリーは
+  相槌で実証済みのエコーガードを継承)。有限性は moment.finitenessHint=**発言内容のみ**(声は変えない・状態は
+  保存しない=§5.3 適合)。設定 `idleTalk`(既定 low・env ENE_IDLE_TALK=0 で無効)。
+  ✅ **実機 smoke 合格(2026-06-13・ユーザー)**: dev 右クリック「（開発）自発発話を今すぐ」で吹き出し＋音声を確認。
+  ハンズフリーでも自発発話の声を**自己トリガしない**(相槌のエコーガードを継承)。`idle talk emitted` ＋ 合成WAV生成で確認。
+  (※ 同セッションで判明した「音声が全く出ない」は P7 と無関係の声モデル未登録=[[voice-model-build-torimi-2026]] 参照)。
+- **横断**: SHORT_TERM_MAX_ENTRIES 20→40(#6)。
+- **テスト**: 純粋ユニット(moment/open-loops/knowledge-gaps/user-birthday/idle-talk/offscreen-life/greeting-tiers)
+  ＋ E2E 記憶シナリオ(`presence-scenarios.test.ts`=記憶を書く→注入を確認)＋ 実API behavior(`tests/live`・
+  ENE_LIVE_TEST=1 で目視・本環境はキー無しで未実行)。**488 テスト・typecheck・lint・lint:deps 全グリーン**。
+  ⚠️ renderer の自発発話表示・起動時 LLM 生成・タイマー/在席は**実機 smoke 未実施**(本環境で Electron/API 実行不可)。
+
+---
+
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
 
 MVP 完成後に改善する項目(Router タイムアウト・記憶抽出のレイテンシ/頻度・
