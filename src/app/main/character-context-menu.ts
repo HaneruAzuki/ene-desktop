@@ -2,7 +2,7 @@ import { Menu, app, dialog, type BrowserWindow } from 'electron';
 import { resetToDefaultPosition } from './window-position';
 import { openApiKeyDialog } from './api-key-dialog';
 import { saveVoiceInputMode } from '../../shared/node/app-settings';
-import type { AppRuntime } from './ipc';
+import type { AppRuntime } from './app-runtime';
 import type { VoiceInputMode } from '../../shared/types/settings';
 
 // キャラ右クリックメニュー(設計書 §8.8)。

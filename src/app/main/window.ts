@@ -19,7 +19,7 @@ export function createMainWindow(position?: Position): BrowserWindow {
     hasShadow: false,
     skipTaskbar: true, // タスクバーに出さない(タスクトレイ運用)
     webPreferences: {
-      preload: join(__dirname, '../../preload/index.js'),
+      preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -40,7 +40,7 @@ export function createMainWindow(position?: Position): BrowserWindow {
   if (rendererUrl) {
     void win.loadURL(rendererUrl);
   } else {
-    void win.loadFile(join(__dirname, '../../renderer/index.html'));
+    void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
   return win;

@@ -56,8 +56,9 @@
 | Electron統合 | electron-vite | `^2.x` | Electron + Vite + React の統合 |
 | ビルド/配布 | electron-builder | `^24.x` | Windows向けexe生成 |
 | テスト | Vitest | `^1.x` | 高速・TS標準対応 |
-| Lint | ESLint | `^8.x` | コード品質 |
+| Lint | ESLint | `^8.x` | コード品質。アーキ境界の一部(キャラ固有文字列のドメイン/shared 層への埋め込み禁止)も `no-restricted-syntax` で担保(§5.1) |
 | Lint(TS拡張) | @typescript-eslint | `^7.x` | TypeScript用ルール |
+| Lint(依存境界) | dependency-cruiser | `^17.x` | アーキ境界の機械的担保(ドメイン→app 逆依存・shared→上位・循環の禁止)。`npm run lint:deps`・設定 `.dependency-cruiser.cjs`・正本は 05_architecture §4。承認済み 2026-06・N-ARCH-2 |
 | フォーマッタ | Prettier | `^3.x` | コード整形 |
 | パッケージマネージャ | npm | `^10.x` | シンプルさ優先 |
 
@@ -227,6 +228,7 @@ ene-desktop/
 │   │   │   ├── character-context-menu.ts ← キャラ右クリックメニュー
 │   │   │   ├── single-instance.ts     ← 多重起動防止
 │   │   │   ├── init-directories.ts    ← data/ 配下の初期化
+│   │   │   ├── app-runtime.ts         ← AppRuntime 型(起動時状態・main 各所で共有・ipc 逆依存回避 N-ARCH-2)
 │   │   │   ├── ipc.ts                 ← IPCハンドラ集約・send-message オーケストレーション
 │   │   │   ├── lifecycle.ts           ← 起動シーケンス(runStartupSequence)
 │   │   │   ├── shutdown.ts            ← 終了シーケンス(runShutdownSequence)

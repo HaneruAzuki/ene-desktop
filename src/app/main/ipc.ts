@@ -33,35 +33,16 @@ import { VadRuntime, type CoalesceHooks } from './vad-runtime';
 import { VoiceTurnCoordinator } from './voice-turn-coordinator';
 import { BackchannelController } from './backchannel-controller';
 import { transcribe, isSttModelAvailable } from '../../voice/stt-transcriber';
-import type { CharacterContext } from '../../shared/types/character';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { TranscribeResult } from '../../shared/types/stt';
 import type { EmotionLabel } from '../../shared/types/animation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
-import type { TtsEngine, VoiceConfig } from '../../shared/types/voice';
 import type { VoiceInputMode } from '../../shared/types/settings';
+import type { AppRuntime } from './app-runtime';
 
 // IPC ハンドラ集約(設計書 §4)。
 // すべての業務ロジックは main 側。Renderer は IPC 経由でのみ呼ぶ(API キーも漏らさない)。
-
-/** 起動時に構築され、ハンドラから参照される実行時状態。 */
-export interface AppRuntime {
-  charContext: CharacterContext | null;
-  apiKey: string | null;
-  /** 起動挨拶(Renderer が getInitialGreeting で1回取得する)。 */
-  initialGreeting: string | null;
-  /** 音声合成エンジン(task_17 Phase A・未起動/未設定なら null=テキストのみ)。 */
-  tts: TtsEngine | null;
-  /** 音声設定(emotion→スタイル/パラメータ・null なら音声無効)。 */
-  voiceConfig: VoiceConfig | null;
-  /** マイク入力方式(push-to-talk / hands-free・設定で切替・task_17 Phase C)。 */
-  voiceInputMode: VoiceInputMode;
-  /** 起動準備(音声エンジンのヘルス到達＋埋め込みウォーム)が整ったか。renderer の「ちょっと待って」解除に使う。 */
-  ready: boolean;
-  /** 思考フィラー(「うーん…」)を鳴らす(熟考時・B-15連動)。registerIpcHandlers が backchannel から配線。 */
-  playThinkingFiller?: () => void;
-}
 
 const NOT_READY: ConversationResponse = {
   type: 'chat',

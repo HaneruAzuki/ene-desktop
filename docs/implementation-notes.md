@@ -969,6 +969,20 @@
   B-06 ストリーミング音声(`ENE_VOICE_STREAMING=1` オプトイン)の現状も §3.4 に反映。
 - **検証**: typecheck / lint / 単体+受入 426 テスト / electron-vite build 全グリーン。
 
+### N-ARCH-2 🟢 アーキ境界を lint で機械的に担保(dependency-cruiser ＋ ESLint・2026-06-13)
+- **狙い**: 05_architecture §4 の依存の向き(app → ドメイン → shared の一方向)を**レビュー任せにせず lint で守る**。
+  再編(N-ARCH-1)で整えた境界が将来の追加で崩れないようにする。
+- **依存境界**(`npm run lint:deps`・**dependency-cruiser** `^17`・承認済み devDep・設定 `.dependency-cruiser.cjs`):
+  - `no-domain-to-app`(ドメイン→app 逆依存禁止)/ `no-shared-to-upper`(shared→上位禁止)/ `no-circular`(循環禁止)、いずれも error。
+  - TypeScript はネイティブ解決(tsConfig 指定・型のみ import も解析)。eslint-plugin-import の TS リゾルバ依存を避けるため dependency-cruiser を採用。
+- **キャラ固有文字列**(`npm run lint` 内・ESLint `no-restricted-syntax`・新規依存ゼロ):ドメイン＋shared 層の
+  文字列リテラル/テンプレートに `魚川トリミ|トリミ|ツンデレ` を埋め込むと error(§5.1。値は `{id}/*.json` へ)。
+  コメントは対象外(挙動に埋め込んでいない)。UI 文言(app/renderer)は固定キャラ名のため対象外(positioning §10)。
+- **既存違反の解消(1件)**: 導入時に循環依存 `ipc.ts ↔ character-context-menu.ts`(型 `AppRuntime` の後方 import)を検出。
+  `AppRuntime` を新規 `src/app/main/app-runtime.ts` へ抽出し、ipc/character-context-menu/index/lifecycle/shutdown の import を張替えて解消(振る舞い不変)。
+- **両ガードの実効性を確認**: 一時プローブ(ドメイン層に `'ツンデレ'` リテラル＋app への import)で両 lint が error を出すことを検証後に撤去。
+- **検証**: typecheck / lint / lint:deps(違反0・139 modules）/ 426 テスト 全グリーン。
+
 ---
 
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動

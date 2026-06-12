@@ -17,4 +17,35 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
   },
+  overrides: [
+    {
+      // CLAUDE.md §4.5/§5.1: ドメイン層(character/knowledge/memory/conversation/voice)と
+      // 土台 shared はキャラ非依存。固有名・性格を**文字列リテラルに埋め込まない**
+      // (キャラ依存値は {id}/*.json へ外出しする)。コメントでの言及は対象外(=挙動に埋め込んでいない)。
+      // UI 文言(app/renderer)は製品の固定キャラ名のため対象外(外出しは positioning §10=別スコープ)。
+      files: [
+        'src/character/**/*.ts',
+        'src/knowledge/**/*.ts',
+        'src/memory/**/*.ts',
+        'src/conversation/**/*.ts',
+        'src/voice/**/*.ts',
+        'src/shared/**/*.ts',
+      ],
+      rules: {
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector: 'Literal[value=/魚川トリミ|トリミ|ツンデレ/]',
+            message:
+              'キャラ固有名・性格をドメイン/shared 層の文字列リテラルに埋め込まない(CLAUDE.md §5.1)。値は {id}/*.json へ外出しする。',
+          },
+          {
+            selector: 'TemplateElement[value.raw=/魚川トリミ|トリミ|ツンデレ/]',
+            message:
+              'キャラ固有名・性格をドメイン/shared 層の文字列(テンプレート)に埋め込まない(CLAUDE.md §5.1)。値は {id}/*.json へ外出しする。',
+          },
+        ],
+      },
+    },
+  ],
 };

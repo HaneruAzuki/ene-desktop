@@ -4,7 +4,7 @@ import { acquireSingleInstanceLock } from './single-instance';
 import { runStartupSequence } from './lifecycle';
 import { runShutdownSequence } from './shutdown';
 import { stopVoiceEngine } from './voice-engine';
-import type { AppRuntime } from './ipc';
+import type { AppRuntime } from './app-runtime';
 
 // Electron main エントリポイント(設計書 §7)。
 // 多重起動防止 → 起動シーケンス(lifecycle)→ 終了時に記憶抽出(shutdown)。

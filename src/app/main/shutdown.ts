@@ -3,7 +3,7 @@ import { flushExtraction } from '../../memory/extraction-scheduler';
 import { clearShortTerm } from '../../memory/short-term';
 import { makeLlmComplete } from '../../conversation/client';
 import { stopVoiceEngine } from './voice-engine';
-import type { AppRuntime } from './ipc';
+import type { AppRuntime } from './app-runtime';
 
 // 終了シーケンス(設計書 §7.2)。
 // 0) 音声サイドカーを停止(自分が起動した場合のみ・孤児プロセス防止・N-17-12)。

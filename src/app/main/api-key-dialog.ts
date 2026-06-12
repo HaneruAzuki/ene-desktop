@@ -77,7 +77,7 @@ export async function openApiKeyDialog(
       maximizable: false,
       title: 'ENE — APIキーの設定',
       webPreferences: {
-        preload: join(__dirname, '../../preload/api-key-dialog.js'),
+        preload: join(__dirname, '../preload/api-key-dialog.js'),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -98,7 +98,7 @@ export async function openApiKeyDialog(
     if (rendererUrl) {
       void win.loadURL(`${rendererUrl}/api-key-dialog/index.html`);
     } else {
-      void win.loadFile(join(__dirname, '../../renderer/api-key-dialog/index.html'));
+      void win.loadFile(join(__dirname, '../renderer/api-key-dialog/index.html'));
     }
   });
 }
