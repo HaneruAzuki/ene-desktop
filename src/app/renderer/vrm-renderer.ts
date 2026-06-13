@@ -66,6 +66,8 @@ export class VrmRenderer {
   private rafId: number | null = null;
   private running = false;
   private dragging = false; // ドラッグ中は描画を止めてウィンドウ移動を優先
+  private visible = true; // 可視状態(コンテキスト復帰時に可視中だけ描画を再開)
+  private lastRenderMs = 0; // 最後に描画した時刻(クリックスルー固着のウォッチドッグ用)
 
   constructor(opts: VrmRendererOptions) {
     this.canvas = opts.canvas;
@@ -82,6 +84,11 @@ export class VrmRenderer {
       preserveDrawingBuffer: true,
     });
     this.renderer.setClearColor(0x000000, 0); // 透明背景(案A・浮遊)
+    // WebGL コンテキストロスト対策(スリープ復帰/GPU リセット)。既定では一度失うと復帰せず、
+    // 描画が止まり readPixels が透明を返してクリックスルーが全透過に固着し操作不能になる。
+    // preventDefault で復帰を許可し、復帰時に描画を再開する(isHit もロスト中はフォールバック)。
+    this.canvas.addEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(28, 1, 0.05, 20);
@@ -171,6 +178,13 @@ export class VrmRenderer {
       return false;
     }
     const gl = this.renderer.getContext();
+    // 3D パイプラインが不健全なとき(コンテキストロスト中 / 描画すべきなのに止まっている / 未描画)は
+    // readPixels が古い・空バッファを返す。シルエットの代わりにバウンディングボックスで「不透明」と
+    // みなし、ウィンドウが全クリックスルーに固着して操作不能になるのを防ぐ(健全時はシルエット精度)。
+    if (gl.isContextLost()) return true;
+    if (this.running && (this.lastRenderMs === 0 || performance.now() - this.lastRenderMs > 1000)) {
+      return true;
+    }
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
     const px = Math.floor(((clientX - rect.left) / rect.width) * w);
@@ -198,6 +212,7 @@ export class VrmRenderer {
 
   /** 表示/非表示(非表示は描画を完全停止=常駐コストを 0 に・§3.6)。 */
   setVisible(visible: boolean): void {
+    this.visible = visible;
     if (visible) this.start();
     else this.stop();
   }
@@ -207,7 +222,20 @@ export class VrmRenderer {
     this.dragging = dragging;
   }
 
+  /** WebGL コンテキストのロスト/復帰(スリープ復帰・GPU リセット時の固着対策)。 */
+  private onContextLost = (e: Event): void => {
+    e.preventDefault(); // これが無いとコンテキストは二度と復帰しない
+    this.stop();
+  };
+  private onContextRestored = (): void => {
+    // three.js が管理リソースを再アップロードする。可視中ならループを再開して描き直す。
+    this.lastRenderMs = 0; // 復帰直後は未描画 → 描くまで isHit はフォールバック
+    if (this.visible) this.start();
+  };
+
   dispose(): void {
+    this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     this.stop();
     if (this.vrm) {
       this.scene.remove(this.vrm.scene);
@@ -244,6 +272,7 @@ export class VrmRenderer {
       this.vrm.update(Math.min(delta, MAX_PHYSICS_DELTA));
     }
     this.renderer.render(this.scene, this.camera);
+    this.lastRenderMs = performance.now();
   };
 
   private updateCamera(): void {
