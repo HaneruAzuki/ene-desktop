@@ -67,4 +67,35 @@ describe('extraction-trigger (設計書 §3.3)', () => {
     const st = await getShortTerm();
     expect(st.every((e) => e.extracted)).toBe(true);
   });
+
+  it('主人未確定なら、抽出で初代主人の名前を確定できる(空→設定)', async () => {
+    const seeded: ShortTermEntry[] = [
+      { role: 'user', text: '私はゆうやです', timestamp: '2026-06-01T10:00:00+09:00', extracted: false },
+    ];
+    await writeJson(`${h.memDir}/short-term.json`, seeded);
+    const complete = vi.fn(async () => JSON.stringify({ semanticPatch: { userName: 'ゆうや' } }));
+
+    await extractFromShortTerm('shutdown', complete);
+
+    expect((await getSemantic()).userName).toBe('ゆうや');
+  });
+
+  it('主人確定後は、抽出が別名を出しても主人の名前を上書きしない(硬いロック)', async () => {
+    // 既に主人=ゆうや が確定している。
+    await writeJson(`${h.memDir}/semantic.json`, { version: 1, userName: 'ゆうや' });
+    const seeded: ShortTermEntry[] = [
+      { role: 'user', text: 'まりこだけど', timestamp: '2026-06-02T10:00:00+09:00', extracted: false },
+    ];
+    await writeJson(`${h.memDir}/short-term.json`, seeded);
+    // 抽出器が別名 + 好みを返しても、名前はロックされ、名前以外だけ反映される。
+    const complete = vi.fn(async () =>
+      JSON.stringify({ semanticPatch: { userName: 'まりこ', preferences: { 色: '青' } } }),
+    );
+
+    await extractFromShortTerm('shutdown', complete);
+
+    const sem = await getSemantic();
+    expect(sem.userName).toBe('ゆうや'); // 主人の名前は不変
+    expect(sem.preferences?.色).toBe('青'); // 名前以外は素通し
+  });
 });

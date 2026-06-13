@@ -6,7 +6,7 @@ import { indexEpisodic } from './index-inverted';
 import { retrieveRecords } from './retriever';
 import { applyCorrections } from './update';
 import { resolveOpenLoop } from './open-loops';
-import { updateSemantic } from './semantic';
+import { getSemantic, updateSemantic, lockOwnerName } from './semantic';
 import { extractMemoryFromConversation, type LlmComplete } from './extractor';
 
 // 抽出トリガの統合(設計書 §3.3 / §7.2 / task_15 の2層フロー)。
@@ -70,7 +70,14 @@ export async function extractFromShortTerm(
     }
   }
   if (semanticPatch) {
-    await updateSemantic(semanticPatch);
+    // 主人の名前の硬いロック(主人固定・2026-06):既に主人が確定しているなら、抽出器が出した
+    // userName 変更は捨てる(名前以外は素通し)。空のとき=初代主人の確定時だけ書き込める。
+    const current = await getSemantic();
+    if (current.userName && semanticPatch.userName && semanticPatch.userName !== current.userName) {
+      log.info('owner name is locked; extraction userName change ignored'); // §6.2: 名前内容は出さない
+    }
+    const patch = lockOwnerName(semanticPatch, current.userName);
+    if (Object.keys(patch).length > 0) await updateSemantic(patch);
   }
   // 抽出に使ったエントリへフラグを立てる(再抽出防止)。
   await markAsExtracted(unextracted.map((e) => e.timestamp));

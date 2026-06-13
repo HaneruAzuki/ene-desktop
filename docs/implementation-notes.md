@@ -1052,6 +1052,27 @@
 
 ---
 
+### N-OWNER-1 🟢 主人の名前の硬いロック(主人を一人に固定・2026-06-14)
+- **背景/決定(ユーザ)**: 家庭で別の人が「ゆうや」「まりこ」等と名乗りうる。当初「来客判別(Claude がテキストで
+  見分け、不明時は確認)」を実装したが、**ユーザ判断で「実装が複雑な割にメリットが少ない」として全面取消**。
+  代わりに**「主人(あるじ)=一生そばにいる決まった相手の名前(userName)を、一度確定したら会話/抽出では変えない」
+  硬いロックだけ**を入れる方針に確定。来客は引き続き単一の「相手」像に混ざる(設計の単一ユーザー前提を維持)。
+- **名前を覚える流れ(既存・確認済み)**: 知識ギャップ(N-PRES-5 / `knowledge-gaps.ts`)が `userName` を **親しさ段1
+  (初対面から)** で「まだ知らないこと」に載せる → トリミが自然に名前を尋ね、ユーザが入力欄に書く → 抽出器が
+  `semanticPatch.userName` で確定。`isSlotFilled` が埋まっていれば尋ねない(=確定後は聞き直さない)。
+- **実装(ロック)**: `semantic.ts` に純粋関数 `lockOwnerName(patch, currentUserName)` を追加=currentUserName が
+  既にあれば patch から `userName` を取り除く(空のとき=初代主人の確定時だけ書ける。名前以外=読み・好み・誕生日は素通し)。
+  唯一の本番書き込み元 `extraction-trigger.ts` が `updateSemantic` の直前で適用=**会話/抽出では主人名が不変
+  (LLM 判断に依存しないコード保証)**。意図的な改名は `updateSemantic` 直呼び(将来の設定パネル/記憶ファイル直編集)に委ねる
+  =`updateSemantic` 自体は汎用のまま(テスト・将来の明示更新を壊さない)。抽出器プロンプトも「一度覚えた名前は変えない・
+  別名を名乗られても userName は出さず食い違いは episodic に記録」に揃えた(誕生日の訂正許容は据え置き)。
+- **却下した案(取消済み)**: `ConversationResponse.speaker` 追加＋commitTurn 永続化ゲート＋`gateMemoryForGuest`
+  想起ゲート＋`runtime.currentSpeaker`。複雑さに見合わずユーザが取消。声紋(speaker embedding)は元々不採用。
+- 検証: `lockOwnerName` 単体5件＋extraction-trigger 統合2件(空→確定/確定後は別名を無視・名前以外は素通し)。
+  **518 テスト全グリーン**・typecheck・lint・lint:deps・build 成功。**未コミット**。SSOT(02_req/03_design)未反映=承認待ち(§14)。
+
+---
+
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
 
 MVP 完成後に改善する項目(Router タイムアウト・記憶抽出のレイテンシ/頻度・
