@@ -6,8 +6,11 @@ import type { CharacterDisplayHandle } from './components/CharacterDisplay';
 //   それ以外は透過(下のウィンドウへマウスを通す)。
 // - ホバー(操作オーバーレイの表示判定)= キャラ不透明 OR 操作オーバーレイ の上。
 //   操作はキャラの不透明部に重ねて出すため、ホバー領域が地続きになり「手を伸ばすと消える」が起きない。
-// 判定には VRM のレイキャスト(やや重い)が含まれるため、mousemove ごとでなく rAF で1フレーム1回に間引く。
-// App から「当たり判定の配線」という単一の DOM 関心を切り出したフック(会話/音声 state には触れない)。
+//
+// ⚠ 固着対策(2026-06): 評価を rAF で回すと、ウィンドウ最小化中は rAF が停止し、復帰後に評価が
+//   走らず「全クリックスルーのまま固着(ホバー/ドラッグ不能)」になり得る。そのため rAF をやめ、
+//   ページ可視性に依存しない「時間スロットル(約60fps)＋末尾取りこぼし防止のトレーリング評価」にした。
+//   当たり判定は VRM=readPixels(1px) / PNG=alpha で十分軽いので、ほぼ毎ムーブ評価でも問題ない。
 
 function rectContains(el: HTMLElement | null, x: number, y: number): boolean {
   if (!el) return false;
@@ -36,11 +39,11 @@ export function useClickThrough(
   });
 
   useEffect(() => {
-    let pending = false;
     let mx = 0;
     let my = 0;
+    let lastEval = 0;
+    let trailTimer: ReturnType<typeof setTimeout> | null = null;
     const evaluate = (): void => {
-      pending = false;
       const overChar = charRef.current?.isOpaqueAt(mx, my) ?? true;
       const overOverlay = rectContains(overlayRef.current, mx, my);
       const interactive =
@@ -62,12 +65,28 @@ export function useClickThrough(
     const onMove = (e: MouseEvent): void => {
       mx = e.clientX;
       my = e.clientY;
-      if (!pending) {
-        pending = true;
-        requestAnimationFrame(evaluate);
+      const now = performance.now();
+      if (now - lastEval >= 16) {
+        lastEval = now;
+        if (trailTimer) {
+          clearTimeout(trailTimer);
+          trailTimer = null;
+        }
+        evaluate();
+      } else {
+        // 直近の評価から間もない=末尾(最終位置)を取りこぼさないようトレーリング評価を予約。
+        if (trailTimer) clearTimeout(trailTimer);
+        trailTimer = setTimeout(() => {
+          trailTimer = null;
+          lastEval = performance.now();
+          evaluate();
+        }, 20);
       }
     };
     window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      if (trailTimer) clearTimeout(trailTimer);
+    };
   }, [charRef, bubbleRef, overlayRef, vrmPanelRef]);
 }

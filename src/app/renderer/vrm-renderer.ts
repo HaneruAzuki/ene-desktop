@@ -182,9 +182,9 @@ export class VrmRenderer {
     // readPixels が古い・空バッファを返す。シルエットの代わりにバウンディングボックスで「不透明」と
     // みなし、ウィンドウが全クリックスルーに固着して操作不能になるのを防ぐ(健全時はシルエット精度)。
     if (gl.isContextLost()) return true;
-    if (this.running && (this.lastRenderMs === 0 || performance.now() - this.lastRenderMs > 1000)) {
-      return true;
-    }
+    // 描画が一定時間止まっている/未描画なら readPixels は当てにならない(最小化復帰直後・パイプライン停止)。
+    // running は条件にしない: 可視のはずなのに描画が止まっている場合も固着させない(不確かなら不透明側へ)。
+    if (this.lastRenderMs === 0 || performance.now() - this.lastRenderMs > 1000) return true;
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
     const px = Math.floor(((clientX - rect.left) / rect.width) * w);
