@@ -30,10 +30,11 @@ export const SHORT_TERM_HARD_MAX = 80;
 
 // --- 忘却機構(B-13 / 設計書 §11.6・段階的記憶縮退) ---
 // 中期記憶(Episodic)が青天井に増えないよう、月次/年次に再要約＋低重要度を物理削除して
-// 常時 ≤1000 件に収める恒久ガバナ。**破壊的処理(物理削除)のため既定はオフ**
-// (環境変数 ENE_FORGETTING=1 で有効化・実データ前にレビュー)。
+// 常時 ≤1000 件に収める恒久ガバナ。ビジョン柱1「人間らしい忘却」の本質機能。
+// **既定オン(2026-06-13 ユーザ決定・実機検証済 N-FORGET-1)**。`ENE_FORGETTING=0` で無効化できる(安全弁)。
+// 安全性:要約成功した期間だけ削除/完了月のみ対象/失敗時は温存(forgetting.ts)。
 
-/** 忘却機構を有効化する環境変数名(値 "1" で ON)。既定は無効(安全側)。 */
+/** 忘却機構の制御環境変数名。**既定オン**(`ENE_FORGETTING=0` で無効化)。 */
 export const FORGETTING_ENABLED_ENV = 'ENE_FORGETTING';
 
 /**
@@ -175,7 +176,7 @@ export const VAD_SILENCE_THRESHOLD = 0.35;
  */
 export const VAD_MIN_SILENCE_MS = 800;
 /**
- * コアレッシング(投機生成＋連結)を有効化する env(値 "1" で ON)。既定オフ=現状の経路(無音800ms・renderer 駆動)。
+ * コアレッシング(投機生成＋連結)の env(値 "0" で OFF)。**既定 ON**。OFF 時は従来の経路(無音800ms・renderer 駆動)。
  * ON 時はハンズフリーの話終わりを**暫定**扱いにし、短い無音で投機生成を開始、発話再開で静かにキャンセル＋連結する。
  */
 export const COALESCE_ENABLED_ENV = 'ENE_COALESCE';
@@ -353,6 +354,12 @@ export const LONG_ABSENCE_DAYS = 7;
 export const DAILY_LIFE_CATEGORY = 'daily-life';
 /** 暮らしの断片の importance(平凡な日は本人も忘れる=低めにして月次忘却で薄れさせる)。 */
 export const DAILY_LIFE_IMPORTANCE = 2;
+/**
+ * 暮らしの断片(daily-life)を忘却対象にする最小経過月数(B-18・N-PRES-3)。
+ * これ未満の月(=当月＋直近の月)は「昨日/最近 何してた?」の連続性のため残す。
+ * 以上で低importanceの断片は **要約せず直接削除**(canon と違い user サマリに混ぜない=provenance を汚さない)。
+ */
+export const FORGET_DAILY_LIFE_MIN_AGE_MONTHS = 2;
 /** 起動時の挨拶/暮らし生成を待つ上限(ms)。超過/失敗は定型文フォールバック(オフラインでも壊れない)。 */
 export const GREETING_GENERATION_TIMEOUT_MS = 4000;
 

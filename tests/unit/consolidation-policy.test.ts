@@ -94,11 +94,28 @@ describe('consolidation-policy (§11.6)', () => {
     expect(plan.yearly).toHaveLength(0);
   });
 
-  it('canon(provenance:self)は忘却対象外', () => {
+  it('canon(provenance:self・daily-life以外)は忘却対象外', () => {
     const records = [
       rec('self/1', '2020-01-01T10:00:00+09:00', { importance: 1, provenance: 'self' }),
     ];
     const plan = planConsolidation(records, NOW);
+    expect(plan.monthly).toHaveLength(0);
+    expect(plan.yearly).toHaveLength(0);
+    expect(plan.dailyLifeDelete).toHaveLength(0); // daily-life ではない self は触らない
+  });
+
+  it('暮らしの断片(daily-life)は十分古い低importanceだけ要約せず削除し、直近・高importanceは残す(B-18)', () => {
+    const records = [
+      // 2ヶ月前(monthsAgo=2)・低importance → 削除
+      rec('2026/daily-life/old', '2026-04-10T10:00:00+09:00', { provenance: 'self', category: 'daily-life', importance: 2 }),
+      // 1ヶ月前(直近)→ 連続性のため残す
+      rec('2026/daily-life/recent', '2026-05-10T10:00:00+09:00', { provenance: 'self', category: 'daily-life', importance: 2 }),
+      // 古いが高importance → 残す
+      rec('2026/daily-life/keep', '2026-01-10T10:00:00+09:00', { provenance: 'self', category: 'daily-life', importance: 4 }),
+    ];
+    const plan = planConsolidation(records, NOW);
+    expect(plan.dailyLifeDelete).toEqual(['2026/daily-life/old']);
+    // daily-life は user サマリ(monthly/yearly)に巻き上げない(provenance を汚さない)。
     expect(plan.monthly).toHaveLength(0);
     expect(plan.yearly).toHaveLength(0);
   });

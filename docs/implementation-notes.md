@@ -1038,6 +1038,20 @@
 
 ---
 
+### N-FORGET-2 🟢 忘却の既定オン化 ＋ 暮らしの断片(daily-life)の縮退(2026-06-13・B-13/B-18)
+- **既定オン(ユーザ決定)**: `isForgettingEnabled()` を `=== '1'` → `!== '0'` に変更=**既定で忘却が走る**
+  (ビジョン柱1「人間らしい忘却」を標準動作に)。`ENE_FORGETTING=0` で無効化できる(安全弁)。実装/安全性は N-FORGET-1 のまま
+  (要約成功した期間だけ削除/完了月のみ/失敗時温存/起動時背景実行)。
+- **B-18 daily-life の縮退**: P3 のオフスクリーンライフが保存する暮らしの断片(`provenance:'self'`・`category:'daily-life'`)を
+  忘却対象にした。**ただし user サマリへ巻き上げない**(混ぜると「自分の生活」が「相手のこと」に化ける provenance 汚染)。
+  方式=**要約せず直接削除**(平凡な日は薄れる)。`consolidation-policy` に `dailyLifeDelete`(self×daily-life で
+  `FORGET_DAILY_LIFE_MIN_AGE_MONTHS=2` ヶ月以上前 かつ importance≤月次しきい値)を追加し、`forgetting` がサマリ無しで削除。
+  当月＋直近月は「昨日/最近 何してた?」の連続性のため残す。canon(life-memory.json)は forgetting の入力に入らないので不変。
+- **「忘れて」明示削除コマンド=不要決定(ユーザ)**: 人間らしい忘却は自動が本筋。特定削除は平文ファイル削除(§6.4)で代替。
+- 検証: consolidation-policy / forgetting テスト追加(daily-life 縮退・既定オン)・497テスト緑・typecheck/lint/lint:deps クリーン。
+
+---
+
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
 
 MVP 完成後に改善する項目(Router タイムアウト・記憶抽出のレイテンシ/頻度・

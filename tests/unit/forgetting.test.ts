@@ -14,7 +14,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { runForgetting } from '../../src/memory/forgetting';
+import { runForgetting, isForgettingEnabled } from '../../src/memory/forgetting';
 import { saveEpisodic, loadEpisodicById, loadAllEpisodicFiles } from '../../src/memory/episodic';
 import { getConsolidationState } from '../../src/memory/consolidation-state';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
@@ -71,5 +71,30 @@ describe('forgetting orchestrator (§11.6)', () => {
     const res = await runForgetting(complete, { year: 2026, month: 6 });
     expect(res.summaries).toBe(0);
     expect(await loadEpisodicById(id)).not.toBeNull();
+  });
+
+  it('暮らしの断片(daily-life)は要約せず直接削除・直近は残す(B-18)', async () => {
+    const dl = (date: string): EpisodicMemory => ({
+      date, topic: '日々', summary: '平凡な一日', importance: 2, category: 'daily-life', provenance: 'self',
+    });
+    const oldId = await saveEpisodic(dl('2026-04-10T10:00:00+09:00')); // 2ヶ月前=削除
+    const recentId = await saveEpisodic(dl('2026-05-10T10:00:00+09:00')); // 直近=残す
+
+    const res = await runForgetting(complete, { year: 2026, month: 6 });
+
+    expect(await loadEpisodicById(oldId)).toBeNull();
+    expect(await loadEpisodicById(recentId)).not.toBeNull();
+    expect(res.deleted).toBeGreaterThanOrEqual(1);
+    // daily-life は user サマリを作らない(provenance 汚染なし)。
+    const all = await loadAllEpisodicFiles();
+    expect(all.find((r) => r.memory.extra?.['summaryTier'])).toBeUndefined();
+  });
+
+  it('忘却は既定オン・ENE_FORGETTING=0 で無効化できる', () => {
+    delete process.env['ENE_FORGETTING'];
+    expect(isForgettingEnabled()).toBe(true);
+    process.env['ENE_FORGETTING'] = '0';
+    expect(isForgettingEnabled()).toBe(false);
+    delete process.env['ENE_FORGETTING']; // 後始末(他テストへ影響させない)
   });
 });

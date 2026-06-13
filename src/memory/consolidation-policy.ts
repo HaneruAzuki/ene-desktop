@@ -2,6 +2,8 @@ import {
   FORGET_MONTHLY_DELETE_IMPORTANCE_MAX,
   FORGET_YEARLY_DELETE_IMPORTANCE_MAX,
   FORGET_YEARLY_AGE_YEARS,
+  FORGET_DAILY_LIFE_MIN_AGE_MONTHS,
+  DAILY_LIFE_CATEGORY,
 } from '../shared/constants';
 import type { EpisodicRecord } from '../shared/types/memory';
 
@@ -37,10 +39,25 @@ export interface YearlyPlan {
 export interface ConsolidationPlan {
   monthly: MonthlyPlan[];
   yearly: YearlyPlan[];
+  /**
+   * 暮らしの断片(daily-life・provenance:'self')のうち、要約せず直接削除する記録 ID(B-18 / N-PRES-3)。
+   * canon と違い「平凡な日は薄れる」=user サマリに巻き上げず、十分古い(FORGET_DAILY_LIFE_MIN_AGE_MONTHS 以上)
+   * かつ低importance(≤ 月次しきい値)のものだけ消す。当月・直近月は連続性のため残す。
+   */
+  dailyLifeDelete: string[];
 }
 
 function yearOf(r: EpisodicRecord): number {
   return parseInt(r.memory.date.slice(0, 4), 10);
+}
+
+function monthOf(r: EpisodicRecord): number {
+  return parseInt(r.memory.date.slice(5, 7), 10);
+}
+
+/** record の月から now までの経過月数(年跨ぎ込み)。 */
+function monthsAgo(year: number, month: number, now: { year: number; month: number }): number {
+  return (now.year - year) * 12 + (now.month - month);
 }
 
 function periodOf(r: EpisodicRecord): string {
@@ -118,5 +135,14 @@ export function planConsolidation(
     monthly.push({ period, year, month, toSummarize: rawRecs, toDelete });
   }
 
-  return { monthly, yearly };
+  // --- 暮らしの断片(daily-life)の縮退(B-18)。canon は forgetting の入力に入らない=ここの self は daily-life のみ。 ---
+  // user サマリに混ぜると provenance が汚れる(自分の生活が「相手のこと」に化ける)ため、要約せず直接削除する。
+  // 当月＋直近月(< FORGET_DAILY_LIFE_MIN_AGE_MONTHS)は「昨日/最近」の連続性のため残し、それ以上の低importanceを消す。
+  const dailyLifeDelete = records
+    .filter((r) => r.memory.provenance === 'self' && r.memory.category === DAILY_LIFE_CATEGORY)
+    .filter((r) => monthsAgo(yearOf(r), monthOf(r), now) >= FORGET_DAILY_LIFE_MIN_AGE_MONTHS)
+    .filter((r) => r.memory.importance <= FORGET_MONTHLY_DELETE_IMPORTANCE_MAX)
+    .map((r) => r.id);
+
+  return { monthly, yearly, dailyLifeDelete };
 }

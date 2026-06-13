@@ -23,12 +23,13 @@ import type { EpisodicMemory } from '../shared/types/memory';
 // 安全設計:
 //  - **要約に失敗した期間は削除しない**(サマリ無しで記憶を失わない)。
 //  - 直列化ロック(inFlight)で多重実行を防ぐ。
-//  - **既定オフ**(ENE_FORGETTING=1 のときだけ lifecycle が起動・破壊的処理のためレビュー後に有効化)。
+//  - **既定オン**(2026-06-13 ユーザ決定・ENE_FORGETTING=0 で無効化・実機検証済 N-FORGET-1)。
 //  - 物理削除(§6.4)。派生索引(inverted/vector)は削除後に再生成/掃除(真実の源は episodic 本体)。
+//  - 暮らしの断片(daily-life・provenance:'self')は user サマリに混ぜず、十分古い低importanceを直接削除(B-18)。
 
-/** 忘却機構が有効か(環境変数で明示 ON のときだけ true・安全側の既定 OFF)。 */
+/** 忘却機構が有効か。**既定オン**(2026-06-13 ユーザ決定)。`ENE_FORGETTING=0` で明示無効化できる(安全弁)。 */
 export function isForgettingEnabled(): boolean {
-  return process.env[FORGETTING_ENABLED_ENV] === '1';
+  return process.env[FORGETTING_ENABLED_ENV] !== '0';
 }
 
 /** サマリの EpisodicMemory を組み立てる(専用カテゴリ・合成日アンカー・mood を動かさない valence=0)。 */
@@ -118,6 +119,17 @@ export async function runForgetting(
       log.warn(`consolidation skipped (summary failed): ${job.tier} ${job.label}`, {
         name: (e as Error).name,
       });
+    }
+  }
+
+  // daily-life(暮らしの断片)の縮退(B-18 / N-PRES-3)。要約せず直接削除する(平凡な日は薄れる・
+  // canon と違い user サマリに巻き上げない=provenance を汚さない)。十分古い低importanceのみ(計画側で判定)。
+  for (const id of plan.dailyLifeDelete) {
+    try {
+      await deleteEpisodicById(id);
+      deleted++;
+    } catch (e) {
+      log.warn('daily-life prune failed', { name: (e as Error).name });
     }
   }
 
