@@ -45,5 +45,22 @@ export function createMainWindow(position?: Position): BrowserWindow {
     void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
+  // 開発時のみ: DevTools を「別ウィンドウ(detach)」で開く。
+  // 本ウィンドウは frame:false・transparent・小サイズのため、既定のドッキング表示だと
+  // DevTools が窓の内側に固定されて外へ出せず使い物にならない。Ctrl+Shift+I / F12 を横取りし、
+  // 既定のドッキング動作(preventDefault)を止めて detach モードでトグルする。
+  if (rendererUrl) {
+    win.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+      const key = input.key.toLowerCase();
+      const isToggle = (input.control && input.shift && key === 'i') || key === 'f12';
+      if (!isToggle) return;
+      event.preventDefault();
+      const wc = win.webContents;
+      if (wc.isDevToolsOpened()) wc.closeDevTools();
+      else wc.openDevTools({ mode: 'detach' });
+    });
+  }
+
   return win;
 }
