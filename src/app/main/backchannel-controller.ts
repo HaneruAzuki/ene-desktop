@@ -137,6 +137,17 @@ export class BackchannelController {
 
 }
 
+/**
+ * 音声サイドカー(AivisSpeech)が未起動=接続拒否か。Node の fetch は接続拒否を
+ * `TypeError('fetch failed')`(cause: ECONNREFUSED)として投げる。これは起動待ちの**想定内**エラーで、
+ * 呼び出し側(prepare)が数秒後に再試行=エンジンが立てば成功する。本物の失敗と区別して警告を抑えるための判定。
+ */
+function isEngineNotReady(e: unknown): boolean {
+  if (e instanceof TypeError) return true;
+  const msg = (e as { message?: unknown })?.message;
+  return typeof msg === 'string' && /fetch failed|ECONNREFUSED/i.test(msg);
+}
+
 /** 相槌語を neutral スタイルで一度ずつ合成してキャッシュする(§6.2: 本文はログに出さない)。 */
 async function prewarm(
   pool: BackchannelPoolData,
@@ -162,6 +173,9 @@ async function prewarm(
     try {
       map.set(phrase, await tts.speak(phrase, opts));
     } catch (e) {
+      // エンジン未起動(接続拒否)は想定内=警告を出さない。残りも同じ理由で失敗するのでこのラウンドは打ち切る
+      //  (呼び出し側 prepare がエンジン起動後に再試行する)。本物の失敗(エンジンは居るのに合成エラー)だけ警告。
+      if (isEngineNotReady(e)) break;
       log.warn(`backchannel prewarm failed for a phrase: ${(e as Error).name}`);
     }
   }
