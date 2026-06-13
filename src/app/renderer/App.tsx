@@ -26,6 +26,7 @@ import {
   TALKING_MAX_MS,
   LOG_PANEL_WIDTH,
   LOG_MAX_ENTRIES,
+  IDLE_TURN_BACK_MS,
 } from './constants';
 import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
@@ -87,6 +88,7 @@ export function App(): React.ReactElement | null {
   const [autoLaunch, setAutoLaunch] = useState(false); // PC起動時に自動起動(段階6)
   const [logOpen, setLogOpen] = useState(false); // 会話ログ(ウィンドウ横拡張・VTuber風)
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]); // 直近のやりとり(セッション内のみ)
+  const [idleBack, setIdleBack] = useState(false); // 会話が途切れて退屈→後ろ向き(話しかけで前へ・見た目だけ)
 
   const charRef = useRef<CharacterDisplayHandle>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,7 @@ export function App(): React.ReactElement | null {
   const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleTurnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 後ろ向きまでのアイドル計時
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
   const pressHeldRef = useRef(false); // マイク押下が長押し(PTT)に確定したか
@@ -157,9 +160,20 @@ export function App(): React.ReactElement | null {
     void window.ene.getAutoLaunch().then(setAutoLaunch);
   }, []);
 
-  // ユーザー発話(ハンズフリー音声・コアレッシング含む)を会話ログへ(表示専用イベント)。
+  // ユーザー発話(ハンズフリー音声・コアレッシング含む)を会話ログへ＋アイドル計時リセット(表示専用イベント)。
   useEffect(() => {
-    window.ene.onUserSaid((text) => pushLog('user', text));
+    window.ene.onUserSaid((text) => {
+      pushLog('user', text);
+      noteActivity();
+    });
+  }, []);
+
+  // 会話が途切れて IDLE_TURN_BACK_MS 経つとトリミは後ろを向く(話しかけ/クリックで前へ・見た目だけ)。起動時から計時。
+  useEffect(() => {
+    noteActivity();
+    return () => {
+      if (idleTurnTimerRef.current) clearTimeout(idleTurnTimerRef.current);
+    };
   }, []);
 
   // ウィンドウ可視性 → VRM 描画の停止/再開(§3.6・軽量原則 柱4)。
@@ -390,10 +404,18 @@ export function App(): React.ReactElement | null {
     setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
   }
 
-  /** 入力欄を開く(操作=起き上がる・クリック音)。 */
+  /** 会話アクティビティを記録: トリミを前へ向け、IDLE_TURN_BACK_MS 後に後ろを向くタイマーを張り直す(見た目だけ)。 */
+  function noteActivity(): void {
+    setIdleBack(false);
+    if (idleTurnTimerRef.current) clearTimeout(idleTurnTimerRef.current);
+    idleTurnTimerRef.current = setTimeout(() => setIdleBack(true), IDLE_TURN_BACK_MS);
+  }
+
+  /** 入力欄を開く(操作=起き上がる・クリック音)。クリック=こちらに気づく→前を向く。 */
   function openInput(): void {
     if (preparingRef.current) return; // 準備中は入力を受け付けない(ユーザー操作は ready 後)
     playClick();
+    noteActivity();
     setForceOpen(true); // 操作オーバーレイを明示展開し入力欄へフォーカス(トレイ/コンテキストメニュー起点)
     setCharState((s) => ({ ...s, pose: 'stand' }));
   }
@@ -423,6 +445,7 @@ export function App(): React.ReactElement | null {
    */
   async function respond(text: string): Promise<void> {
     interactedRef.current = true; // 会話開始 → 準備完了後に挨拶で上書きしない
+    noteActivity(); // 話しかけられた=前を向く＋アイドル計時リセット
     setBubble(null);
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' }));
@@ -472,6 +495,7 @@ export function App(): React.ReactElement | null {
 
   // --- ハンズフリー(VAD)の ON/OFF ---
   async function startHandsFree(): Promise<void> {
+    noteActivity(); // マイクを点ける=こちらへ向き直る
     const ok = await window.ene.startVad();
     if (!ok) {
       setBubble('…ごめん、耳がまだ準備できてないみたい。');
@@ -500,6 +524,7 @@ export function App(): React.ReactElement | null {
   // --- push-to-talk(押している間だけ録音) ---
   async function startPtt(): Promise<void> {
     if (recording) return;
+    noteActivity(); // 話し始める=こちらへ向き直る
     // 録音開始の時点で Tier0 キャッシュを温める(録音→認識の間に書き込まれる・レイテンシ施策)。
     void window.ene.warmCache();
     try {
@@ -644,6 +669,7 @@ export function App(): React.ReactElement | null {
     const next = !away;
     setAway(next);
     window.ene.setAway(next);
+    noteActivity(); // 手動トグル=操作=アイドル計時リセット(離席復帰時に自動後ろ向きを確実に解除)
     if (next) {
       // 離席に入る=マイクを確実に切る(ハンズフリー稼働中なら停止・PTT 録音中なら破棄)。
       if (voiceModeRef.current) stopHandsFree();
@@ -692,7 +718,7 @@ export function App(): React.ReactElement | null {
         vrmDisplay={vrmDisplay ?? undefined}
         amplitudeProvider={getVoiceAmplitude}
         visible={visible}
-        away={away}
+        away={away || idleBack}
         preparing={preparing}
       />
       {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2/§3)。

@@ -16,6 +16,9 @@ export const BUBBLE_MAX_HEIGHT_PX = 400;
 // アニメ(task_13・F-ANIM-12: フレーム間隔等の数値は定数で一元管理)
 export const MOUTH_FLAP_MS = 150; // talking: 口開閉の切替間隔(1トグル=ほぼ1文字)
 export const SOFA_AFTER_IDLE_MS = 60_000; // この時間 idle が続くと寝そべりへ
+// 会話がこの時間途切れると、トリミは退屈して後ろを向く(話しかける/クリックで前を向く)。
+// 手動の離席(☕)とは別=見た目だけ(マイクや自発発話は止めない)。
+export const IDLE_TURN_BACK_MS = 10 * 60_000; // 10分
 // 口パクの総時間 ≈ 文字数 × MOUTH_FLAP_MS(「一文字1口パク」)。話し終えたら idle に戻す。
 export const TALKING_MIN_MS = 400; // 最短(短い相槌でも少し口が動く)
 export const TALKING_MAX_MS = 6000; // 最長(長文でも口パクが延々続かない上限)
