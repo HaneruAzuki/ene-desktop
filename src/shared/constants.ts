@@ -204,10 +204,44 @@ export const COALESCE_WINDOW_STEP_DOWN_MS = 30;
 export const COALESCE_WINDOW_STEP_UP_MS = 200;
 /** 発話開始の確定に必要な最小発話継続(ms)。単発ノイズでの誤発火を防ぐ。 */
 export const VAD_MIN_SPEECH_MS = 160;
+
+// --- 傾聴モード(docs/listening-mode-design.md・2026-06-13) ---
+// 長い語り(プレゼン等)を腰を据えて聞く状態。coalesce の「ターン終了の定義」を
+// 適応窓(400-1200ms) → 固定の長い窓(LISTENING_WINDOW_MS)へ差し替えるだけ(2モード排他)。
+// 傾聴中は適応ループ(adjustWindow)を停止し、無音窓ノブの二重書きを構造的に避ける。
+
+/** 傾聴モードの機能ゲート。**既定 ON**(`ENE_LISTENING=0` で無効化)。 */
+export const LISTENING_ENABLED_ENV = 'ENE_LISTENING';
+/** 傾聴モード中の固定無音窓(ms)。通常の適応窓を一時停止してこの値に差し替える(排他)。 */
+export const LISTENING_WINDOW_MS = 6000;
+/**
+ * 連続サイレントキャンセルがこの回数に達したら傾聴モードへ入る(行動入室)。
+ * サイレントキャンセル=第一声前の再開=「返事しようとするたびユーザが話し続ける」=floor を譲っていない実測。
+ * コミット(トリミが実際に喋った)でカウンタをリセットし「連続」を担保する。
+ */
+export const LISTENING_ENTER_SILENT_CANCELS = 2;
+/**
+ * 傾聴中の蓄積発話(pendingText)の文字数上限。超えたら「聞いた分」で強制的に返事して区切る。
+ * 1時間の長話/論文流し込み/スピーチ反復再生を決定論的に有界化する(≈6000字≈20分)。要実機調整。
+ * 文字数で縛る理由:プロンプトサイズを直接縛る/無音を数えない(長いだけで中身が無いを誤計上しない)。
+ */
+export const LISTENING_MAX_CHARS = 6000;
+/**
+ * 傾聴に入ってからこの経過(ms)で「あくび」を1回出す(長時間傾聴の情緒ビート・退室でリセット)。
+ * §5.3 非抵触:保存スカラーは持たず、その場限りの経過時間のみ(idle-talk のタイマーと同種の事実計測)。
+ */
+export const LISTENING_YAWN_MS = 600_000;
 /** 切り出し時に発話頭へ付ける先読みパディング(ms)。語頭の欠けを防ぐ。 */
 export const VAD_SPEECH_PAD_MS = 200;
-/** barge-in(ENE発話中の割り込み)確定に必要な発話継続(ms)。エコー残響での誤割り込みを抑えるため長め。 */
-export const VAD_BARGE_IN_MIN_SPEECH_MS = 320;
+/**
+ * barge-in(ENE発話中の割り込み)確定に必要な発話継続(ms)=barge-in デバウンス。
+ * これ未満の短い被り(相槌「うん」・咳・独り言・エコー残響)では speech-start 自体が立たず、
+ * 録音も barge-in も起きない=トリミは喋り続ける。≥この時間続いて初めて割り込み確定。
+ * 320→500(2026-06-13・傾聴モード): 長い語りの後の長い回答を「事故被り」で失わないため長めへ
+ * (docs/listening-mode-design.md §6-1)。非対称(長い答えを失う ≫ 一拍の重なり)ゆえ切らない側に倒す。
+ * 実機調整可(500〜800の範囲が目安。元320はエコー対策で実機調整した値)。
+ */
+export const VAD_BARGE_IN_MIN_SPEECH_MS = 500;
 
 // --- 能動的リスニング(相槌エンジン・task_18 Phase A) ---
 // 既存 VAD の発話確率列(silero-vad / vad-segmenter)に相乗りして、

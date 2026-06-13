@@ -5,6 +5,7 @@ import {
   WINDOW_WIDTH,
   WINDOW_HEIGHT,
   COALESCE_ENABLED_ENV,
+  LISTENING_ENABLED_ENV,
   VAD_PROVISIONAL_SILENCE_MS,
   GREETING_GENERATION_TIMEOUT_MS,
 } from '../../shared/constants';
@@ -115,6 +116,15 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
         setSilenceWindow: (ms) => applySilenceWindow(ms),
         // barge-in(生成完了後)時に、最新 assistant 記憶を「聞かせた分」へ切り詰める(Phase B)。
         updateLastAssistant: (heardText) => void replaceLastAssistantText(heardText),
+        // 傾聴モード(docs/listening-mode-design.md)。既定 ON(ENE_LISTENING=0 で無効化)。
+        listeningEnabled: process.env[LISTENING_ENABLED_ENV] !== '0',
+        // 頬杖姿勢の出し入れ/あくびを renderer へ(VRM 視覚は Phase 4 で受信側を配線)。
+        onListeningChange: (on) => {
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:listening', on);
+        },
+        onYawn: () => {
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:yawn');
+        },
       })
     : null;
   const coalesce: CoalesceHooks | undefined = coordinator

@@ -8,6 +8,10 @@ import {
   VAD_PROVISIONAL_SILENCE_MS,
   COALESCE_WINDOW_MIN_MS,
   COALESCE_WINDOW_MAX_MS,
+  LISTENING_WINDOW_MS,
+  LISTENING_ENTER_SILENT_CANCELS,
+  LISTENING_MAX_CHARS,
+  LISTENING_YAWN_MS,
 } from '../../src/shared/constants';
 import type { ConversationResponse } from '../../src/shared/types/conversation';
 
@@ -234,5 +238,138 @@ describe('clampWindow (案① 無音窓のクランプ・純粋)', () => {
     const mid = Math.round((COALESCE_WINDOW_MIN_MS + COALESCE_WINDOW_MAX_MS) / 2);
     expect(clampWindow(mid)).toBe(mid);
     expect(clampWindow(mid + 0.4)).toBe(mid);
+  });
+});
+
+// 傾聴モード(docs/listening-mode-design.md)。窓の差し替え=排他 / 行動入室 / 入力上限 / あくび。
+function listeningHarness(opts?: { now?: () => number; listeningEnabled?: boolean }): {
+  deps: VoiceTurnDeps;
+  calls: GenCall[];
+  windows: number[];
+  listeningChanges: boolean[];
+  yawns: { n: number };
+} {
+  const calls: GenCall[] = [];
+  const windows: number[] = [];
+  const listeningChanges: boolean[] = [];
+  const yawns = { n: 0 };
+  const deps: VoiceTurnDeps = {
+    generate: (text, signal, onFirstAudio) =>
+      new Promise<ConversationResponse>((resolve, reject) => {
+        calls.push({ text, signal, onFirstAudio, resolve, reject });
+      }),
+    commit: async () => {},
+    emitResponse: () => {},
+    setSilenceWindow: (ms) => windows.push(ms),
+    onListeningChange: (on) => listeningChanges.push(on),
+    onYawn: () => {
+      yawns.n += 1;
+    },
+    now: opts?.now,
+    listeningEnabled: opts?.listeningEnabled,
+  };
+  return { deps, calls, windows, listeningChanges, yawns };
+}
+
+/** 連続サイレントキャンセルを n 回起こす(各回: 暫定終了で生成→第一声前に再開で中断)。 */
+function silentCancel(c: VoiceTurnCoordinator, text: string): void {
+  c.onSpeechEnd();
+  c.onProvisionalEnd(text); // userSpeaking=false → 生成開始(未コミット)
+  c.onSpeechStart(); // 第一声前に再開 → サイレントキャンセル
+}
+
+describe('VoiceTurnCoordinator 傾聴モード', () => {
+  it('行動入室: 連続サイレントキャンセル2回で傾聴へ(窓を固定値へ差し替え+通知)', () => {
+    const { deps, windows, listeningChanges } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    silentCancel(c, 'A'); // 1回目
+    expect(listeningChanges).toEqual([]); // まだ入らない
+    silentCancel(c, 'B'); // 2回目 → 入室
+    expect(LISTENING_ENTER_SILENT_CANCELS).toBe(2);
+    expect(listeningChanges).toEqual([true]);
+    expect(windows[windows.length - 1]).toBe(LISTENING_WINDOW_MS);
+  });
+
+  it('サイレントキャンセル1回では入らない(窓は適応のまま短縮)', () => {
+    const { deps, windows, listeningChanges } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    silentCancel(c, 'A');
+    expect(listeningChanges).toEqual([]);
+    expect(windows[windows.length - 1]).toBeLessThan(VAD_PROVISIONAL_SILENCE_MS);
+  });
+
+  it('コミットでカウンタがリセットされ「連続」のみ数える', async () => {
+    const { deps, calls, listeningChanges } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    silentCancel(c, 'A'); // cancel#1
+    // 間に通常応答が成立(第一声→完了)= 連続が途切れる
+    c.onSpeechEnd();
+    c.onProvisionalEnd('B');
+    const g = calls[calls.length - 1];
+    g.onFirstAudio();
+    g.resolve(chat('はい'));
+    await flush();
+    silentCancel(c, 'C'); // これは「1回目」扱い(リセット済み)
+    expect(listeningChanges).toEqual([]); // 入らない
+  });
+
+  it('requestListening(Claude経路)で即入室', () => {
+    const { deps, windows, listeningChanges } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    c.requestListening();
+    expect(listeningChanges).toEqual([true]);
+    expect(windows[windows.length - 1]).toBe(LISTENING_WINDOW_MS);
+  });
+
+  it('傾聴中は適応窓を停止(サイレントキャンセルで縮まない)', () => {
+    const { deps, windows } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    c.requestListening(); // window=6000
+    silentCancel(c, 'x'); // 傾聴中の中断 → adjustWindow は no-op
+    expect(windows[windows.length - 1]).toBe(LISTENING_WINDOW_MS); // 6000 のまま
+  });
+
+  it('退室: 第一声で通常窓へ復元+通知', async () => {
+    const { deps, calls, windows, listeningChanges } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    c.requestListening(); // windowBeforeListening=500 → 6000
+    c.onProvisionalEnd('終わり'); // userSpeaking=false → 生成
+    calls[calls.length - 1].onFirstAudio(); // 第一声 → 退室
+    expect(listeningChanges).toEqual([true, false]);
+    expect(windows[windows.length - 1]).toBe(VAD_PROVISIONAL_SILENCE_MS); // 500 へ復元
+  });
+
+  it('入力上限: pendingText が上限超で、発話中でも強制生成して区切る', () => {
+    const { deps, calls } = listeningHarness();
+    const c = new VoiceTurnCoordinator(deps);
+    c.requestListening();
+    c.onSpeechStart(); // userSpeaking=true(=普通なら生成しない状況)
+    const long = 'あ'.repeat(LISTENING_MAX_CHARS + 1);
+    c.onProvisionalEnd(long);
+    expect(calls).toHaveLength(1); // 強制生成された
+    expect(calls[0].text.length).toBeGreaterThan(LISTENING_MAX_CHARS);
+  });
+
+  it('あくび: 経過が閾値超で1回だけ発火(退室でリセット)', async () => {
+    let t = 1000;
+    const { deps, calls, yawns } = listeningHarness({ now: () => t });
+    const c = new VoiceTurnCoordinator(deps);
+    c.requestListening(); // listeningStartMs=1000
+    c.onSpeechStart(); // userSpeaking=true(生成を起こさず溜めるだけにする)
+    t = 1000 + LISTENING_YAWN_MS; // 閾値到達
+    c.onProvisionalEnd('まだ続く'); // maybeYawn
+    expect(yawns.n).toBe(1);
+    c.onProvisionalEnd('さらに続く'); // 2回目は出ない
+    expect(yawns.n).toBe(1);
+    expect(calls).toHaveLength(0); // userSpeaking 中なので通常生成は無し(あくびのみ)
+  });
+
+  it('ENE_LISTENING 無効化(listeningEnabled=false)では行動入室しない', () => {
+    const { deps, listeningChanges } = listeningHarness({ listeningEnabled: false });
+    const c = new VoiceTurnCoordinator(deps);
+    silentCancel(c, 'A');
+    silentCancel(c, 'B');
+    silentCancel(c, 'C');
+    expect(listeningChanges).toEqual([]);
   });
 });

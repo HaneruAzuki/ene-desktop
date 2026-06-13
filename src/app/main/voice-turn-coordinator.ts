@@ -6,6 +6,10 @@ import {
   COALESCE_WINDOW_MAX_MS,
   COALESCE_WINDOW_STEP_DOWN_MS,
   COALESCE_WINDOW_STEP_UP_MS,
+  LISTENING_WINDOW_MS,
+  LISTENING_ENTER_SILENT_CANCELS,
+  LISTENING_MAX_CHARS,
+  LISTENING_YAWN_MS,
 } from '../../shared/constants';
 
 /** 無音窓(ms)を下限/上限でクランプする(案①・純粋)。 */
@@ -42,6 +46,14 @@ export interface VoiceTurnDeps {
   setSilenceWindow?: (ms: number) => void;
   /** barge-in(生成完了後): 最新 assistant 記憶を「聞かせた分」へ上書きする(切り詰め・Phase B・任意)。 */
   updateLastAssistant?: (heardText: string) => void;
+  /** 傾聴モードの有効/無効(env ゲート)。未指定は有効扱い。無効なら行動入室・あくび等を一切行わない。 */
+  listeningEnabled?: boolean;
+  /** 現在時刻(ms)。あくびの経過判定に使う(テストで注入可)。未指定は Date.now。 */
+  now?: () => number;
+  /** 傾聴モードの出入りを renderer へ通知(頬杖姿勢の出し入れ・Phase 4 で配線・任意)。 */
+  onListeningChange?: (listening: boolean) => void;
+  /** 長時間傾聴のあくびを renderer へ通知(VRM/Few-shot・Phase 4 で配線・任意)。 */
+  onYawn?: () => void;
 }
 
 /** 進行中の生成の状態。 */
@@ -69,7 +81,67 @@ export class VoiceTurnCoordinator {
   /** 現在の無音窓(ms・案①でイベントごとに伸縮)。VadSegmenter と同期(初期=暫定値)。同一稼働中は保持。 */
   private currentWindowMs = VAD_PROVISIONAL_SILENCE_MS;
 
-  constructor(private readonly deps: VoiceTurnDeps) {}
+  // --- 傾聴モード(docs/listening-mode-design.md) ---
+  /** 傾聴モード中か。true の間は適応窓を停止し、固定の長い窓で「終わりまで聞く」。 */
+  private listening = false;
+  /** 連続サイレントキャンセル数(コミットでリセット)。閾値到達で傾聴入室(行動経路)。 */
+  private consecutiveSilentCancels = 0;
+  /** 傾聴入室前の無音窓(退室時に復元し、適応の学習値を失わない)。 */
+  private windowBeforeListening = VAD_PROVISIONAL_SILENCE_MS;
+  /** 傾聴に入った時刻(ms・あくびの経過判定の基点)。 */
+  private listeningStartMs = 0;
+  /** この傾聴セッションで既にあくびを出したか(1回だけ)。 */
+  private yawnedThisListening = false;
+  /** 現在時刻(ms)。注入可(テスト)。 */
+  private readonly now: () => number;
+
+  constructor(private readonly deps: VoiceTurnDeps) {
+    this.now = deps.now ?? ((): number => Date.now());
+  }
+
+  /** 傾聴モードが有効か(env ゲート。未指定は有効扱い)。 */
+  private get listeningEnabled(): boolean {
+    return this.deps.listeningEnabled !== false;
+  }
+
+  /**
+   * Claude 経路の入室口(明示宣言「プレゼン聞いて」の応答に相乗りしたフラグから呼ぶ・Phase 3)。
+   * 行動経路(連続サイレントキャンセル)とは別の、確信の高い入室トリガ。
+   */
+  requestListening(): void {
+    if (this.listeningEnabled && !this.listening) this.enterListening();
+  }
+
+  /** 傾聴モードへ入る:適応窓を退避→固定窓へ差し替え→姿勢/あくび状態を初期化。 */
+  private enterListening(): void {
+    this.listening = true;
+    this.windowBeforeListening = this.currentWindowMs;
+    this.currentWindowMs = LISTENING_WINDOW_MS;
+    this.listeningStartMs = this.now();
+    this.yawnedThisListening = false;
+    this.deps.setSilenceWindow?.(LISTENING_WINDOW_MS);
+    this.deps.onListeningChange?.(true);
+    log.info(`listening: enter (window=${LISTENING_WINDOW_MS}ms)`); // §6.2: 数値のみ
+  }
+
+  /** 傾聴モードを抜ける:窓を入室前の値へ復元し、適応を再開する。 */
+  private exitListening(): void {
+    if (!this.listening) return;
+    this.listening = false;
+    this.currentWindowMs = this.windowBeforeListening;
+    this.deps.setSilenceWindow?.(this.windowBeforeListening);
+    this.deps.onListeningChange?.(false);
+    log.info(`listening: exit (window=${this.windowBeforeListening}ms)`);
+  }
+
+  /** 長時間傾聴のあくび(1セッション1回・経過のみで判定=保存スカラーを持たない)。 */
+  private maybeYawn(): void {
+    if (this.yawnedThisListening) return;
+    if (this.now() - this.listeningStartMs < LISTENING_YAWN_MS) return;
+    this.yawnedThisListening = true;
+    this.deps.onYawn?.();
+    log.info('listening: yawn');
+  }
 
   /** 発話開始(speech-start)。未コミットの投機生成を静かに中断し、発話中フラグを立てる。 */
   onSpeechStart(): void {
@@ -77,7 +149,18 @@ export class VoiceTurnCoordinator {
     if (this.gen && !this.gen.committed) {
       this.gen.ctrl.abort();
       // サイレントキャンセル(第一声前)=声が出る前に捕捉できた=余裕あり → 窓を短く(キビキビへ・案①)。
+      // (傾聴中は adjustWindow が no-op になる=固定窓を守る)
       this.adjustWindow(-COALESCE_WINDOW_STEP_DOWN_MS);
+      // 行動入室:返事しようとするたびユーザが話し続ける=連続サイレントキャンセル。
+      // 閾値に達したら傾聴へ(コミットでリセットされるので「連続」のみ数える)。
+      this.consecutiveSilentCancels += 1;
+      if (
+        this.listeningEnabled &&
+        !this.listening &&
+        this.consecutiveSilentCancels >= LISTENING_ENTER_SILENT_CANCELS
+      ) {
+        this.enterListening();
+      }
     }
   }
 
@@ -97,6 +180,8 @@ export class VoiceTurnCoordinator {
 
   /** 無音窓を delta(ms)動かしクランプして反映する(変化があれば setSilenceWindow)。 */
   private adjustWindow(deltaMs: number): void {
+    // 傾聴中は固定窓(LISTENING_WINDOW_MS)を守るため適応を停止(無音窓ノブの二重書き回避)。
+    if (this.listening) return;
     const next = clampWindow(this.currentWindowMs + deltaMs);
     if (next !== this.currentWindowMs) {
       this.currentWindowMs = next;
@@ -135,6 +220,17 @@ export class VoiceTurnCoordinator {
     if (!t) return;
     if (this.gen && !this.gen.committed) this.gen.ctrl.abort();
     this.pendingText = this.pendingText ? `${this.pendingText} ${t}` : t;
+    // 傾聴中:あくびの経過判定(≤30秒ごとに来る暫定終了で見る=常駐タイマー不要)。
+    if (this.listening) this.maybeYawn();
+    // 傾聴中の入力上限:超えたら「聞いた分」で強制的に返事して区切る(荒らし/超長文の有界化)。
+    // pendingText を即クリアして以降を新ターンにし、無限蓄積を断つ(ユーザがまだ喋っていても切る)。
+    if (this.listening && this.pendingText.length > LISTENING_MAX_CHARS) {
+      const snapshot = this.pendingText;
+      this.pendingText = '';
+      log.info(`listening: input cap reached (${snapshot.length} chars), force respond`); // §6.2: 文字数のみ
+      void this.startGeneration(snapshot);
+      return;
+    }
     if (!this.userSpeaking) void this.startGeneration(this.pendingText);
   }
 
@@ -144,6 +240,13 @@ export class VoiceTurnCoordinator {
     this.gen = null;
     this.pendingText = '';
     this.userSpeaking = false;
+    // 傾聴状態も初期化(窓は入室前の学習値へ戻す=6000を残さない)。
+    if (this.listening) {
+      this.listening = false;
+      this.currentWindowMs = this.windowBeforeListening;
+      this.deps.onListeningChange?.(false);
+    }
+    this.consecutiveSilentCancels = 0;
   }
 
   private async startGeneration(text: string): Promise<void> {
@@ -155,6 +258,10 @@ export class VoiceTurnCoordinator {
         g.committed = true;
         // 第一声が出た=このターンは確定。以降の発話(barge-in 等)は新ターン=連結しない。
         this.pendingText = '';
+        // トリミが実際に喋った=「連続」サイレントキャンセルが途切れた → カウンタを戻す。
+        this.consecutiveSilentCancels = 0;
+        // 傾聴の出口:返事を始めた=聞くターンは終わり → 通常モード(適応窓)へ戻す。
+        this.exitListening();
       });
       // 中断済み / 自分が最新でない / barge-in で切り詰め済み なら通常コミットを破棄。
       if (ctrl.signal.aborted || this.gen !== g || g.bargedIn) return;
