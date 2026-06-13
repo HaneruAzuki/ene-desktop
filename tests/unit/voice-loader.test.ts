@@ -15,12 +15,12 @@ describe('validateVoiceConfig', () => {
     },
   };
 
-  it('妥当な設定を正規化する(未知の pitchScale は採用しない)', () => {
+  it('妥当な設定を正規化する(pitchScale も声の高さ微調整用に採用する)', () => {
     const c = validateVoiceConfig(valid);
     expect(c?.engine).toBe('aivisspeech');
     expect(c?.styles.neutral).toEqual({ styleId: 0, speedScale: 1.0 });
-    // pitchScale はスキーマに無いので落ちる(音質劣化のため使わない)。
-    expect(c?.styles.anger).toEqual({ styleId: 2, intonationScale: 1.3 });
+    // pitchScale は声の高さの微調整に限り採用する(AivisSpeech は大きく動かすと劣化)。
+    expect(c?.styles.anger).toEqual({ styleId: 2, intonationScale: 1.3, pitchScale: 0.5 });
   });
 
   it('engine / baseUrl が無ければ null', () => {

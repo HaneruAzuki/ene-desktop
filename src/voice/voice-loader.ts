@@ -8,7 +8,14 @@ import type { TtsOptions, VoiceConfig, VoiceStyleParams } from '../shared/types/
 // emotion→スタイル/パラメータは {id}/voice.json に外出し(§4.5・ハードコード禁止)。
 // 無い・不正なら null(呼び出し側は TTS 無効=テキストのみへフォールバック)。
 
-const NUMERIC_KEYS = ['speedScale', 'intonationScale', 'tempoDynamicsScale', 'volumeScale'] as const;
+// pitchScale は声の高さの微調整に限り使う(AivisSpeech は大きく動かすと劣化・voice.ts 参照)。
+const NUMERIC_KEYS = [
+  'speedScale',
+  'pitchScale',
+  'intonationScale',
+  'tempoDynamicsScale',
+  'volumeScale',
+] as const;
 
 // baseUrl は後段の TTS クライアントが HTTP リクエスト先に使う(ローカル AivisSpeech サイドカー)。
 // 検証なしだと file:/javascript:/smb: 等のスキームや不正文字列が通り SSRF 面になる(公開前監査の指摘)。

@@ -7,6 +7,7 @@
     "neutral": {
       "styleId": 1736267264,
       "speedScale": 1.0,
+      "pitchScale": -0.08,
       "intonationScale": 1.0,
       "tempoDynamicsScale": 1.0,
       "volumeScale": 1.0

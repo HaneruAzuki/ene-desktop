@@ -22,12 +22,16 @@ export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse
 const defaultFetch: FetchLike = (url, init) =>
   (globalThis as unknown as { fetch: FetchLike }).fetch(url, init);
 
-/** audio_query の結果に合成パラメータを反映する(pitchScale は触らない)。純粋関数。 */
+/**
+ * audio_query の結果に合成パラメータを反映する。純粋関数。
+ * pitchScale は voice.json で明示された時のみ反映(声の高さ微調整・未指定なら触らない=従来通り)。
+ */
 export function applyVoiceParams(
   query: Record<string, unknown>,
   opts: TtsOptions,
 ): Record<string, unknown> {
   if (typeof opts.speedScale === 'number') query.speedScale = opts.speedScale;
+  if (typeof opts.pitchScale === 'number') query.pitchScale = opts.pitchScale;
   if (typeof opts.intonationScale === 'number') query.intonationScale = opts.intonationScale;
   if (typeof opts.tempoDynamicsScale === 'number') query.tempoDynamicsScale = opts.tempoDynamicsScale;
   if (typeof opts.volumeScale === 'number') query.volumeScale = opts.volumeScale;

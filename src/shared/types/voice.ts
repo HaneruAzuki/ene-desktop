@@ -5,12 +5,13 @@ import type { EmotionLabel } from './animation';
 
 /**
  * 1スタイル(感情)の合成パラメータ。
- * `pitchScale` は AivisSpeech で 0 から動かすと音質劣化するため**持たない**(design-revision-voice §4)。
- * 声の高さ/個性は「モデル選択＋スタイル」で決める。
+ * 声の高さ/個性は基本「モデル選択＋スタイル」で決める。`pitchScale` は AivisSpeech で
+ * 大きく動かすと音質劣化するため**小さく(微調整に限り)使う**(声の高さの微調整・任意)。
  */
 export interface VoiceStyleParams {
   styleId: number; // エンジンの話者/スタイルID(/speakers 由来)
   speedScale?: number; // 話速
+  pitchScale?: number; // 声の高さ(0=基準・負で低く)。AivisSpeech では小さい値のみ使う(劣化回避)
   intonationScale?: number; // 抑揚(選択スタイルの感情の強さ)
   tempoDynamicsScale?: number; // 緩急(AivisSpeech 固有)
   volumeScale?: number; // 音量
