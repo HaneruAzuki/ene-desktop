@@ -48,12 +48,15 @@ const TAP_MAX_MS = 250;
 /** 「じゃあね」ポップの表示時間(ms)。これだけ見せてからトレイにしまう(UI改修 段階4)。 */
 const GOODBYE_POP_MS = 600;
 
-/** 起動準備が整うまで吹き出しに出す「まだ話しかけないで」サイン(音声エンジン起動・ウォーム中)。 */
-const WAIT_MESSAGE = 'ちょっと待って、…いま準備してるところ。';
+/** 起動準備(全サブシステムのウォーム)が整うまで出す「準備中」サイン。頭だけ覗く姿勢＋この吹き出しで示す。 */
+const PREPARING_MESSAGE = 'ちょっと待って...';
 
 export function App(): React.ReactElement | null {
   const [characterInfo, setCharacterInfo] = useState<CharacterInfo | null>(null);
   const [bubble, setBubble] = useState<string | null>(null);
+  // 起動ウォーム中=入力を受け付けない「準備中」(頭だけ下から覗く＋「ちょっと待って...」吹き出し)。
+  //   全サブシステムが立ったら(markReady)解除し、通常姿勢へ起き上がって挨拶する(2026-06-14)。
+  const [preparing, setPreparing] = useState(true);
   // 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md): キャラにホバー中 / 明示展開中(トレイ等)/
   //   入力欄フォーカス中 / マイク稼働中 のいずれかで表示。離脱で即消す(透明余白には置かない)。
   const [inZone, setInZone] = useState(false); // 操作ゾーン(下部の固定矩形)内にマウスがあるか(案A・段階5 修正)
@@ -105,6 +108,7 @@ export function App(): React.ReactElement | null {
   const spokenRef = useRef<string[]>([]);
   const readyRef = useRef(false); // 起動準備完了(多重通知の冪等化)
   const interactedRef = useRef(false); // 既にユーザーが会話を始めたか(準備完了後の挨拶差し替え判定)
+  const preparingRef = useRef(true); // 準備中フラグ(コールバックから読む・preparing state と同期)
 
   // ON(リッスン中)かどうか: ハンズフリー起動中 or PTT 録音中。
   const micActive = handsFreeOn || recording;
@@ -115,7 +119,7 @@ export function App(): React.ReactElement | null {
     void window.ene.getCharacterInfo().then(setCharacterInfo);
     void window.ene.isReady().then((r) => {
       if (r) markReady();
-      else if (!readyRef.current && !interactedRef.current) setBubble(WAIT_MESSAGE);
+      // 未完了なら preparing(初期 true)のまま=頭だけ覗く＋「ちょっと待って...」で待つ。
     });
   }, []);
 
@@ -388,6 +392,7 @@ export function App(): React.ReactElement | null {
 
   /** 入力欄を開く(操作=起き上がる・クリック音)。 */
   function openInput(): void {
+    if (preparingRef.current) return; // 準備中は入力を受け付けない(ユーザー操作は ready 後)
     playClick();
     setForceOpen(true); // 操作オーバーレイを明示展開し入力欄へフォーカス(トレイ/コンテキストメニュー起点)
     setCharState((s) => ({ ...s, pose: 'stand' }));
@@ -406,13 +411,10 @@ export function App(): React.ReactElement | null {
   function markReady(): void {
     if (readyRef.current) return;
     readyRef.current = true;
-    if (!interactedRef.current) {
-      // 「ちょっと待って、」を挨拶へ差し替える(まだ会話していない場合のみ)。
-      void showGreeting();
-    } else {
-      // 既に会話中なら、待ちメッセージが残っていれば消すだけ。
-      setBubble((b) => (b === WAIT_MESSAGE ? null : b));
-    }
+    preparingRef.current = false;
+    setPreparing(false); // 「ちょっと待って...」＋頭だけ覗く を解除し、通常姿勢へすっと起き上がる
+    // まだ会話していなければ挨拶へ(準備中は入力を受け付けないので、通常ここは未会話)。
+    if (!interactedRef.current) void showGreeting();
   }
 
   /**
@@ -670,6 +672,8 @@ export function App(): React.ReactElement | null {
       <div className="stage">
       {/* 考える間(thinking)の演出。専用スプライトが無いので「…」で示す(F-ANIM-04)。 */}
       {charState.activity === 'thinking' && <div className="bubble bubble--thinking">…</div>}
+      {/* 準備中(起動ウォーム中)=頭だけ覗く姿勢に添える「ちょっと待って...」(非操作・ready で消える)。 */}
+      {preparing && <div className="bubble bubble--preparing">{PREPARING_MESSAGE}</div>}
       {bubble !== null && (
         <SpeechBubble ref={bubbleRef} message={bubble} onClose={dismissBubble} />
       )}
@@ -689,13 +693,14 @@ export function App(): React.ReactElement | null {
         amplitudeProvider={getVoiceAmplitude}
         visible={visible}
         away={away}
+        preparing={preparing}
       />
       {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2/§3)。
           キャラ下部(胸元の不透明部)にホバーで重ねて出す。離脱で即アンマウント(透明余白には置かない
           =手を伸ばす途中で消えない)。入力中/明示展開中は離れても保持する。
           マイクON 中はホバーを外すと、操作バーの代わりに最小の常駐サイン(緑「聞いてるよ」)を残す。
           段階2: マイクは単一ハイブリッド配線。音量/離席/じゃあねは段階3/5/4 で実装。 */}
-      {(showFull || micActive || away) && (
+      {!preparing && (showFull || micActive || away) && (
         <div className="control-overlay" ref={overlayRef}>
           {away ? (
             // 離席中はホバーでも操作バーを出さず、戻る用の最小サインのみ(クリックで戻る)。

@@ -137,10 +137,8 @@ export async function runStartupSequence(
   // Step 8.4: 埋め込みモデルのウォーム(B-14c)。初回想起のモデルロード停止を起動時へ前倒し。
   // 背景・best-effort(await しない=起動/会話を妨げない。モデル未配置なら何もしない)。
   // 準備完了判定に含めるため promise を保持する。
+  // (ローカル判別器 B-15 と STT のウォームは、下の二段ゲートでこの完了後に実行する。)
   const embedderReady = warmEmbedder().catch(() => undefined);
-  // Step 8.4b: ローカル判別器(B-15)の topics 埋め込みをウォーム。
-  // embedder ウォーム完了後に実行=同一 onnx セッションへの embed 競合を避ける。best-effort。
-  void embedderReady.then(() => warmLocalRouter(charContext.knowledgeDomains));
 
   // Step 8.5: 忘却機構(B-13 / §11.6)。**既定オフ**(ENE_FORGETTING=1 のときのみ)。
   // 起動時に未処理の月次/年次サマリを背景で実行する(await しない=起動/会話を妨げない)。
@@ -170,17 +168,31 @@ export async function runStartupSequence(
   runtime.triggerIdleTalk = () => void idleTalk.triggerNow(); // dev メニューの手動トリガ用
   mainWindow.on('closed', () => idleTalk.stop());
 
-  // 準備完了(音声エンジンのヘルス到達＋埋め込みウォーム)を背景で待ち、整ったら renderer に通知する。
+  // 準備完了=「話しかけてOK」の最終合図(挨拶)を出してよい状態。整ったら renderer に通知する。
   // それまで renderer は「ちょっと待って、」を表示する(=まだ話しかけない状況の明示)。
-  // ここは await しない(ウィンドウ表示・挨拶準備をブロックしない)。
-  void Promise.all([voiceEngineReady, embedderReady]).then(() => {
-    runtime.ready = true;
-    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:app-ready');
-    log.info('app fully ready (voice engine + embedder warmed)');
-    // STT(whisper/kotoba)モデルを背景でウォーム。初回発話の「読込で数十秒待ち」を前倒し(best-effort)。
-    // 準備完了の後に開始=起動の重い処理(エンジン/埋め込み)と競合させない。kotoba(~1GB)で特に効く。
-    void warmStt();
-  });
+  //
+  // ユーザー要望(2026-06-13): 挨拶は「全サブシステムの起動を確認した後の、話し始めてよい合図」にする。
+  //   口(音声エンジン=AivisSpeech)/ 記憶(埋め込み)/ 耳(STT)/ 判別器(ローカル分類)の全部を待つ。
+  // 二段構え:
+  //   ① 重い起動を先に並行で: 音声エンジンのヘルス到達 ＋ 埋め込みウォーム。
+  //   ② ①の完了後に: STT(最大 ~1GB)＋ ローカル判別器(埋め込み依存)をウォーム。
+  //      STT を①と競合させない元の方針(kotoba で特に効く)はそのまま=②に置くことで維持。
+  // 以前は STT を ready 通知の「後」に温めていたため、挨拶が出た直後に耳が未準備という隙があった。
+  //   それを塞ぐ。代償として「ちょっと待って、」は長くなる(STT ロードを含む=ユーザー合意済み)。
+  // 各ウォームは内部で例外を握り潰し必ず解決する(best-effort)。未配置/不調でも ready にして、
+  //   実会話側のフォールバックで補う(ここで固まらせない)。await しない(ウィンドウ表示をブロックしない)。
+  void Promise.all([voiceEngineReady, embedderReady])
+    .then(() =>
+      Promise.all([
+        warmStt().catch(() => undefined),
+        warmLocalRouter(charContext.knowledgeDomains).catch(() => undefined),
+      ]),
+    )
+    .then(() => {
+      runtime.ready = true;
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:app-ready');
+      log.info('app fully ready (voice engine + embedder + STT + local router warmed)');
+    });
 
   // マイク入力方式(設定)を読み込む(task_17 Phase C・既定 push-to-talk)。
   runtime.voiceInputMode = (await loadAppSettings()).voiceInputMode;

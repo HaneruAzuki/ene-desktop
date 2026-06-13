@@ -183,6 +183,16 @@ body,
   }
 }
 
+/* 準備中(起動ウォーム中)=頭だけ下から覗く(PNG。VRM はカメラで表現)。
+   translateY は実機で要調整(大きいほど深く潜る=頭しか出ない)。準備中は breathe を止めて競合回避。
+   PNG は後ろ向き素材・寄り(ズーム)が無いので、VRM のような「後ろ向き/大きな頭」は出せない=深さのみで近似。
+   transition で ready 解除時にすっと起き上がる(class 除去側はベース .character に transform が無いので
+   完全な補間にはならないが、PNG はフォールバック=最小実装。主経路 VRM はレンダラ側で滑らかに補間)。 */
+.character--peek {
+  transform: translateY(88%);
+  transition: transform 0.35s ease-out;
+}
+
 /* 考える間(thinking)の小さな表示(F-ANIM-04・専用スプライト未制作のため「…」) */
 .bubble--thinking {
   width: auto;
@@ -211,6 +221,14 @@ body,
   word-break: break-word;
   cursor: pointer;
   z-index: 10;
+}
+
+/* 準備中の「ちょっと待って...」吹き出し。覗く頭の上あたりに置く(非操作)。
+   bottom は実機で頭の覗き高さに合わせて要調整(頭のすぐ上に吹き出しが乗るように)。 */
+.bubble--preparing {
+  top: auto;
+  bottom: 96px;
+  cursor: default;
 }
 
 /* 入力欄(キャラ下部・統合マイクボタンの上に配置) */

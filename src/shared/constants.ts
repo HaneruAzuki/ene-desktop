@@ -394,8 +394,15 @@ export const DAILY_LIFE_IMPORTANCE = 2;
  * 以上で低importanceの断片は **要約せず直接削除**(canon と違い user サマリに混ぜない=provenance を汚さない)。
  */
 export const FORGET_DAILY_LIFE_MIN_AGE_MONTHS = 2;
-/** 起動時の挨拶/暮らし生成を待つ上限(ms)。超過/失敗は定型文フォールバック(オフラインでも壊れない)。 */
-export const GREETING_GENERATION_TIMEOUT_MS = 4000;
+/**
+ * 起動時の挨拶/暮らし生成を待つ上限(ms)。超過/失敗は定型文フォールバック(オフラインでも壊れない)。
+ * 4s では「クラウド床」(prefill＋512トークン非ストリーミング生成)が間に合わず毎回フォールバック=
+ * 同じ挨拶になりがちだったため延長(起動時の「待って」が長くなるのは許容・ユーザー合意)。
+ * 真の接続失敗(401/接続拒否等)は generateOffscreenLife 側の catch が即 null を返すので、
+ * この上限いっぱい待たされるのは「到達はするが遅い」場合のみ。生成は起動中に先行発火しているため、
+ * 実際の体感待ちは(この上限 − 起動からの経過)に縮む。
+ */
+export const GREETING_GENERATION_TIMEOUT_MS = 8000;
 
 // --- P4: 気にかけエンジン(open loops・自発的想起/約束追跡・違和感 #4/#5/#20) ---
 

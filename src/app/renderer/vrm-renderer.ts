@@ -49,12 +49,25 @@ const FPS_IDLE = 15;
 const MAX_FRAME_DELTA = 0.1;
 const MAX_PHYSICS_DELTA = 1 / 30;
 
+/**
+ * 準備中(起動ウォーム中)の「大きな後ろ向きの頭が下から覗く」姿勢(2026-06-14)。ready で 0 へ戻り起き上がる。
+ * 3要素を peek 量(0〜1)で駆動: ①注視点を上げ被写体を下げる(PAN=頭が下端へ) ②カメラを寄せる(ZOOM=頭が大きく)
+ *   ③体を後ろへ向ける(updatePose=後ろ頭を見せる)。
+ * すべて実機で要調整。⚠ PAN と ZOOM は相互作用: 寄せる(ZOOM大)ほど画角が狭く、同じ PAN でも頭が下へ行く
+ *   =寄せたら PAN は控えめに(上げすぎると頭が画面外へ落ちる)。display.distance(既定0.55)基準。 */
+const PEEK_CAMERA_PAN = 0.2; // 覗きの深さ(被写体を下げる量・大きいほど頭が下=上げすぎ注意)
+const PEEK_CAMERA_ZOOM = 0.25; // 覗き時にカメラを寄せる量(distance から引く・大きいほど頭が大きく映る)
+const PEEK_MIN_DISTANCE = 0.2; // 寄せすぎ防止の下限(これより近づけない)
+const PEEK_LERP = 2.6; // 覗き↔通常の補間速度(大きいほど速く起き上がる)
+
 export interface VrmRendererOptions {
   canvas: HTMLCanvasElement;
   expressionMap: VrmExpressionMap;
   display: VrmDisplayParams;
   /** 再生中の音声振幅(0〜1)。毎フレーム読んで口の開きを駆動する(振幅ドリブン・B-05)。 */
   amplitudeProvider: () => number;
+  /** 生成時の覗き状態(準備中=true で頭だけ覗く姿勢から始める)。 */
+  peek?: boolean;
 }
 
 export class VrmRenderer {
@@ -102,12 +115,16 @@ export class VrmRenderer {
   private lastRenderMs = 0; // 最後に描画した時刻(クリックスルー固着のウォッチドッグ用)
   private away = false; // 離席中(後ろを向く・UI改修 段階5)
   private awayRot = 0; // 現在の回頭角(離席のゆっくり回頭・target へ一定速度で近づける)
+  private peek = 0; // 現在の覗き量(0=通常, 1=頭だけ覗く・準備中)
+  private peekTarget = 0; // 覗きの目標(準備中=1 / ready=0)
+  private springResetPending = false; // ロード直後の1フレーム目に SpringBone を現ポーズで rest 化(初期の毛跳ね対策)
 
   constructor(opts: VrmRendererOptions) {
     this.canvas = opts.canvas;
     this.expressionMap = opts.expressionMap;
     this.display = opts.display;
     this.amplitudeProvider = opts.amplitudeProvider;
+    this.peek = this.peekTarget = opts.peek ? 1 : 0; // 準備中なら最初から頭だけ覗く姿勢
 
     // preserveDrawingBuffer: クリックスルー判定で描画後バッファの alpha を readPixels するため必須
     // (描画停止中=ドラッグ中でも最後のフレームを読める)。
@@ -169,6 +186,7 @@ export class VrmRenderer {
       this.headY = p.y;
     }
     this.applyEmotion();
+    this.springResetPending = true; // 初回ポーズ確定後に SpringBone を rest 化(初期の毛跳ね防止)
   }
 
   /** 会話の感情を反映(JSON マップ経由・ハードコードしない)。 */
@@ -206,6 +224,11 @@ export class VrmRenderer {
   /** 離席の切替(UI改修 段階5)。true で真後ろ(絶対180°)を向く(近い側へ短く回頭・updatePose 参照)。 */
   setAway(away: boolean): void {
     this.away = away;
+  }
+
+  /** 準備中の「頭だけ下から覗く」姿勢の出入り(起動ウォーム中=true / ready=false で通常へ起き上がる)。 */
+  setPeek(on: boolean): void {
+    this.peekTarget = on ? 1 : 0;
   }
 
   private applyEmotion(): void {
@@ -311,7 +334,7 @@ export class VrmRenderer {
     const delta = Math.min(this.acc, MAX_FRAME_DELTA);
     this.acc = 0;
 
-    this.updateCamera();
+    this.updateCamera(delta);
     if (this.vrm) {
       this.updatePose(delta);
       // あくび中は口・目・首をあくびが占有(自動まばたき/リップシンク/うなずきは止める)。
@@ -322,6 +345,13 @@ export class VrmRenderer {
         this.updateLipSync();
       }
       this.updateListeningPose(delta); // 傾聴の首かしげ(neck.z=軸別で nod/あくびと共存)
+      // ロード後の最初の1回: 確定したポーズ(腕下げ・準備中の後ろ向き等)で SpringBone を rest 化する。
+      // bind ポーズから初回ポーズへ一気に動いた反動で毛が跳ね上がる(初期発散)のを防ぐ。
+      if (this.springResetPending) {
+        this.vrm.scene.updateMatrixWorld(true);
+        this.vrm.springBoneManager?.reset();
+        this.springResetPending = false;
+      }
       // 物理(SpringBone)はさらに厳しめにクランプして発散を防ぐ。
       this.vrm.update(Math.min(delta, MAX_PHYSICS_DELTA));
     }
@@ -329,9 +359,14 @@ export class VrmRenderer {
     this.lastRenderMs = performance.now();
   };
 
-  private updateCamera(): void {
-    const pan = this.display.height;
-    this.camera.position.set(0, this.headY - 0.08 + pan, this.display.distance);
+  private updateCamera(delta: number): void {
+    // 覗き量を目標へ補間(ready で 1→0=頭だけ→通常へすっと起き上がる)。
+    this.peek += (this.peekTarget - this.peek) * Math.min(1, delta * PEEK_LERP);
+    // 注視点(と視点)を上げると被写体が下がる=頭だけ下端に残る。pan は覗き量ぶん上乗せ。
+    const pan = this.display.height + this.peek * PEEK_CAMERA_PAN;
+    // 覗き時はカメラを寄せて頭を大きく見せる(distance を引く・下限でクランプ)。
+    const dist = Math.max(PEEK_MIN_DISTANCE, this.display.distance - this.peek * PEEK_CAMERA_ZOOM);
+    this.camera.position.set(0, this.headY - 0.08 + pan, dist);
     this.camera.lookAt(0, this.headY - 0.12 + pan, 0);
   }
 
@@ -346,14 +381,22 @@ export class VrmRenderer {
     const ra = vrm.humanoid?.getNormalizedBoneNode('rightUpperArm');
     if (la) la.rotation.z = armRad;
     if (ra) ra.rotation.z = -armRad;
-    // 体の向き＋離席の回頭(瞬時でなく一定速度でゆっくり・UI改修 段階5/段階6)。
-    // 離席は「真後ろ(絶対180°)」を向く=現在向き+180ではない。yaw の符号側(=真後ろに近い方)へ短く回る。
+    // 体の向き。基準は display.yawDeg。後ろ向きは「真後ろ(絶対180°)」=base からの差分で表す。
     const base = THREE.MathUtils.degToRad(this.display.yawDeg);
-    const target = this.away ? (base >= 0 ? Math.PI : -Math.PI) - base : 0;
-    const step = (Math.PI / 0.7) * delta;
-    if (this.awayRot < target) this.awayRot = Math.min(target, this.awayRot + step);
-    else if (this.awayRot > target) this.awayRot = Math.max(target, this.awayRot - step);
-    vrm.scene.rotation.y = base + this.awayRot;
+    const backTarget = (base >= 0 ? Math.PI : -Math.PI) - base; // base + backTarget = ±π(真後ろ)
+    if (this.peek > 0.001) {
+      // 準備中: peek 量で後ろを向く(peek=1→真後ろ / 0→正面)。起き上がり(peek 減衰)と同期して正面へ戻る。
+      //   初期 peek=1 なので最初のフレームから後ろ向き(回頭アニメ無し)。away の蓄積はリセット。
+      vrm.scene.rotation.y = base + this.peek * backTarget;
+      this.awayRot = 0;
+    } else {
+      // 通常/離席: 一定速度でゆっくり回頭(UI改修 段階5/段階6)。真後ろの符号側へ短く回る。
+      const target = this.away ? backTarget : 0;
+      const step = (Math.PI / 0.7) * delta;
+      if (this.awayRot < target) this.awayRot = Math.min(target, this.awayRot + step);
+      else if (this.awayRot > target) this.awayRot = Math.max(target, this.awayRot - step);
+      vrm.scene.rotation.y = base + this.awayRot;
+    }
   }
 
   private updateBlink(delta: number): void {

@@ -39,6 +39,8 @@ interface Props {
   visible?: boolean;
   /** 離席中(UI改修 段階5)。VRM は後ろを向く、PNG は暗転(後ろ向き素材が無いため)。 */
   away?: boolean;
+  /** 準備中(起動ウォーム中・2026-06-14)。頭だけ下から覗く姿勢(VRM=カメラ / PNG=translateY)。 */
+  preparing?: boolean;
 }
 
 /** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる・PNG モード用)。1.5倍ゆっくりに(2026-06-12)。 */
@@ -46,10 +48,13 @@ const NOD_MS = 830;
 
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
   function CharacterDisplay(
-    { portraitUrl, animation, state, nodKey, nodStrength = 1, yawnKey, listening = false, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true, away = false },
+    { portraitUrl, animation, state, nodKey, nodStrength = 1, yawnKey, listening = false, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true, away = false, preparing = false },
     ref,
   ) {
     const imgRef = useRef<HTMLImageElement>(null);
+    // 生成時の覗き状態を effect 外(レンダラ生成 effect・deps に preparing を入れない)から読むための ref。
+    const preparingRef = useRef(preparing);
+    preparingRef.current = preparing;
     const alphaCanvasRef = useRef<HTMLCanvasElement | null>(null); // PNG alpha 読取用(2D)
     const glCanvasRef = useRef<HTMLCanvasElement>(null); // VRM 描画用(WebGL)
     const rendererRef = useRef<VrmRenderer | null>(null);
@@ -81,6 +86,7 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
         expressionMap: vrmConfig.expressionMap,
         display: vrmDisplay ?? vrmConfig.display,
         amplitudeProvider: amplitudeProvider ?? ((): number => 0),
+        peek: preparingRef.current, // 準備中なら頭だけ覗く姿勢から始める
       });
       renderer
         .loadModel(vrmModel)
@@ -93,6 +99,7 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
           renderer.setEmotion(stateRef.current.emotion);
           renderer.setTalking(stateRef.current.activity === 'talking');
           renderer.setVisible(visible);
+          renderer.setPeek(preparingRef.current); // ロード完了時点の準備状態を反映
         })
         .catch(() => {
           // 読込失敗=低スペック/破損等 → PNG 立ち絵へフォールバック(§3.7)。
@@ -129,6 +136,11 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     useEffect(() => {
       rendererRef.current?.setAway(away);
     }, [away, vrmMode]);
+
+    // 準備中(起動ウォーム中)→ 頭だけ下から覗く。ready で通常姿勢へすっと起き上がる(VRM・2026-06-14)。
+    useEffect(() => {
+      rendererRef.current?.setPeek(preparing);
+    }, [preparing, vrmMode]);
 
     // ウィンドウのリサイズに追従。
     useEffect(() => {
@@ -250,7 +262,9 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
 
     // PNG フォールバック(従来の立ち絵・breathe/nod は CSS)。
     const classes = ['character'];
-    if (state.activity === 'idle') classes.push('character--breathe');
+    // 準備中は覗き姿勢(translateY)が breathe の transform と競合するので、breathe を止めて peek を優先。
+    if (preparing) classes.push('character--peek'); // 準備中=頭だけ下から覗く(PNG)
+    else if (state.activity === 'idle') classes.push('character--breathe');
     if (nodding) classes.push('character--nod');
     if (away) classes.push('character--away'); // PNG は後ろ向き素材が無いので暗転で離席を示す
 
