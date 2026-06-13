@@ -24,6 +24,7 @@ import { VoiceTurnCoordinator } from './voice-turn-coordinator';
 import { BackchannelController } from './backchannel-controller';
 import { transcribe, isSttModelAvailable } from '../../voice/stt-transcriber';
 import { generateResponse, commitTurn, handleSendMessage } from './turn-engine';
+import { speakResponse } from './voice-runtime';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { TranscribeResult } from '../../shared/types/stt';
@@ -268,6 +269,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
         await appendShortTerm({ role: 'assistant', text: greeting, timestamp: nowLocalIso(), extracted: false });
       } catch (e) {
         log.warn('greeting short-term append failed', { name: (e as Error).name });
+      }
+      // 起動挨拶も声に出す(通常応答・自発発話と同じ speakResponse 経路)。これまで挨拶だけ
+      // 吹き出し表示のみで無音だったため配線する。fire-and-forget=テキスト返却(吹き出し)を待たせない。
+      // tts/voiceConfig が揃っている時だけ(オフライン/エンジン未配置なら従来どおり無音テキスト)。emotion は neutral。
+      if (runtime.tts && runtime.voiceConfig) {
+        void speakResponse(greeting, 'neutral', runtime.tts, runtime.voiceConfig, mainWindow);
       }
     }
     return greeting;
