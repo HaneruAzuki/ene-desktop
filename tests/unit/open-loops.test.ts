@@ -5,6 +5,7 @@ import {
   OPEN_LOOP_LOOKBACK_DAYS,
   OPEN_LOOP_COOLDOWN_DAYS,
   OPEN_LOOP_SURFACE_MAX,
+  OPEN_LOOP_MAX_SURFACES,
 } from '../../src/shared/constants';
 import type { EpisodicRecord, OpenLoop } from '../../src/shared/types/memory';
 
@@ -60,21 +61,22 @@ describe('selectOpenLoops (P4)', () => {
     expect(selectOpenLoops([old], empty, NOW_MS, NOW_ISO).notes).toEqual([]);
   });
 
-  it('クールダウン中(直近に注入済み)は再注入しない', () => {
+  it('未注入なら出して、surfaced に注入回数(count=1)と日時を記録する', () => {
     const records = [rec('a', 1, { kind: 'user-event', note: '面接の結果待ち' })];
-    // 1日前に注入済み(クールダウン OPEN_LOOP_COOLDOWN_DAYS 日より短い)→ 出さない。
-    const recent: OpenLoopState = { surfaced: { a: new Date(NOW_MS - 1 * DAY_MS).toISOString() } };
-    expect(selectOpenLoops(records, recent, NOW_MS, NOW_ISO).notes).toEqual([]);
+    const sel = selectOpenLoops(records, empty, NOW_MS, NOW_ISO);
+    expect(sel.notes).toEqual(['面接の結果待ち']);
+    // 注入したら surfaced を now＋回数で更新する。
+    expect(sel.surfaced.a).toEqual({ at: NOW_ISO, count: 1 });
   });
 
-  it('クールダウンを過ぎていれば再注入する', () => {
+  it('上限(OPEN_LOOP_MAX_SURFACES)に達した気にかけは、もう自分からは持ち出さない(一度聞いたら引く)', () => {
     const records = [rec('a', 1, { kind: 'user-event', note: '面接の結果待ち' })];
-    const old: OpenLoopState = {
-      surfaced: { a: new Date(NOW_MS - (OPEN_LOOP_COOLDOWN_DAYS + 1) * DAY_MS).toISOString() },
+    // 既に上限まで注入済み。クールダウンを過ぎていても(=以前なら再注入していた)出さない=休眠。
+    const exhausted: OpenLoopState = {
+      surfaced: {
+        a: { at: new Date(NOW_MS - (OPEN_LOOP_COOLDOWN_DAYS + 1) * DAY_MS).toISOString(), count: OPEN_LOOP_MAX_SURFACES },
+      },
     };
-    const sel = selectOpenLoops(records, old, NOW_MS, NOW_ISO);
-    expect(sel.notes).toEqual(['面接の結果待ち']);
-    // 注入したら surfaced を now で更新する。
-    expect(sel.surfaced.a).toBe(NOW_ISO);
+    expect(selectOpenLoops(records, exhausted, NOW_MS, NOW_ISO).notes).toEqual([]);
   });
 });

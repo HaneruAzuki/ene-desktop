@@ -7,6 +7,7 @@ import {
   EPISODIC_SUMMARY_MAX_CHARS,
 } from '../shared/constants';
 import { loadAllEpisodicFiles, saveEpisodic } from '../memory/episodic';
+import { selectOpenLoops, loadOpenLoopState, saveOpenLoopState } from '../memory/open-loops';
 import { indexEpisodic } from '../memory/index-inverted';
 import type { LlmComplete } from '../memory/extractor';
 import type { ActiveCharacter, CharacterContext } from '../shared/types/character';
@@ -127,11 +128,10 @@ export async function generateOffscreenLife(
     // 同日2回目以降は断片を増やさない(1日1個)。挨拶だけ作る。
     const makeFragment = !dailyLife.some((r) => r.memory.date.slice(0, 10) === todayYmd);
     const recentLife = dailyLife.slice(0, 3).map((r) => r.memory.summary);
-    const openLoops = all
-      .filter((r) => r.memory.openLoop && !r.memory.openLoop.resolvedAt)
-      .map((r) => r.memory.openLoop?.note ?? '')
-      .filter((n) => n.length > 0)
-      .slice(0, 2);
+    // 気にかけは会話・自発発話と同じ選択を通す(上限・休眠を共有)。挨拶が実際に作れたら下で履歴を保存する。
+    const loopState = await loadOpenLoopState();
+    const loopSel = selectOpenLoops(all, loopState, Date.now(), nowLocalIso());
+    const openLoops = loopSel.notes;
 
     const prompt = buildOffscreenLifePrompt({
       systemPrompt: charContext.systemPrompt,
@@ -147,6 +147,15 @@ export async function generateOffscreenLife(
     const raw = await complete({ system: prompt.system, user: prompt.user, maxTokens: 512 });
     const parsed = parseOffscreenLifeResponse(raw);
     if (!parsed) return null;
+
+    // 気にかけを挨拶で持ち出す機会を1回使った=履歴を保存(他経路と上限を共有・上限1で休眠)。
+    if (loopSel.notes.length > 0) {
+      try {
+        await saveOpenLoopState({ surfaced: loopSel.surfaced });
+      } catch (e) {
+        log.warn('offscreen life open-loop state save failed', { name: (e as Error).name });
+      }
+    }
 
     if (makeFragment && parsed.life) {
       try {

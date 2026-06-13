@@ -51,6 +51,7 @@ export function buildSystemPrompt(
     `- 口調: ${personality.tone}`,
     `- 一人称: 「${personality.firstPerson}」`,
     `- 語尾の例: ${personality.speechEndings.join(' / ')}`,
+    ...(personality.demeanor ? [`- ふるまいの基調: ${personality.demeanor}`] : []),
     `一人称は必ず「${personality.firstPerson}」を使い、${personality.tone}の口調を最後まで崩さないでください。`,
     '',
     '# あなたの背景',

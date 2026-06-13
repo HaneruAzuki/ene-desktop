@@ -16,6 +16,12 @@ import {
 import { makeLlmComplete } from '../../conversation/client';
 import { speakResponse } from './voice-runtime';
 import { loadAllEpisodicFiles } from '../../memory/episodic';
+import {
+  selectOpenLoops,
+  loadOpenLoopState,
+  saveOpenLoopState,
+  type OpenLoopSurface,
+} from '../../memory/open-loops';
 import { appendShortTerm } from '../../memory/short-term';
 import { loadAppSettings } from '../../shared/node/app-settings';
 import type { EmotionLabel } from '../../shared/types/animation';
@@ -43,6 +49,8 @@ interface Material {
   openLoops: string[];
   recentLife: string[];
   timeOfDay: string;
+  /** 今回の気にかけ選択を反映した注入履歴(実際に発話できたら emit が保存する=会話経路と上限を共有)。 */
+  openLoopState?: Record<string, OpenLoopSurface>;
 }
 
 export class IdleTalkManager {
@@ -144,6 +152,16 @@ export class IdleTalkManager {
     this.lastIdleTalkMs = Date.now();
     this.countToday += 1;
 
+    // 気にかけを実際に持ち出す機会を1回使った=注入履歴を確定保存(会話経路と同じ state を共有し、上限1で休眠させる)。
+    // 黙ったまま(msg=null)では保存しない=機会を使っていないので上限を消費しない。
+    if (material.openLoops.length > 0 && material.openLoopState) {
+      try {
+        await saveOpenLoopState({ surfaced: material.openLoopState });
+      } catch (e) {
+        log.warn('idle talk open-loop state save failed', { name: (e as Error).name });
+      }
+    }
+
     // 短期記憶に assistant ターンとして残す(以降の会話に接続できる)。
     await appendShortTerm({ role: 'assistant', text: msg.message, timestamp: nowLocalIso(), extracted: false });
 
@@ -164,17 +182,22 @@ export class IdleTalkManager {
     const timeOfDay = timeOfDayLabel(d.getHours());
     try {
       const all = await loadAllEpisodicFiles();
-      const openLoops = all
-        .filter((r) => r.memory.openLoop && !r.memory.openLoop.resolvedAt)
-        .map((r) => r.memory.openLoop?.note ?? '')
-        .filter((n) => n.length > 0)
-        .slice(0, 2);
+      // 会話経路と同じ気にかけ選択を使う(上限・クールダウン・休眠を共有)。
+      // ここでは選択だけ行い、実際に発話できたら emit で state を保存する(黙ったまま上限を消費しない)。
+      const state = await loadOpenLoopState();
+      const sel = selectOpenLoops(all, state, d.getTime(), nowLocalIso());
       const recentLife = all
         .filter((r) => r.memory.category === DAILY_LIFE_CATEGORY)
         .sort((a, b) => b.memory.date.localeCompare(a.memory.date))
         .slice(0, 2)
         .map((r) => r.memory.summary);
-      return { hasMaterial: openLoops.length > 0 || recentLife.length > 0, openLoops, recentLife, timeOfDay };
+      return {
+        hasMaterial: sel.notes.length > 0 || recentLife.length > 0,
+        openLoops: sel.notes,
+        recentLife,
+        timeOfDay,
+        openLoopState: sel.surfaced,
+      };
     } catch {
       return { hasMaterial: false, openLoops: [], recentLife: [], timeOfDay };
     }

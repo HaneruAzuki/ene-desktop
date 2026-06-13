@@ -19,6 +19,8 @@ export interface CharacterIdentity {
     tone: string;
     firstPerson: string;
     speechEndings: string[];
+    /** ふるまいの基調・感情表現の配分(任意・後方互換)。例:ツンを基調に、デレ(気づかい)は希少に出す等。 */
+    demeanor?: string;
   };
   selfRecognition: {
     callsSelf: string;
