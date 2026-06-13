@@ -18,9 +18,15 @@ export interface AppSettings {
   vrmDisplay?: Partial<VrmDisplayParams>;
   /** 自発発話(アイドル時)の頻度(P7・既定 low)。off で完全に黙る。 */
   idleTalk?: IdleTalkMode;
+  /** トリミの声(出力)の音量 0〜1(UI改修 段階3・既定 1)。 */
+  outputVolume?: number;
+  /** ミュート状態(UI改修 段階3・既定 false)。 */
+  muted?: boolean;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   voiceInputMode: 'push-to-talk',
   idleTalk: 'low',
+  outputVolume: 1,
+  muted: false,
 };

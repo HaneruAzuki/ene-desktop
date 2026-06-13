@@ -247,6 +247,32 @@ body,
   font-weight: 500;
 }
 
+/* 音量コントロール(段階3): 🔊ボタン＋ホバーで上にポップするスライダー。 */
+.vol {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.vol-popup {
+  position: absolute;
+  bottom: calc(100% - 2px); /* ボタンと隙間なく接続(間が空くとホバーが切れる) */
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 10px 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.vol-slider {
+  /* 縦スライダー(Chromium 現行): writing-mode で縦・direction:rtl で上=最大(音量大)。
+     旧 appearance:slider-vertical は Chromium 121+ で廃止のため使わない。 */
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
+  height: 100px;
+  cursor: pointer;
+}
+
 /* VRM 描画キャンバス(F・3D化)。3D カメラがバストアップをフレーミングするのでウィンドウ全面に置く。
    背景は WebGL 側で透明クリア。CSS の drop-shadow は毎フレーム合成コストになるため付けない(軽量・柱4)。
    呼吸/うなずきはボーンで行うので CSS アニメも使わない。 */

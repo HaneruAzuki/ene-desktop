@@ -11,6 +11,8 @@ const eneAPI: EneAPI = {
   getVrmConfig: () => ipcRenderer.invoke('ene:get-vrm-config'),
   getCharacterModel: () => ipcRenderer.invoke('ene:get-character-model'),
   setVrmDisplay: (display) => ipcRenderer.invoke('ene:set-vrm-display', display),
+  getAudioPrefs: () => ipcRenderer.invoke('ene:get-audio-prefs'),
+  saveAudioPrefs: (volume, muted) => ipcRenderer.invoke('ene:save-audio-prefs', volume, muted),
   onWindowVisibility: (cb) => {
     // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
     ipcRenderer.removeAllListeners('ene:window-visibility');

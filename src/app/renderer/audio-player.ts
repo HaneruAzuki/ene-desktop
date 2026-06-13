@@ -34,6 +34,10 @@ export function setSentenceHandler(cb: (text: string, index: number) => void): v
 // リップシンク用の振幅解析(F・B-05)。再生グラフに AnalyserNode を1つ挟み、
 // VRM レンダラが毎フレーム getVoiceAmplitude() で開口量を取得する(母音判定は不要・開口量だけで十分自然)。
 let analyser: AnalyserNode | null = null;
+// 出力音量/ミュート(UI改修 段階3)。analyser の後段に GainNode を挟んで実効音量を制御する。
+let gain: GainNode | null = null;
+let outputVolume = 1; // 0〜1
+let outputMuted = false;
 // 注: 型注釈を付けず推論に任せる(Float32Array<ArrayBuffer> となり getFloatTimeDomainData に渡せる)。
 let ampData = new Float32Array(0);
 /** RMS(発話で概ね 0〜0.3)を開口量へ写すゲイン。大きすぎると常時フルオープン(口ガバガバ)になる。 */
@@ -50,9 +54,29 @@ function getAnalyser(): AnalyserNode {
   if (!analyser) {
     analyser = c.createAnalyser();
     analyser.fftSize = 256; // 時間波形 RMS には十分小さく・軽量
-    analyser.connect(c.destination);
+    // 出力音量/ミュートは analyser の後段の GainNode で制御(analyser は gain の前=
+    // 音量に依存しない。ミュート中でもリップシンクの開口量は動く)。
+    gain = c.createGain();
+    gain.gain.value = outputMuted ? 0 : outputVolume;
+    analyser.connect(gain);
+    gain.connect(c.destination);
   }
   return analyser;
+}
+
+/** トリミの声(出力)の音量を設定する 0〜1(UI改修 段階3)。ミュート中は値だけ保持。 */
+export function setOutputVolume(v: number): void {
+  outputVolume = Math.max(0, Math.min(1, v));
+  if (gain && !outputMuted) gain.gain.value = outputVolume;
+}
+/** ミュートの切替(UI改修 段階3)。解除時は保持した音量へ戻す。 */
+export function setMuted(m: boolean): void {
+  outputMuted = m;
+  if (gain) gain.gain.value = m ? 0 : outputVolume;
+}
+/** 現在ミュート中か(相槌など別系統がミュートを尊重するため)。 */
+export function isMuted(): boolean {
+  return outputMuted;
 }
 
 /**

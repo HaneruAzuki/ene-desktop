@@ -21,3 +21,9 @@ export async function saveVrmDisplay(vrmDisplay: Partial<VrmDisplayParams>): Pro
   const current = await loadAppSettings();
   await writeJson(getAppSettingsPath(), { ...current, vrmDisplay });
 }
+
+/** トリミの声(出力)の音量・ミュートを保存する(UI改修 段階3)。 */
+export async function saveAudioPrefs(outputVolume: number, muted: boolean): Promise<void> {
+  const current = await loadAppSettings();
+  await writeJson(getAppSettingsPath(), { ...current, outputVolume, muted });
+}

@@ -8,6 +8,8 @@
 // ダッキング(barge-in / 応答開始): 相槌「うん」が鳴り残ったまま ENE が応答を喋り始める/
 // ユーザが割り込むと声が重なる。stopBackchannel() で再生中の相槌を即停止し、重なりを防ぐ。
 
+import { isMuted } from './audio-player';
+
 let ctx: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
 
@@ -18,6 +20,7 @@ function getCtx(): AudioContext {
 
 /** 相槌 WAV を1つ、即座に再生する(キューに積まない)。 */
 export async function playBackchannel(wav: ArrayBuffer): Promise<void> {
+  if (isMuted()) return; // ミュート中はトリミの声(相槌含む)を鳴らさない(UI改修 段階3)
   const c = getCtx();
   if (c.state === 'suspended') await c.resume();
   // decodeAudioData は渡した ArrayBuffer を detach するためコピーを渡す。

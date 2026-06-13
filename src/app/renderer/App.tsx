@@ -5,7 +5,15 @@ import { InputArea } from './components/InputArea';
 import { VrmSettingsPanel } from './components/VrmSettingsPanel';
 import { ControlBar } from './components/ControlBar';
 import { playClick } from './sound';
-import { enqueueAudio, stopPlayback, setPlaybackHandlers, setSentenceHandler, getVoiceAmplitude } from './audio-player';
+import {
+  enqueueAudio,
+  stopPlayback,
+  setPlaybackHandlers,
+  setSentenceHandler,
+  getVoiceAmplitude,
+  setOutputVolume as audioSetVolume,
+  setMuted as audioSetMuted,
+} from './audio-player';
 import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
@@ -39,6 +47,8 @@ export function App(): React.ReactElement | null {
   const [hovered, setHovered] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [volume, setVolume] = useState(1); // トリミの声(出力)の音量 0〜1(段階3)
+  const [muted, setMuted] = useState(false);
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
   const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
@@ -61,6 +71,7 @@ export function App(): React.ReactElement | null {
   const vrmPanelRef = useRef<HTMLDivElement>(null);
   const warmedRef = useRef(false); // 入力フォーカス時のキャッシュウォームを一度だけ発火
   const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
@@ -98,6 +109,16 @@ export function App(): React.ReactElement | null {
       if (cfg) setVrmDisplay(cfg.display);
     });
     void window.ene.getCharacterModel().then(setVrmModel);
+  }, []);
+
+  // 音量・ミュート設定を読み込み、audio-player へ適用(段階3)。
+  useEffect(() => {
+    void window.ene.getAudioPrefs().then(({ volume: v, muted: m }) => {
+      setVolume(v);
+      setMuted(m);
+      audioSetVolume(v);
+      audioSetMuted(m);
+    });
   }, []);
 
   // ウィンドウ可視性 → VRM 描画の停止/再開(§3.6・軽量原則 柱4)。
@@ -195,6 +216,7 @@ export function App(): React.ReactElement | null {
       if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
       if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (audioSaveTimerRef.current) clearTimeout(audioSaveTimerRef.current);
     };
   }, []);
 
@@ -440,6 +462,29 @@ export function App(): React.ReactElement | null {
     vrmSaveTimerRef.current = setTimeout(() => void window.ene.setVrmDisplay(d), 400);
   }
 
+  /** 音量・ミュートの保存(デバウンス・段階3)。 */
+  function persistAudio(v: number, m: boolean): void {
+    if (audioSaveTimerRef.current) clearTimeout(audioSaveTimerRef.current);
+    audioSaveTimerRef.current = setTimeout(() => void window.ene.saveAudioPrefs(v, m), 400);
+  }
+  /** ミュート切替(段階3)。即時に audio-player へ反映＋デバウンス保存。 */
+  function handleToggleMute(): void {
+    const m = !muted;
+    setMuted(m);
+    audioSetMuted(m);
+    persistAudio(volume, m);
+  }
+  /** 音量変更(段階3・スライダー)。動かしたらミュート解除。即時反映＋デバウンス保存。 */
+  function handleVolume(v: number): void {
+    setVolume(v);
+    audioSetVolume(v);
+    if (muted) {
+      setMuted(false);
+      audioSetMuted(false);
+    }
+    persistAudio(v, false);
+  }
+
   if (!characterInfo) return null;
 
   // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
@@ -482,6 +527,10 @@ export function App(): React.ReactElement | null {
                 micActive={micActive}
                 micHandlers={micHandlers}
                 micTitle={micTitle}
+                volume={volume}
+                muted={muted}
+                onToggleMute={handleToggleMute}
+                onVolume={handleVolume}
                 onSettings={() => setShowVrmPanel((v) => !v)}
               />
               <InputArea

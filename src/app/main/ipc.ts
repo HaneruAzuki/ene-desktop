@@ -14,7 +14,7 @@ import { getSemantic } from '../../memory/semantic';
 import { warmPromptCache } from '../../conversation/client';
 import { loadAnimationData } from '../../character/animation-loader';
 import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../character/vrm-loader';
-import { loadAppSettings, saveVrmDisplay } from '../../shared/node/app-settings';
+import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../shared/node/app-settings';
 import { saveWindowPosition } from './window-position';
 import { showCharacterContextMenu } from './character-context-menu';
 import { VadRuntime, type CoalesceHooks } from './vad-runtime';
@@ -198,6 +198,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   ipcMain.handle('ene:set-vrm-display', async (_event, display: Partial<VrmDisplayParams>): Promise<void> => {
     await saveVrmDisplay(display);
   });
+
+  // 音量・ミュート(トリミの声=出力・UI改修 段階3)。renderer は即時ローカル反映済み・ここは永続化のみ。
+  ipcMain.handle('ene:get-audio-prefs', async (): Promise<{ volume: number; muted: boolean }> => {
+    const s = await loadAppSettings();
+    return { volume: s.outputVolume ?? 1, muted: s.muted ?? false };
+  });
+  ipcMain.handle(
+    'ene:save-audio-prefs',
+    async (_event, volume: number, muted: boolean): Promise<void> => {
+      await saveAudioPrefs(volume, muted);
+    },
+  );
 
   // ウィンドウの可視性を renderer へ通知(非表示中は VRM 描画を止める=軽量原則 柱4・§3.6)。
   const notifyVisibility = (visible: boolean): void => {

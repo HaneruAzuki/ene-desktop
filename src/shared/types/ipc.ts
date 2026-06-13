@@ -41,6 +41,10 @@ export interface EneAPI {
   getCharacterModel(): Promise<ArrayBuffer | null>;
   // GUI スライダーの調整結果を保存する(高さ/距離/向きY/腕下げ)。
   setVrmDisplay(display: Partial<VrmDisplayParams>): Promise<void>;
+
+  // --- 音量・ミュート(トリミの声=出力・UI改修 段階3) ---
+  getAudioPrefs(): Promise<{ volume: number; muted: boolean }>;
+  saveAudioPrefs(volume: number, muted: boolean): Promise<void>;
   // ウィンドウ可視性の通知(main → renderer)。false=非表示/最小化→描画停止。
   onWindowVisibility(callback: (visible: boolean) => void): void;
 
