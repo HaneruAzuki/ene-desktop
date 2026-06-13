@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
 import { WINDOW_WIDTH, WINDOW_HEIGHT } from '../../shared/constants';
+import { getTrayIconPath } from '../../shared/node/paths';
 import type { Position } from './window-position';
 
 // 透過ウィンドウの作成(設計書 §8.1 / §4.4)。
@@ -17,7 +18,8 @@ export function createMainWindow(position?: Position): BrowserWindow {
     alwaysOnTop: true,
     resizable: false,
     hasShadow: false,
-    skipTaskbar: true, // タスクバーに出さない(タスクトレイ運用)
+    skipTaskbar: false, // 常にタスクバーに表示(トレイは廃止・UI改修 段階4。最小化/復帰・右クリック終了の入口にする)
+    icon: getTrayIconPath(), // タスクバーボタンのアイコン
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

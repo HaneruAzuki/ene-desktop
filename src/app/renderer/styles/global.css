@@ -273,6 +273,39 @@ body,
   cursor: pointer;
 }
 
+/* 「じゃあね」ポップ(段階4): トレイにしまう前にトリミの下からふわっと上がって消える。 */
+.goodbye-pop {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1a1a1a;
+  border-radius: 14px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: 30;
+  pointer-events: none;
+  animation: ene-goodbye 0.6s ease-out forwards;
+}
+@keyframes ene-goodbye {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  35% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -26px);
+  }
+}
+
 /* VRM 描画キャンバス(F・3D化)。3D カメラがバストアップをフレーミングするのでウィンドウ全面に置く。
    背景は WebGL 側で透明クリア。CSS の drop-shadow は毎フレーム合成コストになるため付けない(軽量・柱4)。
    呼吸/うなずきはボーンで行うので CSS アニメも使わない。 */

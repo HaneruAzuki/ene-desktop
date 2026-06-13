@@ -42,7 +42,7 @@ export function showCharacterContextMenu(window: BrowserWindow, runtime: AppRunt
         ]
       : []),
     { type: 'separator' },
-    { label: 'じゃあね...', click: () => app.quit() },
+    { label: 'アプリを終了', click: () => app.quit() },
   ]);
   menu.popup({ window });
 }

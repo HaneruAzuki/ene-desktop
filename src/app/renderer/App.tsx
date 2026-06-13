@@ -36,6 +36,9 @@ const MIN_RECORDING_SEC = 0.3;
 /** マイク単一ハイブリッドの判別: 押下がこの ms 未満=タップ(ハンズフリーのトグル)、以上=PTT(押している間録音)。 */
 const TAP_MAX_MS = 250;
 
+/** 「じゃあね」ポップの表示時間(ms)。これだけ見せてからトレイにしまう(UI改修 段階4)。 */
+const GOODBYE_POP_MS = 600;
+
 /** 起動準備が整うまで吹き出しに出す「まだ話しかけないで」サイン(音声エンジン起動・ウォーム中)。 */
 const WAIT_MESSAGE = 'ちょっと待って、…いま準備してるところ。';
 
@@ -49,6 +52,7 @@ export function App(): React.ReactElement | null {
   const [inputFocused, setInputFocused] = useState(false);
   const [volume, setVolume] = useState(1); // トリミの声(出力)の音量 0〜1(段階3)
   const [muted, setMuted] = useState(false);
+  const [goodbyePop, setGoodbyePop] = useState(false); // 「じゃあね」ポップ表示中(段階4)
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
   const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
@@ -485,6 +489,16 @@ export function App(): React.ReactElement | null {
     persistAudio(v, false);
   }
 
+  /** じゃあね(段階4): ポップを一瞬見せてからトレイにしまう。マイクは念のため切る。 */
+  function handleGoodbye(): void {
+    if (handsFreeOn) stopHandsFree();
+    setGoodbyePop(true);
+    setTimeout(() => {
+      void window.ene.goodbye();
+      setGoodbyePop(false); // 再表示時に残らないようリセット
+    }, GOODBYE_POP_MS);
+  }
+
   if (!characterInfo) return null;
 
   // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
@@ -532,6 +546,7 @@ export function App(): React.ReactElement | null {
                 onToggleMute={handleToggleMute}
                 onVolume={handleVolume}
                 onSettings={() => setShowVrmPanel((v) => !v)}
+                onGoodbye={handleGoodbye}
               />
               <InputArea
                 autoFocus={forceOpen}
@@ -555,6 +570,8 @@ export function App(): React.ReactElement | null {
           )}
         </div>
       )}
+      {/* 「じゃあね」ポップ(段階4): トレイにしまう前に一瞬見せる演出。 */}
+      {goodbyePop && <div className="goodbye-pop">＼じゃあね／</div>}
       {/* VRM 表示調整パネル(段階1: 操作バーの設定ボタンから開閉。段階6 で統合設定パネルへ置換)。 */}
       {showVrmPanel && vrmConfig && vrmDisplay && (
         <VrmSettingsPanel

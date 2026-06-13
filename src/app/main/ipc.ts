@@ -89,10 +89,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     return id ? correctNameMishear(text, id.sttAliases ?? [], id.selfRecognition.callsSelf) : text;
   };
 
-  // コアレッシング(段階①・ENE_COALESCE=1): 投機生成＋連結。既定オフ=従来の renderer 駆動経路。
+  // コアレッシング(段階①): 投機生成＋連結。**既定ON**(ENE_COALESCE=0 で無効化=従来の renderer 駆動経路)。
   //   暫定ターン終了(短い無音)で generateResponse を投機実行し、発話再開で静かにキャンセル＋連結。
   //   第一声(コミット点)で committed=true、生成完了で commitTurn(副作用)＋確定応答を renderer へ。
-  const coalesceOn = process.env[COALESCE_ENABLED_ENV] === '1';
+  const coalesceOn = process.env[COALESCE_ENABLED_ENV] !== '0';
   let lastAudioStreamed = false;
   // 適応(段階②)の窓更新を VadRuntime へ橋渡し。vad は後で生成するので前方参照ホルダ経由。
   let applySilenceWindow: (ms: number) => void = () => {};
@@ -210,6 +210,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       await saveAudioPrefs(volume, muted);
     },
   );
+
+  // じゃあね(UI改修 段階4): タスクバーへ最小化する(クリックで戻る)。常時タスクバー表示なのでボタンは常にある。
+  // 完全終了はキャラ右クリック「アプリを終了」or タスクバー右クリック「閉じる」(window-all-closed→quit)。
+  ipcMain.handle('ene:goodbye', (): void => {
+    if (!mainWindow.isDestroyed()) mainWindow.minimize();
+  });
 
   // ウィンドウの可視性を renderer へ通知(非表示中は VRM 描画を止める=軽量原則 柱4・§3.6)。
   const notifyVisibility = (visible: boolean): void => {

@@ -45,6 +45,9 @@ export interface EneAPI {
   // --- 音量・ミュート(トリミの声=出力・UI改修 段階3) ---
   getAudioPrefs(): Promise<{ volume: number; muted: boolean }>;
   saveAudioPrefs(volume: number, muted: boolean): Promise<void>;
+
+  // じゃあね(UI改修 段階4): ウィンドウをトレイにしまう(＋初回だけ常駐を案内)。完全終了はトレイメニュー。
+  goodbye(): Promise<void>;
   // ウィンドウ可視性の通知(main → renderer)。false=非表示/最小化→描画停止。
   onWindowVisibility(callback: (visible: boolean) => void): void;
 

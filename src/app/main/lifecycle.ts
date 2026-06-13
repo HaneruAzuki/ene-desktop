@@ -21,7 +21,6 @@ import { describeElapsed, timeOfDayLabel } from '../../shared/moment';
 import { openApiKeyDialog } from './api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';
 import { createMainWindow } from './window';
-import { createTray } from './tray';
 import { registerIpcHandlers } from './ipc';
 import { IdleTalkManager } from './idle-talk-manager';
 import type { AppRuntime } from './app-runtime';
@@ -155,13 +154,12 @@ export async function runStartupSequence(
   charContext = { ...charContext, birthdayHint: checkBirthday(charContext.identity, active, today) };
   runtime.charContext = charContext;
 
-  // Step 10: 透過ウィンドウ(位置復元)+ IPC + トレイ
+  // Step 10: 透過ウィンドウ(位置復元)+ IPC(トレイは廃止・常時タスクバー表示=UI改修 段階4)
   const saved = await loadWindowPosition();
   const position = saved ? clampPositionToScreen(saved) : getDefaultPosition();
   const mainWindow = createMainWindow(position);
   await saveWindowPosition(position.x, position.y);
   registerIpcHandlers(mainWindow, runtime);
-  createTray(mainWindow);
 
   // 自発発話(P7): アイドル監視を開始(best-effort・既定 low・ENE_IDLE_TALK=0 で無効・v1 はテキストのみ)。
   // 初回 tick は IDLE_TALK_CHECK_INTERVAL_MS 後=起動直後には鳴らない。失敗しても起動に影響しない。
