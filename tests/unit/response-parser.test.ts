@@ -51,4 +51,19 @@ describe('parseConversationResponse - ルビ(振り仮名)', () => {
   it('不正な JSON は null', () => {
     expect(parseConversationResponse('not json')).toBeNull();
   });
+
+  it('enterListening:true を拾う(傾聴入室・listening-mode)', () => {
+    expect(
+      parseConversationResponse(
+        '{"type":"chat","emotion":"joy","message":"うん、聞かせて","enterListening":true}',
+      ),
+    ).toEqual({ type: 'chat', message: 'うん、聞かせて', emotion: 'joy', enterListening: true });
+  });
+
+  it('enterListening が無い/false の通常応答には付けない', () => {
+    expect(parseConversationResponse('{"type":"chat","message":"やあ","enterListening":false}')).toEqual({
+      type: 'chat',
+      message: 'やあ',
+    });
+  });
 });

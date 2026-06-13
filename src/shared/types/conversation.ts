@@ -7,7 +7,7 @@ export type ConversationResponse =
   // message=表示(漢字かな交じり・ルビ除去済) / reading=音声読み上げ用テキスト
   //  Claude は message に青空文庫式ルビ「漢字《よみ》」を埋め、パーサが表示用(stripRuby)と
   //  音声用(rubyToReading)へ分解する。reading はルビがある時だけ付与(欠落時は message を読む)。
-  | { type: 'chat'; message: string; reading?: string; emotion?: EmotionLabel } // emotion は task_13(任意・1ターン揮発)
+  | { type: 'chat'; message: string; reading?: string; emotion?: EmotionLabel; enterListening?: boolean } // emotion=task_13(任意・1ターン揮発) / enterListening=傾聴入室(listening-mode・明示宣言時のみ true)
   | { type: 'os_command'; message: string; reading?: string; command: OsCommand };
 
 /**

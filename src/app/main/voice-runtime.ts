@@ -102,7 +102,12 @@ export async function streamVoiceChat(
   if (result.command) {
     return { type: 'os_command', message: result.spokenText, command: result.command };
   }
-  return { type: 'chat', message: result.spokenText, emotion: result.emotion };
+  return {
+    type: 'chat',
+    message: result.spokenText,
+    emotion: result.emotion,
+    ...(result.enterListening ? { enterListening: true } : {}),
+  };
 }
 
 /**

@@ -12,6 +12,9 @@ import {
   LISTENING_YAWN_MS,
 } from '../../shared/constants';
 
+/** 傾聴入室後、この時間ユーザの発話が無ければ自動退室する(姿勢を戻す・固着回避・listening-mode)。 */
+const LISTENING_IDLE_TIMEOUT_MS = 20_000;
+
 /** 無音窓(ms)を下限/上限でクランプする(案①・純粋)。 */
 export function clampWindow(ms: number): number {
   return Math.round(Math.min(COALESCE_WINDOW_MAX_MS, Math.max(COALESCE_WINDOW_MIN_MS, ms)));
@@ -92,6 +95,8 @@ export class VoiceTurnCoordinator {
   private listeningStartMs = 0;
   /** この傾聴セッションで既にあくびを出したか(1回だけ)。 */
   private yawnedThisListening = false;
+  /** 傾聴のアイドル退室タイマ(発話のたびに張り直す)。放置で姿勢が傾いたまま固着するのを防ぐ。 */
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
   /** 現在時刻(ms)。注入可(テスト)。 */
   private readonly now: () => number;
 
@@ -121,6 +126,7 @@ export class VoiceTurnCoordinator {
     this.yawnedThisListening = false;
     this.deps.setSilenceWindow?.(LISTENING_WINDOW_MS);
     this.deps.onListeningChange?.(true);
+    this.armIdleTimer(); // 放置されたら自動退室(姿勢を戻す)
     log.info(`listening: enter (window=${LISTENING_WINDOW_MS}ms)`); // §6.2: 数値のみ
   }
 
@@ -128,10 +134,28 @@ export class VoiceTurnCoordinator {
   private exitListening(): void {
     if (!this.listening) return;
     this.listening = false;
+    this.clearIdleTimer();
     this.currentWindowMs = this.windowBeforeListening;
     this.deps.setSilenceWindow?.(this.windowBeforeListening);
     this.deps.onListeningChange?.(false);
     log.info(`listening: exit (window=${this.windowBeforeListening}ms)`);
+  }
+
+  /** 傾聴のアイドル退室タイマを張り直す(発話のたびにリセット)。unref で本タイマがプロセスを延命しない。 */
+  private armIdleTimer(): void {
+    this.clearIdleTimer();
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      this.exitListening(); // 一定時間 発話が無い=もう聞く相手がいない → 姿勢を戻す
+    }, LISTENING_IDLE_TIMEOUT_MS);
+    this.idleTimer.unref?.();
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
   }
 
   /** 長時間傾聴のあくび(1セッション1回・経過のみで判定=保存スカラーを持たない)。 */
@@ -146,6 +170,7 @@ export class VoiceTurnCoordinator {
   /** 発話開始(speech-start)。未コミットの投機生成を静かに中断し、発話中フラグを立てる。 */
   onSpeechStart(): void {
     this.userSpeaking = true;
+    if (this.listening) this.armIdleTimer(); // 傾聴中の発話=アクティブ → アイドル退室を先送り
     if (this.gen && !this.gen.committed) {
       this.gen.ctrl.abort();
       // サイレントキャンセル(第一声前)=声が出る前に捕捉できた=余裕あり → 窓を短く(キビキビへ・案①)。
@@ -246,6 +271,7 @@ export class VoiceTurnCoordinator {
       this.currentWindowMs = this.windowBeforeListening;
       this.deps.onListeningChange?.(false);
     }
+    this.clearIdleTimer();
     this.consecutiveSilentCancels = 0;
   }
 
@@ -270,6 +296,9 @@ export class VoiceTurnCoordinator {
       this.gen = null;
       this.deps.emitResponse(response);
       await this.deps.commit(text, response);
+      // Claude入室(明示宣言・listening-mode): 応答に enterListening が立っていたら傾聴へ。
+      // 「わかった」第一声のコミット(onFirstAudio)で一度 exitListening 済なので、ここで改めて入室する。
+      if (response.type === 'chat' && response.enterListening) this.requestListening();
     } catch (e) {
       // 中断(投機キャンセル/reset)は想定内=無言で破棄。それ以外の失敗は記録する(原因究明・§6.2 名前のみ)。
       if (!ctrl.signal.aborted) {

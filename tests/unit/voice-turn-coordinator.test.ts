@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   VoiceTurnCoordinator,
   clampWindow,
@@ -371,5 +371,19 @@ describe('VoiceTurnCoordinator 傾聴モード', () => {
     silentCancel(c, 'B');
     silentCancel(c, 'C');
     expect(listeningChanges).toEqual([]);
+  });
+
+  it('アイドルタイムアウト: 一定時間 発話が無ければ自動退室(姿勢の固着回避)', () => {
+    vi.useFakeTimers();
+    try {
+      const { deps, listeningChanges } = listeningHarness();
+      const c = new VoiceTurnCoordinator(deps);
+      c.requestListening(); // 入室＋アイドルタイマ起動
+      expect(listeningChanges).toEqual([true]);
+      vi.advanceTimersByTime(25_000); // 発話が無いまま放置(LISTENING_IDLE_TIMEOUT_MS 超)
+      expect(listeningChanges).toEqual([true, false]); // 自動退室
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

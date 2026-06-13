@@ -9,6 +9,7 @@ interface RunResult {
   sentences: string[];
   emotion?: EmotionLabel;
   command?: OsCommand;
+  enterListening?: boolean;
 }
 function run(deltas: string[]): RunResult {
   const parser = createJsonStreamParser();
@@ -21,7 +22,7 @@ function run(deltas: string[]): RunResult {
   }
   const f = parser.flush();
   sentences.push(...f.sentences);
-  return { sentences, emotion, command: f.command };
+  return { sentences, emotion, command: f.command, enterListening: f.enterListening };
 }
 
 describe('json-stream-parser (C1)', () => {
@@ -92,5 +93,16 @@ describe('json-stream-parser (C1)', () => {
   it('文末記号で終わらない最終文も flush で出す', () => {
     const r = run(['{"type":"chat","message":"おやすみ"}']);
     expect(r.sentences).toEqual(['おやすみ']);
+  });
+
+  it('enterListening:true を message の後ろから取り出す(傾聴入室・listening-mode)', () => {
+    const r = run(['{"type":"chat","emotion":"joy","message":"わかった","enterListening":true}']);
+    expect(r.sentences).toEqual(['わかった']);
+    expect(r.enterListening).toBe(true);
+  });
+
+  it('enterListening が無ければ undefined(通常応答)', () => {
+    const r = run(['{"type":"chat","message":"やあ。"}']);
+    expect(r.enterListening).toBeUndefined();
   });
 });

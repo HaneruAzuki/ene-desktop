@@ -41,6 +41,7 @@ export interface VoiceChatResult {
   spokenText: string; // 実際に発話したテキスト(吹き出し表示にも使う)
   emotion: EmotionLabel;
   command?: OsCommand; // 喋り終わり後に実行(自称打ち切り時は付かない)
+  enterListening?: boolean; // 傾聴入室(listening-mode・明示宣言時のみ)
   blockedBySelfCheck: boolean; // C2 で自称検知し打ち切ったか
 }
 
@@ -102,7 +103,13 @@ export async function runVoiceChat(
     return { spokenText: spoken.join(''), emotion, blockedBySelfCheck: true };
   }
 
-  return { spokenText: spoken.join(''), emotion, command: final.command, blockedBySelfCheck: blocked };
+  return {
+    spokenText: spoken.join(''),
+    emotion,
+    command: final.command,
+    enterListening: final.enterListening,
+    blockedBySelfCheck: blocked,
+  };
 }
 
 export interface SpeakTextDeps {

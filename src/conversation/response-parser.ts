@@ -44,11 +44,13 @@ export function parseConversationResponse(raw: string): ConversationResponse | n
   // chat は emotion(任意)を許可ラベルへ正規化して付与する(task_13)。
   if (parsed.type === 'chat') {
     const emotion = typeof o.emotion === 'string' ? normalizeEmotion(o.emotion) : undefined;
+    const enterListening = o.enterListening === true; // 傾聴入室(listening-mode・明示宣言時のみ)
     return {
       type: 'chat',
       message: display,
       ...(emotion ? { emotion } : {}),
       ...(reading ? { reading } : {}),
+      ...(enterListening ? { enterListening: true } : {}),
     };
   }
   return { ...parsed, message: display, ...(reading ? { reading } : {}) };

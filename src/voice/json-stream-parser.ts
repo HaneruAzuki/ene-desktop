@@ -21,10 +21,11 @@ export interface StreamChunk {
   sentences: string[];
 }
 
-/** flush の戻り値。残っていた最終文と、末尾トレーラの OS コマンド(妥当な場合のみ)。 */
+/** flush の戻り値。残っていた最終文と、末尾トレーラの OS コマンド/傾聴入室フラグ(妥当な場合のみ)。 */
 export interface StreamFinal {
   sentences: string[];
   command?: OsCommand;
+  enterListening?: boolean;
 }
 
 export interface VoiceStreamParser {
@@ -36,6 +37,7 @@ export interface VoiceStreamParser {
 
 const MSG_OPEN_RE = /"message"\s*:\s*"/;
 const EMOTION_RE = /"emotion"\s*:\s*"([^"]*)"/;
+const ENTER_LISTENING_RE = /"enterListening"\s*:\s*true/; // 傾聴入室(listening-mode・true のみ拾う)
 
 /** tail(message 終了後の生バッファ)から command を取り出して検証する。 */
 function parseCommandFromTail(tail: string): OsCommand | undefined {
@@ -70,6 +72,7 @@ export function createJsonStreamParser(): VoiceStreamParser {
   let uniBuf = '';
   let emotionEmitted = false;
   let firstChunkDone = false; // 第一声(最初のチャンク)を早期発話したか(施策A)
+  let enterListening = false; // 傾聴入室フラグ(message 前=head / 後=tail のどちらでも拾う)
 
   /** message 文字列の 1 文字を処理。閉じ引用符に達したら true(=message 終了)。 */
   function feedChar(c: string): boolean {
@@ -146,6 +149,7 @@ export function createJsonStreamParser(): VoiceStreamParser {
       }
       // phase === 'head'
       head += delta;
+      if (!enterListening && ENTER_LISTENING_RE.test(head)) enterListening = true;
       let emotion: EmotionLabel | undefined;
       if (!emotionEmitted) {
         const em = EMOTION_RE.exec(head);
@@ -170,7 +174,12 @@ export function createJsonStreamParser(): VoiceStreamParser {
       if (last) sentences.push(last);
       sentenceBuf = '';
       const command = phase === 'tail' ? parseCommandFromTail(tail) : undefined;
-      return command ? { sentences, command } : { sentences };
+      if (!enterListening && ENTER_LISTENING_RE.test(tail)) enterListening = true;
+      return {
+        sentences,
+        ...(command ? { command } : {}),
+        ...(enterListening ? { enterListening: true } : {}),
+      };
     },
   };
 }
