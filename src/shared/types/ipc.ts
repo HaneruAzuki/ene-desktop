@@ -124,6 +124,12 @@ export interface EneAPI {
   //  strength = うなずきの深さ(相槌の基準 1.0 比・発話が長いほど重め)。音は鳴らさず視覚のみ。
   onTurnNod(callback: (strength: number) => void): void;
 
+  // あくび(main → renderer・listening-mode)。長時間傾聴で1回あくび(口開き+目細め+首+口元へ手)。
+  onYawn(callback: () => void): void;
+
+  // 傾聴モードの出入り(main → renderer・listening-mode)。on=傾聴中(少し首をかしげる)。
+  onListening(callback: (on: boolean) => void): void;
+
   // 思考フィラーの表示文字列(main → renderer・Phase C)。吹き出しに一時表示(応答で上書き)。
   onThinkingFiller(callback: (text: string) => void): void;
 

@@ -21,6 +21,22 @@ const MOUTH_SMOOTH = 0.4;
 /** これ未満は完全に閉じる(話し終わりに微小値で開きっぱなしになるのを防ぐ)。 */
 const MOUTH_CLOSE_EPS = 0.04;
 
+/**
+ * あくび(長時間傾聴の情緒ビート・Phase4・docs/listening-mode-design.md §8)。
+ * カスタム表情を持たないモデルでも、既存プリセットの合成=口(aa)開閉＋目(blink)細め＋首反らしで出す。
+ * あくび中は自動まばたき/リップシンク/うなずきを止め、口・目・首をあくびに譲る。
+ */
+// poser(scripts/yawn-poser.html)で実機調整した値(2026-06-13)。
+const YAWN_OPEN_S = 0.5; // 開くまで
+const YAWN_HOLD_S = 0.6; // ピーク保持
+const YAWN_CLOSE_S = 0.45; // 閉じるまで
+const YAWN_SQUINT = 0.4; // あくびの目の細め(blink 重み・1=完全閉)
+const YAWN_HEAD_BACK = 0.13; // 頭を後ろへ反らす最大量(rad・「伸び」の表現)
+
+// 傾聴モードの姿勢=少し首をかしげる(neck.z=roll)。nod(neck.x)とは軸が別なので共存する。
+const LISTENING_HEAD_TILT = 0.13; // 首かしげの最大角(rad・~7.5°)。実機で要調整(増減/符号で左右)。
+const LISTENING_TILT_LERP = 3; // 入退室の補間速度(大きいほど速い・約0.3秒で入る/戻る)。
+
 /** フレーム上限。発話中は滑らかに、アイドル時は間引いて常駐 CPU を抑える。 */
 const FPS_TALKING = 30;
 const FPS_IDLE = 15;
@@ -62,6 +78,22 @@ export class VrmRenderer {
   private nodPhase = 0; // うなずき(>0 の間だけ頭を下げる)
   private nodStrength = 1; // うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け)
   private mouthOpen = 0; // 平滑化した開口量
+  private yawnT = -1; // あくび進行(秒・<0=非あくび)
+  // あくびの全調整パラメータ(秒/重み/度)。upper/lower/hand=口元へ添える右手の各ボーン回転(度)。
+  // リグ依存=scripts/yawn-poser.html(ブラウザ単体)で調整→ここの既定へ焼く。
+  private yawn = {
+    open: YAWN_OPEN_S,
+    hold: YAWN_HOLD_S,
+    close: YAWN_CLOSE_S,
+    squint: YAWN_SQUINT,
+    headBack: YAWN_HEAD_BACK,
+    upper: { x: -51, y: 56, z: 96 }, // 右上腕(poser実機調整 2026-06-13)
+    lower: { x: 21, y: 130, z: -38 }, // 右前腕(肘の曲げ)
+    hand: { x: -56, y: -4, z: 6 }, // 右手の向き
+  };
+  // 傾聴中の首かしげ。入退室で target 0↔1、現在値を毎フレーム lerp して neck.z に適用。
+  private listeningTiltTarget = 0;
+  private listeningTilt = 0;
   private acc = 0; // 30fps cap 用の時間アキュムレータ
   private rafId: number | null = null;
   private running = false;
@@ -154,6 +186,16 @@ export class VrmRenderer {
   nod(strength = 1): void {
     this.nodStrength = strength;
     this.nodPhase = 1;
+  }
+
+  /** あくびを1回起こす(長時間傾聴の情緒ビート・Phase4・main の onYawn から駆動)。 */
+  playYawn(): void {
+    this.yawnT = 0;
+  }
+
+  /** 傾聴モードの出入り(main の onListeningChange→ene:listening から駆動)。少し首をかしげる/戻す。 */
+  setListening(on: boolean): void {
+    this.listeningTiltTarget = on ? 1 : 0;
   }
 
   /** 表示パラメータの更新(GUI スライダーから即時反映)。 */
@@ -272,9 +314,14 @@ export class VrmRenderer {
     this.updateCamera();
     if (this.vrm) {
       this.updatePose(delta);
-      this.updateBlink(delta);
-      this.updateNod(delta);
-      this.updateLipSync();
+      // あくび中は口・目・首をあくびが占有(自動まばたき/リップシンク/うなずきは止める)。
+      const yawning = this.updateYawn(delta);
+      if (!yawning) {
+        this.updateBlink(delta);
+        this.updateNod(delta);
+        this.updateLipSync();
+      }
+      this.updateListeningPose(delta); // 傾聴の首かしげ(neck.z=軸別で nod/あくびと共存)
       // 物理(SpringBone)はさらに厳しめにクランプして発散を防ぐ。
       this.vrm.update(Math.min(delta, MAX_PHYSICS_DELTA));
     }
@@ -339,6 +386,78 @@ export class VrmRenderer {
     } else {
       neck.rotation.x = 0;
     }
+  }
+
+  /** あくびの envelope(0→1→0)を進行時刻 t(秒)から求める。 */
+  private yawnEnvelope(t: number): number {
+    const { open, hold, close } = this.yawn;
+    if (t < open) return open > 0 ? t / open : 1;
+    if (t < open + hold) return 1;
+    return Math.max(0, 1 - (t - open - hold) / Math.max(0.001, close));
+  }
+
+  /**
+   * envelope e(0=rest, 1=ピーク)で口(aa)・目(blink)・首・口元へ添える手を一括適用する。
+   * 口は talking より大きく開けたいので MAX_MOUTH_OPEN を通さず直接 aa を駆動する。
+   */
+  private applyYawnPose(e: number): void {
+    const em = this.vrm?.expressionManager;
+    if (em) {
+      em.setValue('aa', e);
+      em.setValue('blink', e * this.yawn.squint); // 開くほど目を細める
+    }
+    // 首を後ろへ(neck は updateNod と共有=あくび中は nod を止める)。
+    const neck = this.vrm?.humanoid?.getNormalizedBoneNode('neck');
+    if (neck) neck.rotation.x = -this.yawn.headBack * e;
+    this.setYawnArm(e);
+  }
+
+  /**
+   * あくびの毎フレーム更新。進行中は true を返し、
+   * 呼び出し側は updateBlink/updateLipSync/updateNod を止めて口・目・首・手をあくびに譲る。
+   * ポーズ値(this.yawn)は scripts/yawn-poser.html で調整して焼く。
+   */
+  private updateYawn(delta: number): boolean {
+    if (!this.vrm || this.yawnT < 0) return false;
+    this.yawnT += delta;
+    const total = this.yawn.open + this.yawn.hold + this.yawn.close;
+    if (this.yawnT >= total) {
+      this.yawnT = -1;
+      this.applyYawnPose(0); // 口・目・首・手を rest へ戻す
+      return false;
+    }
+    this.applyYawnPose(this.yawnEnvelope(this.yawnT));
+    return true;
+  }
+
+  /**
+   * あくびで口元へ添える右手のポーズ。envelope e(0=rest, 1=口元)で rest↔target を補間する。
+   * upperArm/lowerArm/hand を代入(累積させない・gotcha)。z は updatePose の rest(-armDownDeg)から target へ補間。
+   * 角度(this.yawn.upper/lower/hand)はリグ依存=実機のスライダーで調整→既定へ焼く。
+   * updatePose は毎フレーム upperArm.z=rest を入れるが、本メソッドは updatePose の後に走るので上書きできる。
+   */
+  private setYawnArm(e: number): void {
+    const hum = this.vrm?.humanoid;
+    if (!hum) return;
+    const r = THREE.MathUtils.degToRad;
+    const d = this.yawn;
+    const restZ = -r(this.display.armDownDeg);
+    const up = hum.getNormalizedBoneNode('rightUpperArm');
+    const lo = hum.getNormalizedBoneNode('rightLowerArm');
+    const ha = hum.getNormalizedBoneNode('rightHand');
+    if (up) up.rotation.set(r(d.upper.x) * e, r(d.upper.y) * e, restZ + (r(d.upper.z) - restZ) * e);
+    if (lo) lo.rotation.set(r(d.lower.x) * e, r(d.lower.y) * e, r(d.lower.z) * e);
+    if (ha) ha.rotation.set(r(d.hand.x) * e, r(d.hand.y) * e, r(d.hand.z) * e);
+  }
+
+  /** 傾聴の首かしげ(neck.z=roll を lerp)。nod は neck.x なので軸が別=共存する。毎フレーム呼ぶ。 */
+  private updateListeningPose(delta: number): void {
+    const neck =
+      this.vrm?.humanoid?.getNormalizedBoneNode('neck') ?? this.vrm?.humanoid?.getNormalizedBoneNode('head');
+    if (!neck) return;
+    this.listeningTilt +=
+      (this.listeningTiltTarget - this.listeningTilt) * Math.min(1, delta * LISTENING_TILT_LERP);
+    neck.rotation.z = LISTENING_HEAD_TILT * this.listeningTilt;
   }
 
   private updateLipSync(): void {

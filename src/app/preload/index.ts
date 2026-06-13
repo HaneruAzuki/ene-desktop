@@ -92,6 +92,16 @@ const eneAPI: EneAPI = {
     ipcRenderer.removeAllListeners('ene:turn-nod');
     ipcRenderer.on('ene:turn-nod', (_event, strength: number) => cb(strength));
   },
+  onYawn: (cb) => {
+    // あくび(長時間傾聴の情緒ビート・listening-mode)。二重登録防止で単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:yawn');
+    ipcRenderer.on('ene:yawn', () => cb());
+  },
+  onListening: (cb) => {
+    // 傾聴モードの出入り(少し首をかしげる)。二重登録防止で単一リスナーへ張り替える。
+    ipcRenderer.removeAllListeners('ene:listening');
+    ipcRenderer.on('ene:listening', (_event, on: boolean) => cb(on));
+  },
   onThinkingFiller: (cb) => {
     // 思考フィラーの表示文字列(「そうね」等)。吹き出しに一時表示=応答で上書きされる。
     ipcRenderer.removeAllListeners('ene:thinking-filler');

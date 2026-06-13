@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>Yawn Poser — あくび/手のポーズ調整</title>
+<!--
+  あくび(口開き+目細め+首+口元へ添える手)のポーズを、ブラウザ単体で詰めるツール。
+  ・ダブルクリックで開く(file://でOK)→ VRM をドラッグ投入 or 「ファイル選択」。
+  ・スライダーで姿勢が即反映。▶Play で開閉アニメ確認。
+  ・「Copy」で JSON をコピー → src/app/renderer/vrm-renderer.ts の this.yawn 既定へ焼く。
+  ・適用ロジックは vrm-renderer の applyYawnPose / setYawnArm と同形(左腕は armDown で下げ、右腕を
+    rest(-armDown)→target へ e で補間)。なので、ここで決めた upper/lower/hand/squint/headBack は
+    そのままアプリの this.yawn に転記できる(armDown はアプリの「腕下げ」設定に合わせる)。
+  ※もし画面が真っ黒で何も出ない場合は、CDN のモジュール読込が file:// で弾かれている可能性。
+    その時はリポジトリ直下で `npx serve` 等を起動し http://localhost/scripts/yawn-poser.html を開く。
+-->
+<style>
+  html,body { margin:0; height:100%; background:#202028; overflow:hidden; font-family:system-ui,sans-serif; }
+  #c { display:block; }
+  #ui {
+    position:fixed; top:0; right:0; width:300px; height:100vh; overflow-y:auto;
+    background:#12121aee; color:#e6e6e6; font:11px/1.5 ui-monospace,monospace;
+    padding:10px; box-sizing:border-box; border-left:1px solid #333;
+  }
+  #drop { border:1px dashed #567; border-radius:6px; padding:10px; text-align:center; color:#9ab; margin-bottom:8px; }
+  .row { display:flex; align-items:center; gap:6px; margin:1px 0; }
+  .row span.l { width:60px; color:#9ab; }
+  .row span.v { width:42px; text-align:right; color:#cde; }
+  .row input[type=range] { flex:1; }
+  h3 { margin:9px 0 2px; color:#7cf; font-size:11px; border-bottom:1px solid #333; }
+  button { background:#2a2e38; color:#e6e6e6; border:1px solid #444; border-radius:5px; padding:3px 9px; cursor:pointer; }
+  #ctl { display:flex; gap:8px; align-items:center; margin:6px 0; }
+  #json { width:100%; height:92px; background:#000; color:#9f9; font:10px ui-monospace,monospace; border:0; box-sizing:border-box; margin-top:4px; }
+  #err { color:#f99; white-space:pre-wrap; margin-top:6px; min-height:14px; }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <div id="drop">ここに <b>.vrm</b> をドロップ<br />または <input type="file" id="file" accept=".vrm" /></div>
+    <div id="ctl"><b>e</b> を 1 にするとあくびのピーク姿勢。ここで形だけ決める(動きはアプリが補間)。</div>
+    <div id="ctrls"></div>
+    <h3>this.yawn へ焼く JSON</h3>
+    <textarea id="json" readonly></textarea>
+    <button id="copy">📋 Copy</button>
+    <div id="err"></div>
+  </div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.4.0/lib/three-vrm.module.js"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+
+const $ = (id) => document.getElementById(id);
+const d2r = THREE.MathUtils.degToRad;
+const showErr = (m) => { $('err').textContent = String(m); };
+addEventListener('error', (e) => showErr('error: ' + e.message));
+
+// --- 調整パラメータ(this.yawn と同形 + armDown=アプリの「腕下げ」設定) ---
+const Y = {
+  e: 1, armDown: 70,
+  open: 0.45, hold: 0.3, close: 0.65,
+  squint: 0.7, headBack: 0.12,
+  upper: { x: -25, y: 15, z: -75 },
+  lower: { x: 0, y: -110, z: 0 },
+  hand: { x: 0, y: 0, z: 30 },
+};
+const SPEC = [
+  ['e', 0, 1, 0.01], ['armDown', -85, 85, 1],
+  ['open', 0.1, 1, 0.05], ['hold', 0, 1, 0.05], ['close', 0.1, 1.5, 0.05],
+  ['squint', 0, 1, 0.05], ['headBack', 0, 0.4, 0.01],
+  ['upper.x', -180, 180, 1], ['upper.y', -180, 180, 1], ['upper.z', -180, 180, 1],
+  ['lower.x', -180, 180, 1], ['lower.y', -180, 180, 1], ['lower.z', -180, 180, 1],
+  ['hand.x', -180, 180, 1], ['hand.y', -180, 180, 1], ['hand.z', -180, 180, 1],
+];
+const getP = (p) => (p.includes('.') ? Y[p.split('.')[0]][p.split('.')[1]] : Y[p]);
+const setP = (p, v) => { if (p.includes('.')) { const [a, b] = p.split('.'); Y[a][b] = v; } else Y[p] = v; };
+
+function buildCtrls() {
+  const c = $('ctrls');
+  for (const [p, min, max, step] of SPEC) {
+    const row = document.createElement('div'); row.className = 'row';
+    const lab = document.createElement('span'); lab.className = 'l'; lab.textContent = p;
+    const val = document.createElement('span'); val.className = 'v';
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = getP(p);
+    const fmt = (v) => (step < 1 ? (+v).toFixed(2) : String(+v));
+    val.textContent = fmt(getP(p));
+    inp.oninput = () => { setP(p, parseFloat(inp.value)); val.textContent = fmt(inp.value); refreshJson(); };
+    row.append(lab, inp, val); c.appendChild(row);
+  }
+}
+function refreshJson() {
+  $('json').value = JSON.stringify({
+    open: Y.open, hold: Y.hold, close: Y.close, squint: Y.squint, headBack: Y.headBack,
+    upper: Y.upper, lower: Y.lower, hand: Y.hand,
+  });
+}
+buildCtrls(); refreshJson();
+$('copy').onclick = () => {
+  $('json').select();
+  try { navigator.clipboard?.writeText($('json').value); } catch { /* file:// は execCommand へ */ }
+  try { document.execCommand('copy'); } catch { /* 失敗時は手動選択 */ }
+};
+
+// --- three / three-vrm ---
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setClearColor(0x202028, 1);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.05, 20);
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dirLight = new THREE.DirectionalLight(0xffffff, Math.PI); dirLight.position.set(1, 1, 1); scene.add(dirLight);
+let dist = 0.7;
+function resize() {
+  const w = Math.max(100, innerWidth - 300);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(w, innerHeight);
+  camera.aspect = w / innerHeight; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+addEventListener('wheel', (e) => { dist = Math.min(3, Math.max(0.25, dist + Math.sign(e.deltaY) * 0.05)); });
+
+let vrm = null, headY = 1.35;
+const loader = new GLTFLoader();
+loader.register((p) => new VRMLoaderPlugin(p));
+function setup(gltf) {
+  if (vrm) { scene.remove(vrm.scene); VRMUtils.deepDispose(vrm.scene); }
+  const v = gltf.userData.vrm;
+  VRMUtils.removeUnnecessaryVertices(gltf.scene);
+  VRMUtils.combineSkeletons(gltf.scene);
+  if (v.meta?.metaVersion === '0') VRMUtils.rotateVRM0(v);
+  scene.add(v.scene); vrm = v;
+  if (v.lookAt) v.lookAt.target = camera;
+  const head = v.humanoid?.getNormalizedBoneNode('head');
+  if (head) { const pos = new THREE.Vector3(); head.getWorldPosition(pos); headY = pos.y; }
+  showErr('loaded ✓');
+}
+async function loadFile(f) {
+  try { const buf = await f.arrayBuffer(); loader.parse(buf, '', setup, (e) => showErr('parse failed: ' + (e?.message || e))); }
+  catch (e) { showErr('read failed: ' + (e?.message || e)); }
+}
+$('file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) loadFile(f); });
+document.body.addEventListener('dragover', (e) => e.preventDefault());
+document.body.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+// サーバ運用時は ?vrm=../ene/torimi.vrm でも読める。
+const q = new URLSearchParams(location.search).get('vrm');
+if (q) loader.loadAsync(decodeURIComponent(q)).then(setup).catch((e) => showErr('url load failed: ' + (e?.message || e)));
+
+// --- あくびポーズ適用(vrm-renderer の applyYawnPose / setYawnArm と同形) ---
+function applyPose(e) {
+  if (!vrm) return;
+  const hum = vrm.humanoid, em = vrm.expressionManager;
+  if (em) { em.setValue('aa', e); em.setValue('blink', e * Y.squint); }
+  const restZ = -d2r(Y.armDown);
+  const la = hum?.getNormalizedBoneNode('leftUpperArm');
+  const up = hum?.getNormalizedBoneNode('rightUpperArm');
+  const lo = hum?.getNormalizedBoneNode('rightLowerArm');
+  const ha = hum?.getNormalizedBoneNode('rightHand');
+  if (la) la.rotation.z = d2r(Y.armDown); // 左腕は下げたまま(rest)
+  if (up) up.rotation.set(d2r(Y.upper.x) * e, d2r(Y.upper.y) * e, restZ + (d2r(Y.upper.z) - restZ) * e);
+  if (lo) lo.rotation.set(d2r(Y.lower.x) * e, d2r(Y.lower.y) * e, d2r(Y.lower.z) * e);
+  if (ha) ha.rotation.set(d2r(Y.hand.x) * e, d2r(Y.hand.y) * e, d2r(Y.hand.z) * e);
+  const neck = hum?.getNormalizedBoneNode('neck');
+  if (neck) neck.rotation.x = -Y.headBack * e;
+}
+const clock = new THREE.Clock();
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = clock.getDelta();
+  camera.position.set(0, headY - 0.06, dist);
+  camera.lookAt(0, headY - 0.12, 0);
+  if (vrm) {
+    applyPose(Y.e); // 静止プレビュー(e=0:通常ポーズ ↔ e=1:あくびピーク)。動きはアプリ側が補間する。
+    vrm.update(dt);
+  }
+  renderer.render(scene, camera);
+}
+frame();
+</script>
+</body>
+</html>

@@ -23,6 +23,10 @@ interface Props {
   nodKey?: number;
   /** うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け・2026-06-12)。未指定は 1.0。 */
   nodStrength?: number;
+  /** 増えるたびに1回あくびする(長時間傾聴の情緒ビート・listening-mode・VRMモードのみ)。 */
+  yawnKey?: number;
+  /** 傾聴モード中か(少し首をかしげる・listening-mode・VRMモードのみ)。 */
+  listening?: boolean;
   onClick: () => void;
   // --- VRM(F)。両方揃えば VRM モード、欠ければ PNG フォールバック ---
   vrmConfig?: VrmRenderConfig | null;
@@ -42,7 +46,7 @@ const NOD_MS = 830;
 
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
   function CharacterDisplay(
-    { portraitUrl, animation, state, nodKey, nodStrength = 1, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true, away = false },
+    { portraitUrl, animation, state, nodKey, nodStrength = 1, yawnKey, listening = false, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true, away = false },
     ref,
   ) {
     const imgRef = useRef<HTMLImageElement>(null);
@@ -146,6 +150,17 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
         return () => clearTimeout(id);
       }
     }, [nodKey, nodStrength]);
+
+    // あくび(長時間傾聴・listening-mode): VRM のみ(口開き+目細め+首+口元へ手)。PNG は素材が無いので無視。
+    useEffect(() => {
+      if (!yawnKey) return;
+      rendererRef.current?.playYawn();
+    }, [yawnKey]);
+
+    // 傾聴モードの首かしげ(listening-mode): VRM のみ。入退室で setListening→補間(PNG は素材が無いので無視)。
+    useEffect(() => {
+      rendererRef.current?.setListening(listening);
+    }, [listening, vrmMode]);
 
     // --- 以降は PNG モードの口パク・フレーム解決・alpha 描画(VRM モードでは未使用) ---
     useEffect(() => {

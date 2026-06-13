@@ -67,6 +67,8 @@ export function App(): React.ReactElement | null {
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
   const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
   const [nodStrength, setNodStrength] = useState(1); // うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け)
+  const [yawnKey, setYawnKey] = useState(0); // あくび(増えるたびに1回・長時間傾聴・listening-mode)
+  const [isListening, setIsListening] = useState(false); // 傾聴モード中(少し首をかしげる・listening-mode)
   const [charState, setCharState] = useState<CharacterState>({
     activity: 'idle',
     emotion: 'neutral',
@@ -201,6 +203,16 @@ export function App(): React.ReactElement | null {
       setNodStrength(strength);
       setNodKey((k) => k + 1);
     });
+  }, []);
+
+  // あくび(長時間傾聴の情緒ビート・listening-mode): main が ene:yawn を送ったら1回あくび。
+  useEffect(() => {
+    window.ene.onYawn(() => setYawnKey((k) => k + 1));
+  }, []);
+
+  // 傾聴モードの出入り(listening-mode): 入室で少し首をかしげ、退室で戻す。
+  useEffect(() => {
+    window.ene.onListening((on) => setIsListening(on));
   }, []);
 
   // 思考フィラー(熟考の入り・Phase C): 吹き出しに「考えている」文字列を一時表示。
@@ -668,6 +680,8 @@ export function App(): React.ReactElement | null {
         state={charState}
         nodKey={nodKey}
         nodStrength={nodStrength}
+        yawnKey={yawnKey}
+        listening={isListening}
         onClick={openInput}
         vrmConfig={vrmConfig}
         vrmModel={vrmModel}
