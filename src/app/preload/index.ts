@@ -14,6 +14,7 @@ const eneAPI: EneAPI = {
   getAudioPrefs: () => ipcRenderer.invoke('ene:get-audio-prefs'),
   saveAudioPrefs: (volume, muted) => ipcRenderer.invoke('ene:save-audio-prefs', volume, muted),
   goodbye: () => ipcRenderer.invoke('ene:goodbye'),
+  setAway: (away) => ipcRenderer.send('ene:set-away', away),
   onWindowVisibility: (cb) => {
     // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
     ipcRenderer.removeAllListeners('ene:window-visibility');

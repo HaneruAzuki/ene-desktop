@@ -47,12 +47,13 @@ export function App(): React.ReactElement | null {
   const [bubble, setBubble] = useState<string | null>(null);
   // 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md): キャラにホバー中 / 明示展開中(トレイ等)/
   //   入力欄フォーカス中 / マイク稼働中 のいずれかで表示。離脱で即消す(透明余白には置かない)。
-  const [hovered, setHovered] = useState(false);
+  const [inZone, setInZone] = useState(false); // 操作ゾーン(下部の固定矩形)内にマウスがあるか(案A・段階5 修正)
   const [forceOpen, setForceOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [volume, setVolume] = useState(1); // トリミの声(出力)の音量 0〜1(段階3)
   const [muted, setMuted] = useState(false);
   const [goodbyePop, setGoodbyePop] = useState(false); // 「じゃあね」ポップ表示中(段階4)
+  const [away, setAway] = useState(false); // 離席中(段階5)
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
   const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
   const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
@@ -250,9 +251,51 @@ export function App(): React.ReactElement | null {
     return () => clearTimeout(id);
   }, [charState.activity, charState.pose]);
 
+  // 操作バーの表示/非表示は「バーの実矩形(=ボタンの両端)＋余白」で判定する(キャラ形状に依存しない＝固着しない・
+  //   絶対pxでなくバー基準=ウィンドウ幅やバー幅が変わっても追従・案A/B 段階5 修正)。
+  //   バーが出ている間: その矩形＋余白(上方向は音量ノブのポップを含む)で「畳むか」を決める。
+  //   バー未表示時(通常のアイドル): 持ち上げ用トリガはウィンドウ相対(下部中央)。
+  useEffect(() => {
+    const MARGIN_X = 10; // 左右の許容(バー端＋少し)。これを超えて左右に外れると畳む。
+    const MARGIN_TOP = 130; // 上方向(音量ノブのポップを含む)
+    const MARGIN_BOTTOM = 12;
+    const onMove = (e: MouseEvent): void => {
+      const x = e.clientX;
+      const y = e.clientY;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (x < 0 || x >= w || y < 0 || y >= h) {
+        setInZone(false);
+        return;
+      }
+      const el = overlayRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setInZone(
+          x >= r.left - MARGIN_X &&
+            x < r.right + MARGIN_X &&
+            y >= r.top - MARGIN_TOP &&
+            y < r.bottom + MARGIN_BOTTOM,
+        );
+      } else {
+        // バー未表示=持ち上げ用トリガ(ウィンドウ相対の下部中央)。バー矩形より小さくしてフリップ防止。
+        setInZone(y >= h * 0.68 && Math.abs(x - w / 2) <= w * 0.34);
+      }
+    };
+    const onLeave = (): void => setInZone(false);
+    window.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseleave', onLeave);
+    window.addEventListener('blur', onLeave);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseleave', onLeave);
+      window.removeEventListener('blur', onLeave);
+    };
+  }, []);
+
   // クリックスルー(§8.6): キャラ不透明や各 UI 要素の上なら不透過、それ以外は下の窓へ通す。
   // 当たり判定の配線(rAF 間引き含む)は専用フックへ分離(振る舞い不変)。
-  useClickThrough({ charRef, bubbleRef, overlayRef, vrmPanelRef }, setHovered);
+  useClickThrough({ charRef, bubbleRef, overlayRef, vrmPanelRef });
 
   // 【開発用】数字キー 1〜6 で表情を強制切替し、VRM の表情レンダリングを会話なしで単体確認する。
   // dev ビルドのみ有効(本番では無効・キーマップは neutral/joy/anger/sorrow/surprise/embarrassed)。
@@ -489,7 +532,7 @@ export function App(): React.ReactElement | null {
     persistAudio(v, false);
   }
 
-  /** じゃあね(段階4): ポップを一瞬見せてからトレイにしまう。マイクは念のため切る。 */
+  /** じゃあね(段階4): ポップを一瞬見せてからタスクバーへ最小化。マイクは念のため切る。 */
   function handleGoodbye(): void {
     if (handsFreeOn) stopHandsFree();
     setGoodbyePop(true);
@@ -499,6 +542,22 @@ export function App(): React.ReactElement | null {
     }, GOODBYE_POP_MS);
   }
 
+  /** 離席(段階5): トグル。離席に入る時はマイクを必ず切る。main へ通知して自発発話も止める。 */
+  function handleAway(): void {
+    const next = !away;
+    setAway(next);
+    window.ene.setAway(next);
+    if (next) {
+      // 離席に入る=マイクを確実に切る(ハンズフリー稼働中なら停止・PTT 録音中なら破棄)。
+      if (voiceModeRef.current) stopHandsFree();
+      if (recorderRef.current) {
+        recorderRef.current.cancel();
+        recorderRef.current = null;
+        setRecording(false);
+      }
+    }
+  }
+
   if (!characterInfo) return null;
 
   // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
@@ -506,6 +565,9 @@ export function App(): React.ReactElement | null {
   const micTitle = handsFreeOn
     ? '聞いてるよ(クリックで切る)'
     : 'クリックで聞く / 押している間だけ話す';
+
+  // フルバーを出す条件=下部ゾーン内 or 明示展開 or 入力中(案A・段階5 修正)。離席は常にサインのみ。
+  const showFull = forceOpen || inputFocused || inZone;
 
   return (
     <div className="app">
@@ -527,15 +589,27 @@ export function App(): React.ReactElement | null {
         vrmDisplay={vrmDisplay ?? undefined}
         amplitudeProvider={getVoiceAmplitude}
         visible={visible}
+        away={away}
       />
       {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2/§3)。
           キャラ下部(胸元の不透明部)にホバーで重ねて出す。離脱で即アンマウント(透明余白には置かない
           =手を伸ばす途中で消えない)。入力中/明示展開中は離れても保持する。
           マイクON 中はホバーを外すと、操作バーの代わりに最小の常駐サイン(緑「聞いてるよ」)を残す。
           段階2: マイクは単一ハイブリッド配線。音量/離席/じゃあねは段階3/5/4 で実装。 */}
-      {(hovered || forceOpen || inputFocused || micActive) && (
+      {(showFull || micActive || away) && (
         <div className="control-overlay" ref={overlayRef}>
-          {hovered || forceOpen || inputFocused ? (
+          {away ? (
+            // 離席中はホバーでも操作バーを出さず、戻る用の最小サインのみ(クリックで戻る)。
+            <button
+              className="away-indicator"
+              onClick={handleAway}
+              title="離席中(クリックで戻る)"
+              aria-label="離席を解除"
+            >
+              <span className="mic-indicator__dot">☕</span>
+              <span className="mic-indicator__label">離席中</span>
+            </button>
+          ) : showFull ? (
             <>
               <ControlBar
                 micActive={micActive}
@@ -545,6 +619,8 @@ export function App(): React.ReactElement | null {
                 muted={muted}
                 onToggleMute={handleToggleMute}
                 onVolume={handleVolume}
+                away={away}
+                onAway={handleAway}
                 onSettings={() => setShowVrmPanel((v) => !v)}
                 onGoodbye={handleGoodbye}
               />
@@ -556,7 +632,7 @@ export function App(): React.ReactElement | null {
                 onFocusChange={setInputFocused}
               />
             </>
-          ) : (
+          ) : micActive ? (
             // マイクON だがホバー外: 最小の常駐サイン(クリックで切る)。
             <button
               className="mic-indicator"
@@ -567,7 +643,7 @@ export function App(): React.ReactElement | null {
               <span className="mic-indicator__dot">🎙️</span>
               <span className="mic-indicator__label">聞いてるよ</span>
             </button>
-          )}
+          ) : null}
         </div>
       )}
       {/* 「じゃあね」ポップ(段階4): トレイにしまう前に一瞬見せる演出。 */}

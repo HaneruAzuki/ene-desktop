@@ -46,8 +46,11 @@ export interface EneAPI {
   getAudioPrefs(): Promise<{ volume: number; muted: boolean }>;
   saveAudioPrefs(volume: number, muted: boolean): Promise<void>;
 
-  // じゃあね(UI改修 段階4): ウィンドウをトレイにしまう(＋初回だけ常駐を案内)。完全終了はトレイメニュー。
+  // じゃあね(UI改修 段階4): ウィンドウをタスクバーへ最小化する(クリックで戻る)。完全終了は右クリック。
   goodbye(): Promise<void>;
+
+  // 離席(UI改修 段階5): 離席中フラグを main へ通知(自発発話を止める)。renderer→main 一方向。
+  setAway(away: boolean): void;
   // ウィンドウ可視性の通知(main → renderer)。false=非表示/最小化→描画停止。
   onWindowVisibility(callback: (visible: boolean) => void): void;
 

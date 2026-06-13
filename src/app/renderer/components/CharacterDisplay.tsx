@@ -33,6 +33,8 @@ interface Props {
   amplitudeProvider?: () => number;
   /** ウィンドウ可視性(false=非表示/最小化→VRM 描画停止)。 */
   visible?: boolean;
+  /** 離席中(UI改修 段階5)。VRM は後ろを向く、PNG は暗転(後ろ向き素材が無いため)。 */
+  away?: boolean;
 }
 
 /** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる・PNG モード用)。1.5倍ゆっくりに(2026-06-12)。 */
@@ -40,7 +42,7 @@ const NOD_MS = 830;
 
 export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
   function CharacterDisplay(
-    { portraitUrl, animation, state, nodKey, nodStrength = 1, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true },
+    { portraitUrl, animation, state, nodKey, nodStrength = 1, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true, away = false },
     ref,
   ) {
     const imgRef = useRef<HTMLImageElement>(null);
@@ -118,6 +120,11 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     useEffect(() => {
       rendererRef.current?.setVisible(visible);
     }, [visible, vrmMode]);
+
+    // 離席 → VRM は後ろを向く(段階5)。
+    useEffect(() => {
+      rendererRef.current?.setAway(away);
+    }, [away, vrmMode]);
 
     // ウィンドウのリサイズに追従。
     useEffect(() => {
@@ -229,6 +236,7 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     const classes = ['character'];
     if (state.activity === 'idle') classes.push('character--breathe');
     if (nodding) classes.push('character--nod');
+    if (away) classes.push('character--away'); // PNG は後ろ向き素材が無いので暗転で離席を示す
 
     return (
       <img

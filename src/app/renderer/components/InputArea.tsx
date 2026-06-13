@@ -26,6 +26,10 @@ export const InputArea = forwardRef<HTMLDivElement, Props>(function InputArea(
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
+  // アンマウント時に「フォーカス解除」を必ず親へ伝える(onBlur 未発火のまま消えると
+  // inputFocused が true で固着しバーが畳まれないため・UI改修 段階5 修正)。
+  useEffect(() => () => onFocusChange?.(false), [onFocusChange]);
+
   /** 内容に合わせて高さを伸ばす(上限は CSS の max-height=3行・超過分は内部スクロール)。 */
   function autoGrow(): void {
     const el = inputRef.current;

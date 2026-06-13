@@ -68,6 +68,8 @@ export class VrmRenderer {
   private dragging = false; // ドラッグ中は描画を止めてウィンドウ移動を優先
   private visible = true; // 可視状態(コンテキスト復帰時に可視中だけ描画を再開)
   private lastRenderMs = 0; // 最後に描画した時刻(クリックスルー固着のウォッチドッグ用)
+  private away = false; // 離席中(後ろを向く・UI改修 段階5)
+  private awayRot = 0; // 現在の回頭角(離席のゆっくり回頭・target へ一定速度で近づける)
 
   constructor(opts: VrmRendererOptions) {
     this.canvas = opts.canvas;
@@ -157,6 +159,11 @@ export class VrmRenderer {
   /** 表示パラメータの更新(GUI スライダーから即時反映)。 */
   setDisplay(display: VrmDisplayParams): void {
     this.display = display;
+  }
+
+  /** 離席の切替(UI改修 段階5)。true で後ろを向く(体の向きに 180° 加算)。 */
+  setAway(away: boolean): void {
+    this.away = away;
   }
 
   private applyEmotion(): void {
@@ -264,7 +271,7 @@ export class VrmRenderer {
 
     this.updateCamera();
     if (this.vrm) {
-      this.updatePose();
+      this.updatePose(delta);
       this.updateBlink(delta);
       this.updateNod(delta);
       this.updateLipSync();
@@ -281,7 +288,7 @@ export class VrmRenderer {
     this.camera.lookAt(0, this.headY - 0.12 + pan, 0);
   }
 
-  private updatePose(): void {
+  private updatePose(delta: number): void {
     const vrm = this.vrm;
     if (!vrm) return;
     const now = performance.now();
@@ -292,7 +299,12 @@ export class VrmRenderer {
     const ra = vrm.humanoid?.getNormalizedBoneNode('rightUpperArm');
     if (la) la.rotation.z = armRad;
     if (ra) ra.rotation.z = -armRad;
-    vrm.scene.rotation.y = THREE.MathUtils.degToRad(this.display.yawDeg); // 体の向き
+    // 体の向き＋離席の回頭(瞬時でなく一定速度=180°を約0.7秒でゆっくり向く・UI改修 段階5)。
+    const target = this.away ? Math.PI : 0;
+    const step = (Math.PI / 0.7) * delta;
+    if (this.awayRot < target) this.awayRot = Math.min(target, this.awayRot + step);
+    else if (this.awayRot > target) this.awayRot = Math.max(target, this.awayRot - step);
+    vrm.scene.rotation.y = THREE.MathUtils.degToRad(this.display.yawDeg) + this.awayRot;
   }
 
   private updateBlink(delta: number): void {

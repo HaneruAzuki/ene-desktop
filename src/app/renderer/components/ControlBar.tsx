@@ -25,6 +25,7 @@ interface Props {
   muted: boolean;
   onToggleMute: () => void;
   onVolume: (v: number) => void;
+  away: boolean;
   onAway?: () => void;
   onSettings?: () => void;
   onGoodbye?: () => void;
@@ -38,6 +39,7 @@ export function ControlBar({
   muted,
   onToggleMute,
   onVolume,
+  away,
   onAway,
   onSettings,
   onGoodbye,
@@ -53,7 +55,12 @@ export function ControlBar({
         🎙️
       </button>
       <VolumeControl volume={volume} muted={muted} onToggleMute={onToggleMute} onVolume={onVolume} />
-      <button className="ctl-btn" title="離席(ちょっとまってね)" aria-label="離席" onClick={onAway}>
+      <button
+        className={`ctl-btn${away ? ' ctl-away--on' : ''}`}
+        title={away ? '離席中(クリックで戻る)' : '離席(ちょっとまってね)'}
+        aria-label="離席"
+        onClick={onAway}
+      >
         ☕
       </button>
       <button className="ctl-btn" title="設定" aria-label="設定" onClick={onSettings}>
