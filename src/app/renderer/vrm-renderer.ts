@@ -161,7 +161,7 @@ export class VrmRenderer {
     this.display = display;
   }
 
-  /** 離席の切替(UI改修 段階5)。true で後ろを向く(体の向きに 180° 加算)。 */
+  /** 離席の切替(UI改修 段階5)。true で真後ろ(絶対180°)を向く(近い側へ短く回頭・updatePose 参照)。 */
   setAway(away: boolean): void {
     this.away = away;
   }
@@ -299,12 +299,14 @@ export class VrmRenderer {
     const ra = vrm.humanoid?.getNormalizedBoneNode('rightUpperArm');
     if (la) la.rotation.z = armRad;
     if (ra) ra.rotation.z = -armRad;
-    // 体の向き＋離席の回頭(瞬時でなく一定速度=180°を約0.7秒でゆっくり向く・UI改修 段階5)。
-    const target = this.away ? Math.PI : 0;
+    // 体の向き＋離席の回頭(瞬時でなく一定速度でゆっくり・UI改修 段階5/段階6)。
+    // 離席は「真後ろ(絶対180°)」を向く=現在向き+180ではない。yaw の符号側(=真後ろに近い方)へ短く回る。
+    const base = THREE.MathUtils.degToRad(this.display.yawDeg);
+    const target = this.away ? (base >= 0 ? Math.PI : -Math.PI) - base : 0;
     const step = (Math.PI / 0.7) * delta;
     if (this.awayRot < target) this.awayRot = Math.min(target, this.awayRot + step);
     else if (this.awayRot > target) this.awayRot = Math.max(target, this.awayRot - step);
-    vrm.scene.rotation.y = THREE.MathUtils.degToRad(this.display.yawDeg) + this.awayRot;
+    vrm.scene.rotation.y = base + this.awayRot;
   }
 
   private updateBlink(delta: number): void {
