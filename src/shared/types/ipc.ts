@@ -1,7 +1,7 @@
 import type { ConversationResponse } from './conversation';
 import type { CharacterAnimationData } from './animation';
 import type { TranscribeResult } from './stt';
-import type { VoiceInputMode } from './settings';
+import type { VoiceInputMode, IdleTalkMode } from './settings';
 import type { VrmRenderConfig, VrmDisplayParams } from './vrm';
 
 // IPC 通信の契約(設計書 §4.2)。Renderer 側は window.ene.* で呼ぶ。
@@ -51,6 +51,22 @@ export interface EneAPI {
 
   // 離席(UI改修 段階5): 離席中フラグを main へ通知(自発発話を止める)。renderer→main 一方向。
   setAway(away: boolean): void;
+
+  // --- 設定パネル(UI改修 段階6・⚙) ---
+  getIdleTalk(): Promise<IdleTalkMode>;
+  saveIdleTalk(mode: IdleTalkMode): Promise<void>;
+  openApiKeyDialog(): Promise<void>;
+  showAbout(): Promise<void>;
+  openDataFolder(): Promise<void>;
+  openConsole(): Promise<void>;
+  getAutoLaunch(): Promise<boolean>;
+  setAutoLaunch(on: boolean): Promise<void>;
+
+  // --- 会話ログ(UI改修・VTuber風) ---
+  // 「>>」でウィンドウ幅を伸縮(トリミ部分は固定、右にログ領域を足す)。renderer→main 一方向。
+  setLogExpanded(expanded: boolean, panelWidth: number): void;
+  // ユーザー発話の確定テキスト(ログ表示専用・main→renderer)。ハンズフリー音声(コアレッシング含む)で発火。
+  onUserSaid(callback: (text: string) => void): void;
   // ウィンドウ可視性の通知(main → renderer)。false=非表示/最小化→描画停止。
   onWindowVisibility(callback: (visible: boolean) => void): void;
 

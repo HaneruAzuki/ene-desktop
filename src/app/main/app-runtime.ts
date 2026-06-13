@@ -30,4 +30,6 @@ export interface AppRuntime {
   lastActivityMs?: number;
   /** 開発用:自発発話をゲート無視で今すぐ鳴らす(dev の右クリックメニューから・実機smoke用)。 */
   triggerIdleTalk?: () => void;
+  /** 離席中か(UI改修 段階5・☕ボタン)。true の間は自発発話を止める(誰もいない椅子に話しかけない)。 */
+  away?: boolean;
 }

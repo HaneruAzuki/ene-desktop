@@ -23,10 +23,13 @@ interface ClickThroughRefs {
   bubbleRef: RefObject<HTMLElement>;
   overlayRef: RefObject<HTMLElement>;
   vrmPanelRef: RefObject<HTMLElement>;
+  /** 会話ログのトグル(>>)とログ枠。開いている間/トグル上は不透過に保つ(VTuber風)。 */
+  logToggleRef: RefObject<HTMLElement>;
+  logPanelRef: RefObject<HTMLElement>;
 }
 
 export function useClickThrough(refs: ClickThroughRefs): void {
-  const { charRef, bubbleRef, overlayRef, vrmPanelRef } = refs;
+  const { charRef, bubbleRef, overlayRef, vrmPanelRef, logToggleRef, logPanelRef } = refs;
   const lastIgnoreRef = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -39,7 +42,9 @@ export function useClickThrough(refs: ClickThroughRefs): void {
         (charRef.current?.isOpaqueAt(mx, my) ?? true) ||
         rectContains(overlayRef.current, mx, my) ||
         rectContains(bubbleRef.current, mx, my) ||
-        rectContains(vrmPanelRef.current, mx, my);
+        rectContains(vrmPanelRef.current, mx, my) ||
+        rectContains(logToggleRef.current, mx, my) ||
+        rectContains(logPanelRef.current, mx, my);
       const ignore = !interactive;
       if (lastIgnoreRef.current !== ignore) {
         lastIgnoreRef.current = ignore;
@@ -71,5 +76,5 @@ export function useClickThrough(refs: ClickThroughRefs): void {
       window.removeEventListener('mousemove', onMove);
       if (trailTimer) clearTimeout(trailTimer);
     };
-  }, [charRef, bubbleRef, overlayRef, vrmPanelRef]);
+  }, [charRef, bubbleRef, overlayRef, vrmPanelRef, logToggleRef, logPanelRef]);
 }

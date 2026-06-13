@@ -9,7 +9,8 @@ import {
   VAD_PROVISIONAL_SILENCE_MS,
   GREETING_GENERATION_TIMEOUT_MS,
 } from '../../shared/constants';
-import { replaceLastAssistantText } from '../../memory/short-term';
+import { replaceLastAssistantText, appendShortTerm } from '../../memory/short-term';
+import { nowLocalIso } from '../../shared/datetime';
 import { correctNameMishear } from '../../voice/name-correction';
 import { getSemantic } from '../../memory/semantic';
 import { warmPromptCache } from '../../conversation/client';
@@ -227,6 +228,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     if (!mainWindow.isDestroyed()) mainWindow.minimize();
   });
 
+  // 離席(UI改修 段階5): 離席中フラグを保持(自発発話の停止に使う・idle-talk-manager が参照)。
+  ipcMain.on('ene:set-away', (_event, away: boolean) => {
+    runtime.away = away;
+  });
+
   // ウィンドウの可視性を renderer へ通知(非表示中は VRM 描画を止める=軽量原則 柱4・§3.6)。
   const notifyVisibility = (visible: boolean): void => {
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:window-visibility', visible);
@@ -253,6 +259,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     }
     const greeting = runtime.initialGreeting;
     runtime.initialGreeting = null;
+    // 起動挨拶も assistant 発話として短期記憶へ残す(自発発話 idle-talk と同じ extracted:false の assistant)。
+    //  狙い: ①ユーザーが挨拶へ返したとき、Claude が自分の第一声を文脈で見られる(返事が宙に浮かない)
+    //        ②記憶抽出の対象になり、その日の会話の一部として中期記憶へ繋がる。
+    //  best-effort=書き込み失敗しても挨拶表示は続行(会話・起動に影響させない)。
+    if (greeting) {
+      try {
+        await appendShortTerm({ role: 'assistant', text: greeting, timestamp: nowLocalIso(), extracted: false });
+      } catch (e) {
+        log.warn('greeting short-term append failed', { name: (e as Error).name });
+      }
+    }
     return greeting;
   });
 

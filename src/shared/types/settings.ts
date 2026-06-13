@@ -22,6 +22,8 @@ export interface AppSettings {
   outputVolume?: number;
   /** ミュート状態(UI改修 段階3・既定 false)。 */
   muted?: boolean;
+  /** PC起動時に自動起動(UI改修 段階6・既定 false)。本番は OS のスタートアップ、開発はこの値を表示に使う。 */
+  autoLaunch?: boolean;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -29,4 +31,5 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   idleTalk: 'low',
   outputVolume: 1,
   muted: false,
+  autoLaunch: false,
 };

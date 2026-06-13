@@ -22,6 +22,7 @@ import { openApiKeyDialog } from './api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';
 import { createMainWindow } from './window';
 import { registerIpcHandlers } from './ipc';
+import { registerSettingsIpc } from './settings-ipc';
 import { IdleTalkManager } from './idle-talk-manager';
 import type { AppRuntime } from './app-runtime';
 import { initVoice } from './voice-runtime';
@@ -160,6 +161,7 @@ export async function runStartupSequence(
   const mainWindow = createMainWindow(position);
   await saveWindowPosition(position.x, position.y);
   registerIpcHandlers(mainWindow, runtime);
+  registerSettingsIpc(mainWindow, runtime); // 設定パネル(段階6)の IPC を別モジュールで登録
 
   // 自発発話(P7): アイドル監視を開始(best-effort・既定 low・ENE_IDLE_TALK=0 で無効・v1 はテキストのみ)。
   // 初回 tick は IDLE_TALK_CHECK_INTERVAL_MS 後=起動直後には鳴らない。失敗しても起動に影響しない。

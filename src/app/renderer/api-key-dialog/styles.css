@@ -2,87 +2,97 @@
   box-sizing: border-box;
 }
 
+/* 設定パネルと同じ、明るくニュートラルな配色に統一(華やかにしない・シンプル)。 */
 html,
 body,
 #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #f5f6f8;
-  color: #1a1a1a;
+  background: #f7f8fa;
+  color: #2b2f36;
   font-family: 'Segoe UI', 'Yu Gothic UI', 'Hiragino Sans', sans-serif;
   font-size: 14px;
 }
 
+/* 全体を中央寄せ。 */
 .dialog {
-  padding: 20px 24px;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 30px 28px 24px;
+  text-align: center;
 }
 
 .dialog h1 {
-  font-size: 18px;
-  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.6;
+  margin: 0 0 18px;
+  color: #1c2026;
 }
 
-.dialog p {
-  margin: 6px 0;
-  line-height: 1.5;
+/* 共通ボタン(設定パネルと統一): 既定はニュートラル(白＋細い枠・角丸10px)。色は主ボタンだけ。 */
+.link-button,
+.key-input button,
+.buttons button {
+  padding: 9px 16px;
+  border: 1px solid rgba(20, 24, 31, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #3a3f46;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.12s;
+}
+.link-button:hover,
+.key-input button:hover:not(:disabled),
+.buttons .cancel:hover {
+  background: #eef1f6;
 }
 
 .link-button {
-  margin: 8px 0;
-  padding: 8px 14px;
-  border: 1px solid #4a82c8;
-  border-radius: 6px;
-  background: #fff;
-  color: #2a5da0;
-  cursor: pointer;
-  font-size: 13px;
+  display: inline-block;
+  margin: 2px 0 16px;
 }
 
-.link-button:hover {
-  background: #eef4fc;
-}
-
+/* 手順は左揃えのまま、ブロックごと中央に置く(設定パネルの淡いカードと同系)。 */
 .steps {
-  margin: 8px 0 14px;
-  padding-left: 20px;
-  line-height: 1.7;
-  color: #444;
+  display: inline-block;
+  text-align: left;
+  margin: 0 auto 18px;
+  padding: 14px 18px 14px 38px;
+  background: rgba(20, 24, 31, 0.04);
+  border: 1px solid rgba(20, 24, 31, 0.08);
+  border-radius: 10px;
+  line-height: 1.8;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .key-input {
   display: flex;
   gap: 8px;
-  margin: 10px 0;
+  margin: 0 0 10px;
 }
-
 .key-input input {
   flex: 1;
-  padding: 8px 10px;
-  border: 1px solid #c2c6cc;
-  border-radius: 6px;
+  padding: 9px 12px;
+  border: 1px solid rgba(20, 24, 31, 0.14);
+  border-radius: 10px;
   font-size: 13px;
   font-family: monospace;
+  background: #fff;
 }
-
-.key-input button,
-.buttons button {
-  padding: 8px 14px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.key-input button {
-  background: #4a82c8;
-  color: #fff;
+.key-input input:focus {
+  outline: none;
+  border-color: #4c6ef5;
 }
 
 .key-input button:disabled,
 .buttons button:disabled {
-  background: #c9ccd1;
-  color: #888;
+  background: #eceef2;
+  color: #aeb4bd;
+  border-color: transparent;
   cursor: not-allowed;
 }
 
@@ -90,35 +100,38 @@ body,
   min-height: 20px;
   margin: 8px 0;
   font-size: 13px;
+  color: #6b7280;
 }
-
 .status-success {
-  color: #1f8a4c;
+  color: #2b9d6a;
 }
-
 .status-failed {
-  color: #c0392b;
+  color: #e0607a;
 }
 
 .note {
-  margin: 14px 0;
+  margin: 16px 0 20px;
   font-size: 12px;
-  color: #666;
+  color: #9aa0aa;
+  line-height: 1.7;
 }
 
 .buttons {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
 }
-
 .buttons .cancel {
-  background: #e3e5e8;
-  color: #333;
+  background: #fff;
+  color: #3a3f46;
 }
-
+/* 主ボタンだけアクセント(設定パネルの選択色 #4c6ef5 と統一)。 */
 .buttons .save {
-  background: #2a7d46;
+  background: #4c6ef5;
+  border-color: #4c6ef5;
   color: #fff;
+}
+.buttons .save:hover:not(:disabled) {
+  background: #3f5fe0;
 }

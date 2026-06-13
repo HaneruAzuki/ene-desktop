@@ -1,6 +1,11 @@
 import { getAppSettingsPath } from './paths';
 import { readJson, writeJson } from './json-store';
-import { DEFAULT_APP_SETTINGS, type AppSettings, type VoiceInputMode } from '../types/settings';
+import {
+  DEFAULT_APP_SETTINGS,
+  type AppSettings,
+  type VoiceInputMode,
+  type IdleTalkMode,
+} from '../types/settings';
 import type { VrmDisplayParams } from '../types/vrm';
 
 // アプリ設定の読み書き(task_17 Phase C)。平文JSON(data/config/app-settings.json)。
@@ -26,4 +31,16 @@ export async function saveVrmDisplay(vrmDisplay: Partial<VrmDisplayParams>): Pro
 export async function saveAudioPrefs(outputVolume: number, muted: boolean): Promise<void> {
   const current = await loadAppSettings();
   await writeJson(getAppSettingsPath(), { ...current, outputVolume, muted });
+}
+
+/** 話しかけてくる頻度(自発発話・P7)を保存する(UI改修 段階6・設定パネル)。 */
+export async function saveIdleTalk(idleTalk: IdleTalkMode): Promise<void> {
+  const current = await loadAppSettings();
+  await writeJson(getAppSettingsPath(), { ...current, idleTalk });
+}
+
+/** PC起動時の自動起動の希望値を保存する(UI改修 段階6)。本番は OS と併用、開発は表示用。 */
+export async function saveAutoLaunch(autoLaunch: boolean): Promise<void> {
+  const current = await loadAppSettings();
+  await writeJson(getAppSettingsPath(), { ...current, autoLaunch });
 }

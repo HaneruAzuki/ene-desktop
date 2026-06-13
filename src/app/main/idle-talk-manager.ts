@@ -83,6 +83,7 @@ export class IdleTalkManager {
       const { charContext, apiKey } = this.runtime;
       if (!charContext || !apiKey) return;
       if (this.mainWindow.isDestroyed()) return;
+      if (this.runtime.away) return; // 離席中は自分から話しかけない(UI改修 段階5)
 
       const settings = await loadAppSettings();
       // 設定 off か env で明示無効なら黙る。既定は low(有効)。

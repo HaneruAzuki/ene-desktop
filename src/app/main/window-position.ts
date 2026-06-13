@@ -76,3 +76,26 @@ export function resetToDefaultPosition(window: BrowserWindow): void {
   window.setBounds({ x: pos.x, y: pos.y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
   void saveWindowPosition(pos.x, pos.y);
 }
+
+// 会話ログ(UI改修・VTuber風)の開閉でウィンドウ幅を伸縮する。
+// トリミ部分(WINDOW_WIDTH)は左に固定し、右にログ領域(panelWidth)を足す。
+// 右にはみ出す場合は左へ寄せて画面内に収め、閉じる時は元の左端へ戻す。
+// 幅だけの一時変更で位置(window-position.json)は保存しない=再起動時は通常幅・ログ閉で始まる。
+let logPreExpandX: number | null = null;
+export function setLogExpanded(window: BrowserWindow, expanded: boolean, panelWidth: number): void {
+  if (window.isDestroyed()) return;
+  const b = window.getBounds();
+  const wa = screen.getDisplayMatching(b).workArea;
+  if (expanded) {
+    if (logPreExpandX === null) logPreExpandX = b.x; // 復帰用に元の左端を記憶
+    const width = WINDOW_WIDTH + panelWidth;
+    let x = b.x;
+    if (x + width > wa.x + wa.width) x = wa.x + wa.width - width; // 右にはみ出す→左へ寄せる
+    if (x < wa.x) x = wa.x;
+    window.setBounds({ x, y: b.y, width, height: b.height });
+  } else {
+    const x = logPreExpandX ?? b.x;
+    logPreExpandX = null;
+    window.setBounds({ x, y: b.y, width: WINDOW_WIDTH, height: b.height });
+  }
+}

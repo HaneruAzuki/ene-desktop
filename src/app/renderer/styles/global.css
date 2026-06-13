@@ -23,6 +23,106 @@ body,
   height: 100%;
 }
 
+/* 会話ログ展開時もトリミを隠さない左固定ステージ(幅=キャラ部分のウィンドウ幅 260px=WINDOW_WIDTH)。
+   通常時はウィンドウ全体と同じ幅。展開時はウィンドウだけ右に伸び、ステージ(=トリミと操作UI)は左に残る。 */
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 100%;
+}
+
+/* 会話ログの開閉トグル(»/«)。ステージ右端の中央に常駐。透明で控えめ、ホバーで濃く(VTuber風)。 */
+.log-toggle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 48px;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  background: rgba(28, 32, 39, 0.18);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 50;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.log-toggle:hover {
+  background: rgba(28, 32, 39, 0.55);
+  color: #fff;
+}
+
+/* 会話ログ(VTuber風・ウィンドウ右拡張領域)。トリミの右に最新のやりとりを並べる。 */
+.log-panel {
+  position: absolute;
+  left: 260px; /* = WINDOW_WIDTH。ステージの右隣〜画面端 */
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(249, 250, 252, 0.95);
+  border-left: 1px solid rgba(20, 24, 31, 0.12);
+  backdrop-filter: blur(12px);
+  box-shadow: -8px 0 24px rgba(17, 22, 31, 0.18);
+}
+.log-panel__head {
+  flex: none;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c2026;
+  border-bottom: 1px solid rgba(20, 24, 31, 0.08);
+}
+.log-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.log-empty {
+  color: #9aa0aa;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 20px;
+}
+.log-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.log-msg--user {
+  align-items: flex-end;
+}
+.log-msg--torimi {
+  align-items: flex-start;
+}
+.log-msg__who {
+  font-size: 10px;
+  color: #8a909a;
+}
+.log-msg__text {
+  color: #2b2f36;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: #eef1f6;
+}
+.log-msg--user .log-msg__text {
+  background: #e3ecff;
+}
+
 /* キャラ画像(全身立ち絵)。上=吹き出し余白(100px)/下=入力欄余白(52px)を空け、中央帯に配置。
    周囲・余白の透明部分はクリックスルー対象(isOpaqueAt が現フレーム alpha で判定)。 */
 .character {
@@ -342,48 +442,150 @@ body,
   animation: none;
 }
 
-/* VRM 表示調整パネル(スライダー・開いている間だけ表示)。 */
-.vrm-panel {
+/* 統合設定パネル(段階6・⚙)。明るくニュートラルな配色で、透過浮遊の上に乗せる(段階6 見た目調整)。 */
+.settings-panel {
   position: absolute;
   left: 6px;
   right: 6px;
   bottom: 64px;
-  background: rgba(11, 12, 16, 0.86);
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 6px 8px;
-  color: #dde;
-  font-size: 11px;
+  background: rgba(249, 250, 252, 0.97);
+  border: 1px solid rgba(20, 24, 31, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #2b2f36;
+  font-size: 12px;
   z-index: 40;
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(17, 22, 31, 0.22);
+  backdrop-filter: blur(12px);
 }
-.vrm-panel__head {
+.settings-panel__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1c2026;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(20, 24, 31, 0.08);
 }
-.vrm-panel__close {
+.settings-panel__close {
   background: none;
   border: none;
-  color: #dde;
-  font-size: 14px;
+  color: #9aa0aa;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
+  padding: 0 2px;
 }
-.vrm-panel__row {
+.settings-panel__close:hover {
+  color: #4a4f57;
+}
+.settings-panel__section {
+  margin: 10px 0;
+}
+.settings-panel__label {
+  color: #6b7280;
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+/* 頻度のセグメント(しない/控えめ/ふつう)。 */
+.settings-seg {
+  display: flex;
+  gap: 5px;
+}
+.settings-seg__btn {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid rgba(20, 24, 31, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #3a3f46;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.settings-seg__btn:hover {
+  background: #eef1f6;
+}
+.settings-seg__btn--on {
+  background: #4c6ef5;
+  border-color: #4c6ef5;
+  color: #fff;
+}
+/* オン/オフのトグル行(PC起動時に自動起動 など)。 */
+.settings-toggle-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 3px 0;
+  justify-content: space-between;
 }
-.vrm-panel__label {
-  width: 40px;
-  color: #9ab;
+.settings-toggle-row .settings-panel__label {
+  margin-bottom: 0;
+  color: #3a3f46;
+  font-size: 12px;
 }
-.vrm-panel__row input[type='range'] {
+.settings-toggle {
+  padding: 5px 16px;
+  border: 1px solid rgba(20, 24, 31, 0.14);
+  border-radius: 14px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-toggle--on {
+  background: #4c6ef5;
+  border-color: #4c6ef5;
+  color: #fff;
+}
+/* 共通アクションボタン(見た目の調整・記憶フォルダ・APIキー・このアプリ)。全幅で揃える。 */
+.settings-action {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(20, 24, 31, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #3a3f46;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.settings-action:hover {
+  background: #eef1f6;
+}
+/* 見た目の調整: ボタンにホバーで詳細スライダーを出す(段階6・数値は出さない)。 */
+.settings-vrm {
+  margin: 10px 0;
+}
+.settings-vrm__popup {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(20, 24, 31, 0.04);
+  border: 1px solid rgba(20, 24, 31, 0.08);
+  border-radius: 8px;
+}
+/* 見た目調整(VRM スライダー)。 */
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.settings-row__label {
+  width: 44px;
+  color: #6b7280;
+}
+.settings-row input[type='range'] {
   flex: 1;
+  accent-color: #4c6ef5;
 }
-.vrm-panel__value {
-  width: 34px;
-  text-align: right;
-  color: #9ab;
+/* アクション群(縦並び)。 */
+.settings-panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

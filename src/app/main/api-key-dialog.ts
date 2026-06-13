@@ -75,7 +75,7 @@ export async function openApiKeyDialog(
       resizable: false,
       minimizable: false,
       maximizable: false,
-      title: 'ENE — APIキーの設定',
+      title: 'APIキーの設定',
       webPreferences: {
         preload: join(__dirname, '../preload/api-key-dialog.js'),
         contextIsolation: true,

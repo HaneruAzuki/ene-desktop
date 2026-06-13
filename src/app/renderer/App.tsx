@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CharacterDisplay, type CharacterDisplayHandle } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea } from './components/InputArea';
-import { VrmSettingsPanel } from './components/VrmSettingsPanel';
+import { SettingsPanel } from './components/SettingsPanel';
+import { ConversationLog, type LogEntry } from './components/ConversationLog';
 import { ControlBar } from './components/ControlBar';
 import { playClick } from './sound';
 import {
@@ -18,12 +19,20 @@ import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { useClickThrough } from './use-click-through';
-import { SOFA_AFTER_IDLE_MS, MOUTH_FLAP_MS, TALKING_MIN_MS, TALKING_MAX_MS } from './constants';
+import {
+  SOFA_AFTER_IDLE_MS,
+  MOUTH_FLAP_MS,
+  TALKING_MIN_MS,
+  TALKING_MAX_MS,
+  LOG_PANEL_WIDTH,
+  LOG_MAX_ENTRIES,
+} from './constants';
 import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { CharacterState } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
+import type { IdleTalkMode } from '../../shared/types/settings';
 
 // トップコンポーネント(設計書 §8 / task_13 / UI改修 2026-06)。
 // キャラ表示・吹き出し・ホバーで現れる操作バー(マイク/音量/離席/設定/じゃあね)＋入力ピルを束ねる。
@@ -68,12 +77,18 @@ export function App(): React.ReactElement | null {
   const [vrmModel, setVrmModel] = useState<ArrayBuffer | null>(null);
   const [vrmDisplay, setVrmDisplay] = useState<VrmDisplayParams | null>(null);
   const [visible, setVisible] = useState(true); // ウィンドウ可視性(非表示で VRM 描画停止)
-  const [showVrmPanel, setShowVrmPanel] = useState(false); // 表示調整パネル
+  const [showSettings, setShowSettings] = useState(false); // 統合設定パネル(段階6)
+  const [idleTalk, setIdleTalk] = useState<IdleTalkMode>('low'); // 話しかけてくる頻度(段階6)
+  const [autoLaunch, setAutoLaunch] = useState(false); // PC起動時に自動起動(段階6)
+  const [logOpen, setLogOpen] = useState(false); // 会話ログ(ウィンドウ横拡張・VTuber風)
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]); // 直近のやりとり(セッション内のみ)
 
   const charRef = useRef<CharacterDisplayHandle>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const vrmPanelRef = useRef<HTMLDivElement>(null);
+  const logToggleRef = useRef<HTMLButtonElement>(null);
+  const logPanelRef = useRef<HTMLDivElement>(null);
   const warmedRef = useRef(false); // 入力フォーカス時のキャッシュウォームを一度だけ発火
   const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,6 +139,21 @@ export function App(): React.ReactElement | null {
       audioSetVolume(v);
       audioSetMuted(m);
     });
+  }, []);
+
+  // 話しかけてくる頻度を読み込み(段階6・設定パネルの初期表示用)。
+  useEffect(() => {
+    void window.ene.getIdleTalk().then(setIdleTalk);
+  }, []);
+
+  // 自動起動の状態を読み込み(段階6・設定パネルの初期表示用)。
+  useEffect(() => {
+    void window.ene.getAutoLaunch().then(setAutoLaunch);
+  }, []);
+
+  // ユーザー発話(ハンズフリー音声・コアレッシング含む)を会話ログへ(表示専用イベント)。
+  useEffect(() => {
+    window.ene.onUserSaid((text) => pushLog('user', text));
   }, []);
 
   // ウィンドウ可視性 → VRM 描画の停止/再開(§3.6・軽量原則 柱4)。
@@ -237,12 +267,32 @@ export function App(): React.ReactElement | null {
     const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         setForceOpen(false);
+        setShowSettings(false);
         dismissBubble();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // 設定パネルはパネル外クリック(入力欄・キャラ含む)/ウィンドウブラーで閉じる(段階6・×だけに頼らない)。
+  useEffect(() => {
+    if (!showSettings) return;
+    const onDown = (e: MouseEvent): void => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (vrmPanelRef.current?.contains(t)) return; // パネル内 → 保持
+      if (t.closest('.control-row')) return; // 操作バーのボタン(⚙トグル含む)はそのボタン側に委ねる
+      setShowSettings(false);
+    };
+    const onBlur = (): void => setShowSettings(false);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [showSettings]);
 
   // 長時間 idle で寝そべり(F-ANIM-03)。
   useEffect(() => {
@@ -295,7 +345,7 @@ export function App(): React.ReactElement | null {
 
   // クリックスルー(§8.6): キャラ不透明や各 UI 要素の上なら不透過、それ以外は下の窓へ通す。
   // 当たり判定の配線(rAF 間引き含む)は専用フックへ分離(振る舞い不変)。
-  useClickThrough({ charRef, bubbleRef, overlayRef, vrmPanelRef });
+  useClickThrough({ charRef, bubbleRef, overlayRef, vrmPanelRef, logToggleRef, logPanelRef });
 
   // 【開発用】数字キー 1〜6 で表情を強制切替し、VRM の表情レンダリングを会話なしで単体確認する。
   // dev ビルドのみ有効(本番では無効・キーマップは neutral/joy/anger/sorrow/surprise/embarrassed)。
@@ -334,7 +384,10 @@ export function App(): React.ReactElement | null {
   /** 起動挨拶を1回取得して吹き出しに出す(pull・取得後 main 側でクリア)。 */
   async function showGreeting(): Promise<void> {
     const greeting = await window.ene.getInitialGreeting();
-    if (greeting) setBubble(greeting);
+    if (greeting) {
+      setBubble(greeting);
+      pushLog('torimi', greeting); // 起動挨拶も会話ログへ(他の発話経路と揃える=ログが空のまま残らない)
+    }
   }
 
   /** 起動準備が整った時の処理(pull/push どちらから来ても冪等)。 */
@@ -370,6 +423,7 @@ export function App(): React.ReactElement | null {
    */
   function applyResponseUI(response: ConversationResponse, setBubbleToo = true): void {
     interactedRef.current = true;
+    pushLog('torimi', response.message);
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
@@ -387,6 +441,7 @@ export function App(): React.ReactElement | null {
   async function handleSubmit(text: string): Promise<void> {
     playClick();
     setForceOpen(false);
+    pushLog('user', text);
     await respond(text);
   }
 
@@ -451,8 +506,10 @@ export function App(): React.ReactElement | null {
       if (samples.length < STT_SAMPLE_RATE * MIN_RECORDING_SEC) return; // 短すぎ=無視
       setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' })); // 認識中は「…」
       const result = await window.ene.transcribeAudio(samples);
-      if (result.ok) await respond(result.text);
-      else {
+      if (result.ok) {
+        pushLog('user', result.text);
+        await respond(result.text);
+      } else {
         setBubble(result.message);
         setCharState((s) => (s.activity === 'thinking' ? { ...s, activity: 'idle' } : s));
       }
@@ -507,6 +564,32 @@ export function App(): React.ReactElement | null {
     setVrmDisplay(d);
     if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
     vrmSaveTimerRef.current = setTimeout(() => void window.ene.setVrmDisplay(d), 400);
+  }
+
+  /** 話しかけてくる頻度の変更(段階6)。即時反映＋保存。 */
+  function handleIdleTalkChange(mode: IdleTalkMode): void {
+    setIdleTalk(mode);
+    void window.ene.saveIdleTalk(mode);
+  }
+
+  /** 自動起動の切替(段階6)。即時反映＋保存(本番は OS のスタートアップにも反映)。 */
+  function handleAutoLaunchChange(on: boolean): void {
+    setAutoLaunch(on);
+    void window.ene.setAutoLaunch(on);
+  }
+
+  /** 会話ログへ1件追記(直近 LOG_MAX_ENTRIES 件だけ保持・セッション内のみ)。 */
+  function pushLog(role: 'user' | 'torimi', text: string): void {
+    const t = text.trim();
+    if (!t) return;
+    setLogEntries((prev) => [...prev, { role, text: t }].slice(-LOG_MAX_ENTRIES));
+  }
+
+  /** 会話ログの開閉(ウィンドウ横拡張・VTuber風)。main にウィンドウ幅の伸縮を依頼。 */
+  function toggleLog(): void {
+    const next = !logOpen;
+    setLogOpen(next);
+    window.ene.setLogExpanded(next, LOG_PANEL_WIDTH);
   }
 
   /** 音量・ミュートの保存(デバウンス・段階3)。 */
@@ -570,7 +653,9 @@ export function App(): React.ReactElement | null {
   const showFull = forceOpen || inputFocused || inZone;
 
   return (
-    <div className="app">
+    <div className={`app${logOpen ? ' app--log-open' : ''}`}>
+      {/* トリミ本体＋彼女のUIは常に左260pxの「ステージ」に閉じ込める(会話ログ展開時も隠さない・VTuber風)。 */}
+      <div className="stage">
       {/* 考える間(thinking)の演出。専用スプライトが無いので「…」で示す(F-ANIM-04)。 */}
       {charState.activity === 'thinking' && <div className="bubble bubble--thinking">…</div>}
       {bubble !== null && (
@@ -621,7 +706,7 @@ export function App(): React.ReactElement | null {
                 onVolume={handleVolume}
                 away={away}
                 onAway={handleAway}
-                onSettings={() => setShowVrmPanel((v) => !v)}
+                onSettings={() => setShowSettings((v) => !v)}
                 onGoodbye={handleGoodbye}
               />
               <InputArea
@@ -648,15 +733,37 @@ export function App(): React.ReactElement | null {
       )}
       {/* 「じゃあね」ポップ(段階4): トレイにしまう前に一瞬見せる演出。 */}
       {goodbyePop && <div className="goodbye-pop">＼じゃあね／</div>}
-      {/* VRM 表示調整パネル(段階1: 操作バーの設定ボタンから開閉。段階6 で統合設定パネルへ置換)。 */}
-      {showVrmPanel && vrmConfig && vrmDisplay && (
-        <VrmSettingsPanel
+      {/* 統合設定パネル(段階6・⚙)。話しかけ頻度＋見た目(VRM)＋APIキー/クレジット。
+          パネル外クリックで閉じる(上の useEffect)。ref はクリックスルー判定用(開いている間インタラクティブに保つ)。 */}
+      {showSettings && (
+        <SettingsPanel
           ref={vrmPanelRef}
-          display={vrmDisplay}
-          onChange={handleVrmDisplayChange}
-          onClose={() => setShowVrmPanel(false)}
+          idleTalk={idleTalk}
+          onIdleTalkChange={handleIdleTalkChange}
+          autoLaunch={autoLaunch}
+          onAutoLaunchChange={handleAutoLaunchChange}
+          vrmDisplay={vrmConfig && vrmDisplay ? vrmDisplay : undefined}
+          onVrmChange={handleVrmDisplayChange}
+          onApiKey={() => void window.ene.openApiKeyDialog()}
+          onAbout={() => void window.ene.showAbout()}
+          onOpenDataFolder={() => void window.ene.openDataFolder()}
+          onConsole={() => void window.ene.openConsole()}
+          onClose={() => setShowSettings(false)}
         />
       )}
+      {/* 会話ログのトグル(»/«)。ステージ右端の中央に常駐(透明・ホバーで濃く)。 */}
+      <button
+        className="log-toggle"
+        ref={logToggleRef}
+        onClick={toggleLog}
+        title={logOpen ? '会話ログを閉じる' : '会話ログを開く'}
+        aria-label="会話ログ"
+      >
+        {logOpen ? '«' : '»'}
+      </button>
+      </div>
+      {/* 会話ログ(VTuber風・ウィンドウを右に広げた時のみ表示)。 */}
+      {logOpen && <ConversationLog ref={logPanelRef} entries={logEntries} />}
     </div>
   );
 }

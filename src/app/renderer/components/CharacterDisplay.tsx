@@ -216,8 +216,9 @@ export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
     );
 
     function onContextMenu(e: React.MouseEvent): void {
+      // 右クリックメニューは廃止(2026-06 ユーザー方針)。既定メニューだけ抑止する
+      // (完全終了はタスクバーのアイコン右クリック、各設定は⚙の設定パネルへ集約)。
       e.preventDefault();
-      void window.ene.showCharacterContextMenu();
     }
 
     // VRM モード: WebGL キャンバス(背景透過・浮遊)。

@@ -15,6 +15,20 @@ const eneAPI: EneAPI = {
   saveAudioPrefs: (volume, muted) => ipcRenderer.invoke('ene:save-audio-prefs', volume, muted),
   goodbye: () => ipcRenderer.invoke('ene:goodbye'),
   setAway: (away) => ipcRenderer.send('ene:set-away', away),
+  getIdleTalk: () => ipcRenderer.invoke('ene:get-idle-talk'),
+  saveIdleTalk: (mode) => ipcRenderer.invoke('ene:save-idle-talk', mode),
+  openApiKeyDialog: () => ipcRenderer.invoke('ene:open-api-key-dialog'),
+  showAbout: () => ipcRenderer.invoke('ene:show-about'),
+  openDataFolder: () => ipcRenderer.invoke('ene:open-data-folder'),
+  openConsole: () => ipcRenderer.invoke('ene:open-console'),
+  getAutoLaunch: () => ipcRenderer.invoke('ene:get-auto-launch'),
+  setAutoLaunch: (on) => ipcRenderer.invoke('ene:set-auto-launch', on),
+  setLogExpanded: (expanded, panelWidth) =>
+    ipcRenderer.send('ene:set-log-expanded', expanded, panelWidth),
+  onUserSaid: (cb) => {
+    ipcRenderer.removeAllListeners('ene:user-said');
+    ipcRenderer.on('ene:user-said', (_event, text: string) => cb(text));
+  },
   onWindowVisibility: (cb) => {
     // 二重登録防止(StrictMode 対策)=常に単一リスナーへ張り替える。
     ipcRenderer.removeAllListeners('ene:window-visibility');

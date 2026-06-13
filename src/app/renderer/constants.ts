@@ -4,6 +4,10 @@
 export const DRAG_THRESHOLD_PX = 5; // この距離以上でドラッグ判定
 export const CLICK_MAX_DURATION_MS = 500; // この時間未満でクリック判定
 
+// 会話ログ(UI改修・VTuber風サイドパネル)
+export const LOG_PANEL_WIDTH = 300; // 「>>」で右に広げるログ領域の幅(px)。トリミ部分(260)はそのまま左に残す
+export const LOG_MAX_ENTRIES = 20; // ログに保持する直近のやりとり件数(=最新10往復ぶん・メモリのみ)
+
 // 応答吹き出し(§8.5)
 export const BUBBLE_AUTO_DISMISS_MS = 30_000; // 30秒で自動消滅
 export const BUBBLE_MAX_WIDTH_PX = 240;
