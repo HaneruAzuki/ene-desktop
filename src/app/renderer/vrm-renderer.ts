@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
+import {
+  VRMLoaderPlugin,
+  VRMUtils,
+  VRMLookAtBoneApplier,
+  VRMLookAtExpressionApplier,
+  type VRM,
+} from '@pixiv/three-vrm';
 import type { EmotionLabel } from '../../shared/types/animation';
 import type { VrmDisplayParams, VrmExpressionMap } from '../../shared/types/vrm';
 import { resolveExpressionWeights } from './vrm/expression-resolver';
@@ -48,6 +54,17 @@ const FPS_IDLE = 15;
  */
 const MAX_FRAME_DELTA = 0.1;
 const MAX_PHYSICS_DELTA = 1 / 30;
+
+/**
+ * 目線(lookAt)の可動域クランプ＝白目防止(2026-06-14)。
+ * 体が後ろを向く(離席/アイドル)間も瞳はカメラ(常に正面中央)を追うため、振り向き中に頭が大きく傾いた
+ * 瞬間に眼球が回りすぎて白目になる。three-vrm の rangeMap.outputScale(眼球の最大回転=ボーン式は度/
+ * 表情式はウェイト)を上限で抑え、「白目にならない範囲で」カメラを追わせる(map は outputScale で飽和する
+ * ので、頭が真後ろでも眼球はこの上限を超えない)。正面時は瞳ほぼ中央なので追従の損失は小さい。
+ * いずれも実機で要調整: 白目が残るなら下げる / 3/4 ビューで目が合わないなら上げる(白目の手前まで)。
+ */
+const GAZE_MAX_BONE_DEG = 14; // ボーン式の眼球最大回転角(度)
+const GAZE_MAX_EXPR_WEIGHT = 0.6; // 表情式の目線ウェイト上限(1.0=白目になりやすい)
 
 /**
  * 準備中(起動ウォーム中)の「大きな後ろ向きの頭が下から覗く」姿勢(2026-06-14)。ready で 0 へ戻り起き上がる。
@@ -178,6 +195,7 @@ export class VrmRenderer {
     this.scene.add(vrm.scene);
     this.vrm = vrm;
     if (vrm.lookAt) vrm.lookAt.target = this.camera; // 目線は常にこちら(正面固定)
+    this.clampGazeRange(); // 眼球の可動域を白目にならない上限へ(振り向き中の白目防止)
 
     const head = vrm.humanoid?.getNormalizedBoneNode('head');
     if (head) {
@@ -187,6 +205,29 @@ export class VrmRenderer {
     }
     this.applyEmotion();
     this.springResetPending = true; // 初回ポーズ確定後に SpringBone を rest 化(初期の毛跳ね防止)
+  }
+
+  /**
+   * 目線の可動域を「白目にならない上限」でクランプする(白目防止・2026-06-14)。
+   * rangeMap.outputScale(眼球の最大回転=ボーン式は度/表情式はウェイト)を上限で抑える。各軸を独立に
+   * min するので、上限内ではカメラ方向への追従(向き)は保たれ、上限を超える分(振り向きの極端な角度)だけが
+   * 抑えられる。lookAt を持たないモデルや想定外の applier 型では何もしない(描画を止めない)。
+   */
+  private clampGazeRange(): void {
+    const applier = this.vrm?.lookAt?.applier;
+    if (!applier) return;
+    let cap: number;
+    if (applier instanceof VRMLookAtBoneApplier) cap = GAZE_MAX_BONE_DEG;
+    else if (applier instanceof VRMLookAtExpressionApplier) cap = GAZE_MAX_EXPR_WEIGHT;
+    else return;
+    for (const m of [
+      applier.rangeMapHorizontalInner,
+      applier.rangeMapHorizontalOuter,
+      applier.rangeMapVerticalDown,
+      applier.rangeMapVerticalUp,
+    ]) {
+      if (m) m.outputScale = Math.min(m.outputScale, cap);
+    }
   }
 
   /** 会話の感情を反映(JSON マップ経由・ハードコードしない)。 */
