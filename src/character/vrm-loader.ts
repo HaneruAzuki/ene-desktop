@@ -11,13 +11,14 @@ import {
 } from '../shared/types/vrm';
 
 // VRM 表示設定のロード(F・3D化)。
-// vrm.json が無い/不正・モデルファイルが読めない場合は null を返し、
-// 呼び出し側は既存の PNG 立ち絵経路へフォールバックする(§3.7・後方互換)。
+// vrm.json が無い/不正・モデルファイルが読めない場合は null を返す(VRM 無効)。
+// 立ち絵フォールバックは 2026-06 に廃止=表示は VRM 一本(VRM を出せない時は一言メッセージのみ)。
 
 /** 数値フィールドを既定値で補完しつつ正規化する(不正値=既定)。 */
 function normalizeDisplay(raw: unknown): VrmDisplayParams {
   const d = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
-  const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  const num = (v: unknown, fallback: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? v : fallback;
   return {
     height: num(d.height, DEFAULT_VRM_DISPLAY.height),
     distance: num(d.distance, DEFAULT_VRM_DISPLAY.distance),
@@ -67,9 +68,12 @@ export async function loadVrmConfig(characterId: string): Promise<VrmConfig | nu
 
 /**
  * VRM モデル本体(.vrm)のバイト列を読む。10MB 規模を base64 化せず、IPC で ArrayBuffer を渡す(§3.8)。
- * 読めなければ null(=PNG フォールバック)。
+ * 読めなければ null(VRM 無効=表示できない。立ち絵フォールバックは廃止)。
  */
-export async function loadVrmModelBytes(characterId: string, modelFile: string): Promise<ArrayBuffer | null> {
+export async function loadVrmModelBytes(
+  characterId: string,
+  modelFile: string,
+): Promise<ArrayBuffer | null> {
   try {
     const buf = await fs.readFile(getCharacterAssetPath(characterId, modelFile));
     // Buffer の backing ArrayBuffer の該当範囲だけを切り出して返す(プール共有を避ける)。

@@ -28,6 +28,11 @@ export function createMainWindow(position?: Position): BrowserWindow {
     },
   });
 
+  // クリックスルーの起点: 既定で全透過(下の窓へマウスを通す)＋ forward:true(無視中も mousemove は届くので
+  //   ヒットボックスへの出入りを検知できる=「無視で固まって復帰しない」自己ロックが構造的に起きない)。
+  //   以後はレンダラ(use-interaction-routing)がカーソル位置に応じて false/true を切り替える。
+  win.setIgnoreMouseEvents(true, { forward: true });
+
   // マイク権限(getUserMedia)のみ許可する(task_17 Phase B・音声入力)。
   // 対象はローカルの自アプリのみ。録音音声はローカル STT(main)にしか使わない(§4.2/§7.1)。
   // media 以外の権限(通知・位置情報等)は一切使わないため拒否する(最小権限)。

@@ -31,7 +31,6 @@ export async function buildCharacterContext(): Promise<CharacterContext> {
     background: profile.background,
     knowledgeDomains: profile.knowledgeDomains,
     fewshot: profile.fewshot,
-    portraitPath: profile.portraitPath,
     systemPrompt,
     birthdayHint,
     currentState: profile.currentState,

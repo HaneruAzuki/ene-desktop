@@ -75,8 +75,9 @@ export type ExtraValue = string | string[] | number | boolean;
 export interface SemanticMemory {
   // コアフィールド(スキーマ検証対象)
   version: number; // スキーマバージョン(MVPは 1)
-  userName?: string;
-  userNameReading?: string; // 名前の読み(かな)。呼びかけTTS用(ルビ機構で発声)・STT誤認の照合用(P5)
+  userName?: string; // 呼び方(トリミが相手を呼ぶ名前)。設定で登録/変更・会話/抽出では不変(lockOwnerName)
+  userNameReading?: string; // 呼び方の読み(かな)。呼びかけTTS用(ルビ機構で発声)・STT誤認の照合用(P5)
+  userFullName?: string; // 本名(フルネーム)。会話で出たら覚える完全パッシブ(設定UIには出さない)。identity 属性・忘却外
   userBirthday?: UserBirthday; // 相手の誕生日(構造化スロット・祝う/矛盾指摘に使う・P5)
   preferences?: Record<string, string>;
   longTermGoals?: string[];

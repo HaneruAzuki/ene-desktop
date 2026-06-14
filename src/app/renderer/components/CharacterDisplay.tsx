@@ -1,34 +1,27 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { resolveFrame } from '../resolve-frame';
-import { MOUTH_FLAP_MS } from '../constants';
+import React, { useEffect, useRef, useState } from 'react';
 import { VrmRenderer } from '../vrm-renderer';
 import { useWindowDrag } from '../use-window-drag';
-import type { CharacterAnimationData, CharacterState } from '../../../shared/types/animation';
+import type { CharacterState } from '../../../shared/types/animation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../../shared/types/vrm';
 
-// キャラ表示 + マウス操作判別 + 当たり判定(設計書 §8.2 / §8.6 / task_13 / F・3D化)。
-// VRM 設定とモデルが揃えば VRM(three-vrm)で描画し、欠ければ PNG 立ち絵へフォールバック(§3.7)。
-// クリックスルー判定(isOpaqueAt)は VRM=レイキャスト / PNG=現フレーム alpha で切り替える。
-
-export interface CharacterDisplayHandle {
-  /** 表示座標(clientX/Y)がキャラ上(不透明/メッシュ)かを返す(クリックスルー・§8.6)。 */
-  isOpaqueAt(clientX: number, clientY: number): boolean;
-}
+// キャラ表示(VRM・three-vrm)＋ マウス操作判別(設計書 §8.2 / task_13 / F・3D化)。
+// 表示は VRM 一本。2026-06 に PNG 立ち絵フォールバックを撤去した(あらゆる挙動を VRM/PNG で二重実装する
+//   負担を排除し、複雑さを下げるため)。WebGL 初期化不可・モデル読込失敗など VRM を出せない稀な場合は、
+//   代替表示は持たず、トリミ口調の短いメッセージだけ出す。
+// クリックスルー判定は専用ヒットボックス(.character-hitbox)で行う(イベント駆動・use-interaction-routing.ts)。
 
 interface Props {
-  portraitUrl: string; // フォールバック(VRM/アニメ無し時)
-  animation?: CharacterAnimationData;
   state: CharacterState;
   /** 増えるたびに1回うなずく(相槌の非言語表現・task_18 Phase B)。 */
   nodKey?: number;
   /** うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け・2026-06-12)。未指定は 1.0。 */
   nodStrength?: number;
-  /** 増えるたびに1回あくびする(長時間傾聴の情緒ビート・listening-mode・VRMモードのみ)。 */
+  /** 増えるたびに1回あくびする(長時間傾聴の情緒ビート・listening-mode)。 */
   yawnKey?: number;
-  /** 傾聴モード中か(少し首をかしげる・listening-mode・VRMモードのみ)。 */
+  /** 傾聴モード中か(少し首をかしげる・listening-mode)。 */
   listening?: boolean;
   onClick: () => void;
-  // --- VRM(F)。両方揃えば VRM モード、欠ければ PNG フォールバック ---
+  // --- VRM(F)。設定とモデルが揃えば描画。揃わない/失敗時は短いメッセージのみ ---
   vrmConfig?: VrmRenderConfig | null;
   vrmModel?: ArrayBuffer | null;
   /** 表示パラメータ(GUI スライダーの実効値)。未指定なら vrmConfig.display を使う。 */
@@ -37,250 +30,169 @@ interface Props {
   amplitudeProvider?: () => number;
   /** ウィンドウ可視性(false=非表示/最小化→VRM 描画停止)。 */
   visible?: boolean;
-  /** 離席中(UI改修 段階5)。VRM は後ろを向く、PNG は暗転(後ろ向き素材が無いため)。 */
+  /** 離席中(UI改修 段階5)。VRM は後ろを向く。 */
   away?: boolean;
-  /** 準備中(起動ウォーム中・2026-06-14)。頭だけ下から覗く姿勢(VRM=カメラ / PNG=translateY)。 */
+  /** 準備中(起動ウォーム中・2026-06-14)。頭だけ下から覗く姿勢(VRM=カメラ)。 */
   preparing?: boolean;
+  /** クリックスルー判定(シルエット)を外へ公開する ref。レンダラの isOpaqueAt を差し込む(use-interaction-routing が参照)。 */
+  hitTestRef?: React.MutableRefObject<((x: number, y: number) => boolean) | null>;
 }
 
-/** うなずきアニメの長さ(ms・CSS の ene-nod と合わせる・PNG モード用)。1.5倍ゆっくりに(2026-06-12)。 */
-const NOD_MS = 830;
+export function CharacterDisplay({
+  state,
+  nodKey,
+  nodStrength = 1,
+  yawnKey,
+  listening = false,
+  onClick,
+  vrmConfig,
+  vrmModel,
+  vrmDisplay,
+  amplitudeProvider,
+  visible = true,
+  away = false,
+  preparing = false,
+  hitTestRef,
+}: Props): React.ReactElement {
+  // 生成時の覗き状態を effect 外(レンダラ生成 effect・deps に preparing を入れない)から読むための ref。
+  const preparingRef = useRef(preparing);
+  preparingRef.current = preparing;
+  const glCanvasRef = useRef<HTMLCanvasElement>(null); // VRM 描画用(WebGL)
+  const rendererRef = useRef<VrmRenderer | null>(null);
+  const stateRef = useRef(state);
+  // VRM を出せなかった(WebGL 初期化不可 / モデル読込失敗)。立ち絵の代替は持たないので一言だけ出す。
+  const [vrmFailed, setVrmFailed] = useState(false);
 
-export const CharacterDisplay = forwardRef<CharacterDisplayHandle, Props>(
-  function CharacterDisplay(
-    { portraitUrl, animation, state, nodKey, nodStrength = 1, yawnKey, listening = false, onClick, vrmConfig, vrmModel, vrmDisplay, amplitudeProvider, visible = true, away = false, preparing = false },
-    ref,
-  ) {
-    const imgRef = useRef<HTMLImageElement>(null);
-    // 生成時の覗き状態を effect 外(レンダラ生成 effect・deps に preparing を入れない)から読むための ref。
-    const preparingRef = useRef(preparing);
-    preparingRef.current = preparing;
-    const alphaCanvasRef = useRef<HTMLCanvasElement | null>(null); // PNG alpha 読取用(2D)
-    const glCanvasRef = useRef<HTMLCanvasElement>(null); // VRM 描画用(WebGL)
-    const rendererRef = useRef<VrmRenderer | null>(null);
-    const stateRef = useRef(state);
+  // ドラッグ移動(押下→閾値超えで移動 / 閾値内ならクリック)は専用フックへ分離。
+  const { onMouseDown } = useWindowDrag(rendererRef, onClick);
 
-    // 口パク(PNG モードの talking 中のみ開閉トグル)。
-    const [flapOpen, setFlapOpen] = useState(false);
-    // うなずき(PNG モード・CSS)。
-    const [nodding, setNodding] = useState(false);
-    // VRM のロード失敗(=PNG フォールバックへ)。
-    const [vrmFailed, setVrmFailed] = useState(false);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
-    const vrmMode = !!(vrmConfig && vrmModel && !vrmFailed);
-
-    // ドラッグ移動(押下→閾値超えで移動 / 閾値内ならクリック)は専用フックへ分離(振る舞い不変)。
-    const { onMouseDown } = useWindowDrag(rendererRef, onClick);
-
-    useEffect(() => {
-      stateRef.current = state;
-    }, [state]);
-
-    // --- VRM レンダラのライフサイクル(設定＋モデルが揃ったら生成・破棄でクリーンアップ) ---
-    useEffect(() => {
-      const canvas = glCanvasRef.current;
-      if (!vrmConfig || !vrmModel || !canvas) return;
-      let disposed = false;
-      const renderer = new VrmRenderer({
+  // --- VRM レンダラのライフサイクル(設定＋モデルが揃ったら生成・破棄でクリーンアップ) ---
+  useEffect(() => {
+    const canvas = glCanvasRef.current;
+    if (!vrmConfig || !vrmModel || !canvas) return;
+    let disposed = false;
+    let renderer: VrmRenderer;
+    try {
+      renderer = new VrmRenderer({
         canvas,
         expressionMap: vrmConfig.expressionMap,
         display: vrmDisplay ?? vrmConfig.display,
         amplitudeProvider: amplitudeProvider ?? ((): number => 0),
         peek: preparingRef.current, // 準備中なら頭だけ覗く姿勢から始める
       });
-      renderer
-        .loadModel(vrmModel)
-        .then(() => {
-          if (disposed) {
-            renderer.dispose();
-            return;
-          }
-          rendererRef.current = renderer;
-          renderer.setEmotion(stateRef.current.emotion);
-          renderer.setTalking(stateRef.current.activity === 'talking');
-          renderer.setVisible(visible);
-          renderer.setPeek(preparingRef.current); // ロード完了時点の準備状態を反映
-        })
-        .catch(() => {
-          // 読込失敗=低スペック/破損等 → PNG 立ち絵へフォールバック(§3.7)。
+    } catch {
+      // WebGL 初期化不可など(古いGPU/ドライバ/一部の VM・RDP)。代替表示は持たないので一言だけ。
+      setVrmFailed(true);
+      return;
+    }
+    renderer
+      .loadModel(vrmModel)
+      .then(() => {
+        if (disposed) {
           renderer.dispose();
-          setVrmFailed(true);
-        });
-      return () => {
-        disposed = true;
-        rendererRef.current?.dispose();
-        rendererRef.current = null;
-      };
-      // モデル/設定が変わった時のみ作り直す(emotion 等は別 effect で反映)。
-    }, [vrmConfig, vrmModel]);
+          return;
+        }
+        rendererRef.current = renderer;
+        // クリックスルー判定(シルエット)を外へ公開: use-interaction-routing がこの関数で透過/非透過を決める。
+        if (hitTestRef) hitTestRef.current = (x, y) => renderer.isOpaqueAt(x, y);
+        setVrmFailed(false);
+        renderer.setEmotion(stateRef.current.emotion);
+        renderer.setTalking(stateRef.current.activity === 'talking');
+        renderer.setVisible(visible);
+        renderer.setPeek(preparingRef.current); // ロード完了時点の準備状態を反映
+      })
+      .catch(() => {
+        // モデルが壊れている/読めない → 代替表示は持たない(一言だけ)。
+        renderer.dispose();
+        setVrmFailed(true);
+      });
+    return () => {
+      disposed = true;
+      if (hitTestRef) hitTestRef.current = null;
+      rendererRef.current?.dispose();
+      rendererRef.current = null;
+    };
+    // モデル/設定が変わった時のみ作り直す(emotion 等は別 effect で反映)。
+  }, [vrmConfig, vrmModel]);
 
-    // 感情・talking を VRM へ反映。
-    useEffect(() => {
-      const r = rendererRef.current;
-      if (!r) return;
-      r.setEmotion(state.emotion);
-      r.setTalking(state.activity === 'talking');
-    }, [state.emotion, state.activity, vrmMode]);
+  // 感情・talking を VRM へ反映(レンダラ未準備時は無視。初期値はロード完了時に適用済み)。
+  useEffect(() => {
+    const r = rendererRef.current;
+    if (!r) return;
+    r.setEmotion(state.emotion);
+    r.setTalking(state.activity === 'talking');
+  }, [state.emotion, state.activity]);
 
-    // 表示パラメータの即時反映(GUI スライダー)。
-    useEffect(() => {
-      if (vrmDisplay) rendererRef.current?.setDisplay(vrmDisplay);
-    }, [vrmDisplay]);
+  // 表示パラメータの即時反映(GUI スライダー)。
+  useEffect(() => {
+    if (vrmDisplay) rendererRef.current?.setDisplay(vrmDisplay);
+  }, [vrmDisplay]);
 
-    // 可視性 → 描画の開始/停止(非表示で常駐コスト 0・§3.6)。
-    useEffect(() => {
-      rendererRef.current?.setVisible(visible);
-    }, [visible, vrmMode]);
+  // 可視性 → 描画の開始/停止(非表示で常駐コスト 0・§3.6)。
+  useEffect(() => {
+    rendererRef.current?.setVisible(visible);
+  }, [visible]);
 
-    // 離席 → VRM は後ろを向く(段階5)。
-    useEffect(() => {
-      rendererRef.current?.setAway(away);
-    }, [away, vrmMode]);
+  // 離席 → VRM は後ろを向く(段階5)。
+  useEffect(() => {
+    rendererRef.current?.setAway(away);
+  }, [away]);
 
-    // 準備中(起動ウォーム中)→ 頭だけ下から覗く。ready で通常姿勢へすっと起き上がる(VRM・2026-06-14)。
-    useEffect(() => {
-      rendererRef.current?.setPeek(preparing);
-    }, [preparing, vrmMode]);
+  // 準備中(起動ウォーム中)→ 頭だけ下から覗く。ready で通常姿勢へすっと起き上がる。
+  useEffect(() => {
+    rendererRef.current?.setPeek(preparing);
+  }, [preparing]);
 
-    // ウィンドウのリサイズに追従。
-    useEffect(() => {
-      if (!vrmMode) return;
-      const onResize = (): void => rendererRef.current?.resize();
-      window.addEventListener('resize', onResize);
-      return () => window.removeEventListener('resize', onResize);
-    }, [vrmMode]);
+  // ウィンドウのリサイズに追従。
+  useEffect(() => {
+    const onResize = (): void => rendererRef.current?.resize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
-    // うなずき(相槌＝聞くターン / ターン終端＝無音窓終端): VRM はボーン、PNG は CSS クラスで表現(0/未指定は無視)。
-    //   nodStrength=深さ(相槌 1.0 / ターン終端は発話長で出し分け)。VRM は回転量、PNG は CSS 変数 --nod-scale を倍率に。
-    useEffect(() => {
-      if (!nodKey) return;
-      if (rendererRef.current) {
-        rendererRef.current.nod(nodStrength);
-      } else {
-        setNodding(true);
-        const id = setTimeout(() => setNodding(false), NOD_MS);
-        return () => clearTimeout(id);
-      }
-    }, [nodKey, nodStrength]);
+  // うなずき(相槌＝聞くターン / ターン終端＝無音窓終端): VRM のボーンで表現(0/未指定は無視)。
+  useEffect(() => {
+    if (!nodKey) return;
+    rendererRef.current?.nod(nodStrength);
+  }, [nodKey, nodStrength]);
 
-    // あくび(長時間傾聴・listening-mode): VRM のみ(口開き+目細め+首+口元へ手)。PNG は素材が無いので無視。
-    useEffect(() => {
-      if (!yawnKey) return;
-      rendererRef.current?.playYawn();
-    }, [yawnKey]);
+  // あくび(長時間傾聴・listening-mode)。
+  useEffect(() => {
+    if (!yawnKey) return;
+    rendererRef.current?.playYawn();
+  }, [yawnKey]);
 
-    // 傾聴モードの首かしげ(listening-mode): VRM のみ。入退室で setListening→補間(PNG は素材が無いので無視)。
-    useEffect(() => {
-      rendererRef.current?.setListening(listening);
-    }, [listening, vrmMode]);
+  // 傾聴モードの首かしげ(listening-mode)。
+  useEffect(() => {
+    rendererRef.current?.setListening(listening);
+  }, [listening]);
 
-    // --- 以降は PNG モードの口パク・フレーム解決・alpha 描画(VRM モードでは未使用) ---
-    useEffect(() => {
-      if (vrmMode) return;
-      if (state.activity !== 'talking') {
-        setFlapOpen(false);
-        return;
-      }
-      const ms = animation?.timing?.mouthFlapMs ?? MOUTH_FLAP_MS;
-      const id = setInterval(() => setFlapOpen((o) => !o), ms);
-      return () => clearInterval(id);
-    }, [state.activity, animation, vrmMode]);
+  function onContextMenu(e: React.MouseEvent): void {
+    // 右クリックメニューは廃止(2026-06 ユーザー方針)。既定メニューだけ抑止する
+    // (完全終了はタスクバーのアイコン右クリック、各設定は⚙の設定パネルへ集約)。
+    e.preventDefault();
+  }
 
-    const frameKey = animation ? resolveFrame(animation, state, flapOpen) : null;
-    const displaySrc = (frameKey && animation?.frames[frameKey]) || portraitUrl;
-
-    function drawToCanvas(): void {
-      const img = imgRef.current;
-      if (!img || !img.complete || img.naturalWidth === 0) return;
-      const canvas = alphaCanvasRef.current ?? document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
-      alphaCanvasRef.current = canvas;
-    }
-    useEffect(() => {
-      if (!vrmMode) drawToCanvas();
-    }, [displaySrc, vrmMode]);
-
-    useImperativeHandle(
-      ref,
-      () => ({
-        isOpaqueAt(clientX: number, clientY: number): boolean {
-          // VRM モード: メッシュへのレイキャストで判定(案A・透過浮遊)。
-          const renderer = rendererRef.current;
-          if (renderer) return renderer.isHit(clientX, clientY);
-
-          // PNG モード: 現フレームの alpha を 2D canvas から読む(F-ANIM-08)。
-          const img = imgRef.current;
-          const canvas = alphaCanvasRef.current;
-          if (!img || !canvas) return true; // 未準備なら安全側(不透明扱い)
-          const rect = img.getBoundingClientRect();
-          if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) {
-            return false;
-          }
-          const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
-          const drawnW = canvas.width * scale;
-          const drawnH = canvas.height * scale;
-          const offX = (rect.width - drawnW) / 2;
-          const offY = (rect.height - drawnH) / 2;
-          const localX = clientX - rect.left - offX;
-          const localY = clientY - rect.top - offY;
-          if (localX < 0 || localX >= drawnW || localY < 0 || localY >= drawnH) return false; // letterbox 余白
-          const sx = Math.floor(localX / scale);
-          const sy = Math.floor(localY / scale);
-          try {
-            const alpha = canvas.getContext('2d')?.getImageData(sx, sy, 1, 1).data[3] ?? 255;
-            return alpha > 0;
-          } catch {
-            return true;
-          }
-        },
-      }),
-      [],
-    );
-
-    function onContextMenu(e: React.MouseEvent): void {
-      // 右クリックメニューは廃止(2026-06 ユーザー方針)。既定メニューだけ抑止する
-      // (完全終了はタスクバーのアイコン右クリック、各設定は⚙の設定パネルへ集約)。
-      e.preventDefault();
-    }
-
-    // VRM モード: WebGL キャンバス(背景透過・浮遊)。
-    if (vrmMode) {
-      return (
-        <canvas
-          ref={glCanvasRef}
-          className="character character--vrm"
-          onMouseDown={onMouseDown}
-          onContextMenu={onContextMenu}
-        />
-      );
-    }
-
-    // PNG フォールバック(従来の立ち絵・breathe/nod は CSS)。
-    const classes = ['character'];
-    // 準備中は覗き姿勢(translateY)が breathe の transform と競合するので、breathe を止めて peek を優先。
-    if (preparing) classes.push('character--peek'); // 準備中=頭だけ下から覗く(PNG)
-    else if (state.activity === 'idle') classes.push('character--breathe');
-    if (nodding) classes.push('character--nod');
-    if (away) classes.push('character--away'); // PNG は後ろ向き素材が無いので暗転で離席を示す
-
-    return (
-      <img
-        ref={imgRef}
-        className={classes.join(' ')}
-        src={displaySrc}
-        alt="魚川トリミ"
-        draggable={false}
-        // うなずきの深さを CSS 変数で渡す(ene-nod の translateY 倍率)。非うなずき時は無指定。
-        style={nodding ? ({ ['--nod-scale']: String(nodStrength) } as React.CSSProperties) : undefined}
+  return (
+    <>
+      {/* WebGL キャンバス。当たり判定はシルエット(isOpaqueAt)で行うので、キャンバス自身が押下を受ける
+          (透明部の上ではコントローラが ignore=true にするので、その押下は下のデスクトップへ通る)。 */}
+      <canvas
+        ref={glCanvasRef}
+        className="character character--vrm"
         onMouseDown={onMouseDown}
         onContextMenu={onContextMenu}
-        onLoad={drawToCanvas}
       />
-    );
-  },
-);
+      {/* VRM を出せない稀な場合(WebGL 不可/モデル破損)。代替表示は持たず、トリミ口調で一言だけ。 */}
+      {vrmFailed && (
+        <div className="character-error" data-interactive data-hitbox>
+          …ごめん、うまく姿を出せないみたい。
+        </div>
+      )}
+    </>
+  );
+}

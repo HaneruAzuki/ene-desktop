@@ -17,7 +17,7 @@ interface PressState {
 
 /**
  * 押下ハンドラ(onMouseDown)を返す。
- *  - rendererRef: ドラッグ中は VRM 描画を止めて移動を滑らかにする(無ければ PNG モード=無視)。
+ *  - rendererRef: ドラッグ中は VRM 描画を止めて移動を滑らかにする(未ロード/失敗で null の時は無視)。
  *  - onClick: 閾値内の押下(=クリック)で呼ぶ。最新値を ref 経由で参照する。
  * 位置反映は rAF で1フレーム1回に間引き、アンマウント時は途中ドラッグのリスナ/予約 rAF を確実に外す。
  */
@@ -61,7 +61,10 @@ export function useWindowDrag(
       isDragging: false,
     };
     const onMove = (ev: MouseEvent): void => {
-      if (!press.isDragging && exceedsDragThreshold(ev.screenX - press.startX, ev.screenY - press.startY)) {
+      if (
+        !press.isDragging &&
+        exceedsDragThreshold(ev.screenX - press.startX, ev.screenY - press.startY)
+      ) {
         press.isDragging = true;
         rendererRef.current?.setDragging(true); // ドラッグ中は VRM 描画を止めて移動を滑らかに
       }

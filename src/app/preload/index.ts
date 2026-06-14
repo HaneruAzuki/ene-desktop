@@ -23,6 +23,8 @@ const eneAPI: EneAPI = {
   openConsole: () => ipcRenderer.invoke('ene:open-console'),
   getAutoLaunch: () => ipcRenderer.invoke('ene:get-auto-launch'),
   setAutoLaunch: (on) => ipcRenderer.invoke('ene:set-auto-launch', on),
+  getOwnerName: () => ipcRenderer.invoke('ene:get-owner-name'),
+  setOwnerName: (name, reading) => ipcRenderer.invoke('ene:set-owner-name', name, reading),
   setLogExpanded: (expanded, panelWidth) =>
     ipcRenderer.send('ene:set-log-expanded', expanded, panelWidth),
   onUserSaid: (cb) => {

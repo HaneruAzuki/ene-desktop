@@ -1,5 +1,4 @@
 import type { ConversationResponse } from './conversation';
-import type { CharacterAnimationData } from './animation';
 import type { TranscribeResult } from './stt';
 import type { VoiceInputMode, IdleTalkMode } from './settings';
 import type { VrmRenderConfig, VrmDisplayParams } from './vrm';
@@ -8,10 +7,12 @@ import type { VrmRenderConfig, VrmDisplayParams } from './vrm';
 
 export interface CharacterInfo {
   name: string;
-  // portrait は CSP/サンドボックス制約のため data URL で渡す(main 側で PNG を base64 化)。
-  portraitUrl: string;
-  // アニメ(task_13・任意)。frames は dataURL 群。無ければ単一 portrait 表示にフォールバック。
-  animation?: CharacterAnimationData;
+}
+
+/** 主人の呼び方(＋読み)。設定画面の取得/登録に使う(本名 userFullName は会話で覚える=含めない)。 */
+export interface OwnerName {
+  name: string; // 呼び方(userName)
+  reading: string; // 呼び方の読み(userNameReading・かな・音声用)
 }
 
 /**
@@ -61,6 +62,9 @@ export interface EneAPI {
   openConsole(): Promise<void>;
   getAutoLaunch(): Promise<boolean>;
   setAutoLaunch(on: boolean): Promise<void>;
+  // 主人の呼び方(＋読み)の取得/登録(本名 userFullName は会話で覚える=設定では扱わない)。
+  getOwnerName(): Promise<OwnerName>;
+  setOwnerName(name: string, reading: string): Promise<void>;
 
   // --- 会話ログ(UI改修・VTuber風) ---
   // 「>>」でウィンドウ幅を伸縮(トリミ部分は固定、右にログ領域を足す)。renderer→main 一方向。

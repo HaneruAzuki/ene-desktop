@@ -129,7 +129,6 @@ export interface CharacterContext {
   background: CharacterBackground;
   knowledgeDomains: CharacterKnowledgeDomains;
   fewshot: CharacterFewshot;
-  portraitPath: string; // 絶対パス
   systemPrompt: string; // 構築済みのキャラクター人格プロンプト(応答形式は Conversation Layer が付与)
   birthdayHint?: 'today' | 'forgotten' | null;
   currentState?: CurrentState | null; // ★task_16 現在状態(任意・不在可)

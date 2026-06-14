@@ -3,7 +3,9 @@ import { loadAppSettings, saveIdleTalk, saveAutoLaunch } from '../../shared/node
 import { openApiKeyDialog } from './api-key-dialog';
 import { setLogExpanded } from './window-position';
 import { getPortableDataDir } from '../../shared/node/paths';
+import { getSemantic, updateSemantic } from '../../memory/semantic';
 import type { IdleTalkMode } from '../../shared/types/settings';
+import type { OwnerName } from '../../shared/types/ipc';
 import type { AppRuntime } from './app-runtime';
 
 // 設定パネル(UI改修 段階6・⚙ボタン)関連の IPC。
@@ -17,6 +19,18 @@ export function registerSettingsIpc(mainWindow: BrowserWindow, runtime: AppRunti
   });
   ipcMain.handle('ene:save-idle-talk', async (_event, mode: IdleTalkMode): Promise<void> => {
     await saveIdleTalk(mode);
+  });
+
+  // 主人の呼び方(userName)＋その読み(userNameReading)を取得/登録する(設定画面・2026-06)。
+  // 本名(userFullName)はここでは扱わない=会話で覚える完全パッシブ(設計合意)。
+  ipcMain.handle('ene:get-owner-name', async (): Promise<OwnerName> => {
+    const s = await getSemantic();
+    return { name: s.userName ?? '', reading: s.userNameReading ?? '' };
+  });
+  // 設定からの「意図的な」登録/変更。会話/抽出のロック(lockOwnerName)は extraction-trigger 側だけなので、
+  // この updateSemantic 直呼び経路は通る=ここでだけ呼び方を確定/改名できる。読みが空なら読みを消す。
+  ipcMain.handle('ene:set-owner-name', async (_event, name: string, reading: string): Promise<void> => {
+    await updateSemantic({ userName: name.trim(), userNameReading: reading.trim() || undefined });
   });
 
   // APIキーを変更(ダイアログを開く)。保存成功時は実行時 apiKey を更新し、即座に会話可能にする。

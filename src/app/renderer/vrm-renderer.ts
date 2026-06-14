@@ -15,7 +15,7 @@ import { resolveExpressionWeights } from './vrm/expression-resolver';
 // React 側(CharacterDisplay)は薄いラッパで、描画・表情・口パク・当たり判定は本クラスに集約する。
 //
 // 軽量原則(柱4・§3.6): 30fps 上限・非発話時は間引き・非表示中は完全停止。
-// 透過浮遊(案A): WebGL を alpha 付きで描画し背景は透明クリア(クリックスルーはレイキャストで判定)。
+// 透過浮遊(案A): WebGL を alpha 付きで描画し背景は透明クリア(クリックスルーは描画後 alpha のシルエットマスクで判定)。
 
 /** 口形の母音キー(モデルのプリセット)。リップシンクは aa の開口量だけ動かす。 */
 const VISEME_AA = 'aa';
@@ -42,6 +42,15 @@ const YAWN_HEAD_BACK = 0.13; // 頭を後ろへ反らす最大量(rad・「伸�
 // 傾聴モードの姿勢=少し首をかしげる(neck.z=roll)。nod(neck.x)とは軸が別なので共存する。
 const LISTENING_HEAD_TILT = 0.13; // 首かしげの最大角(rad・~7.5°)。実機で要調整(増減/符号で左右)。
 const LISTENING_TILT_LERP = 3; // 入退室の補間速度(大きいほど速い・約0.3秒で入る/戻る)。
+
+// 離席/退屈の後ろ向きは「真後ろ(12時)」のままだと後頭部だけで素っ気ないので、真後ろから少し回し込んで
+// こちらから見て1時方向(上-右)を向かせる。±30°=ちょうど1時間ぶん。0で真後ろ・符号で左右反転
+// (ユーザー確認: −30=1時/上-右、+30=11時/上-左)。背景を右寄せにしたので右(1時)を向く方が収まりが良い。
+const AWAY_FACE_OFFSET_DEG = -30;
+
+// クリックスルー用アルファマスクの読み出し間隔(ms)。~10fps。mousemove ごとではなくこの間隔で一括読みするので
+// 旧来の「毎 mousemove で readPixels」より遥かに軽い(GPU同期はこの頻度だけ)。
+const MASK_UPDATE_MS = 100;
 
 /** フレーム上限。発話中は滑らかに、アイドル時は間引いて常駐 CPU を抑える。 */
 const FPS_TALKING = 30;
@@ -93,8 +102,13 @@ export class VrmRenderer {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly clock = new THREE.Clock();
-  private readonly hitPixel = new Uint8Array(4); // クリックスルー判定の 1px alpha 読取用
   private readonly amplitudeProvider: () => number;
+  // クリックスルー用アルファマスク(2026-06)。描画後フレームの alpha を定期的に CPU へ一括読み出しし、
+  //   mousemove では配列参照だけで「トリミのピクセル(シルエット)上か」を判定する(毎フレームGPU読みを回避)。
+  private alphaBuf: Uint8Array | null = null;
+  private maskW = 0;
+  private maskH = 0;
+  private lastMaskMs = 0;
 
   private vrm: VRM | null = null;
   private expressionMap: VrmExpressionMap;
@@ -129,7 +143,6 @@ export class VrmRenderer {
   private running = false;
   private dragging = false; // ドラッグ中は描画を止めてウィンドウ移動を優先
   private visible = true; // 可視状態(コンテキスト復帰時に可視中だけ描画を再開)
-  private lastRenderMs = 0; // 最後に描画した時刻(クリックスルー固着のウォッチドッグ用)
   private away = false; // 離席中(後ろを向く・UI改修 段階5)
   private awayRot = 0; // 現在の回頭角(離席のゆっくり回頭・target へ一定速度で近づける)
   private peek = 0; // 現在の覗き量(0=通常, 1=頭だけ覗く・準備中)
@@ -143,18 +156,16 @@ export class VrmRenderer {
     this.amplitudeProvider = opts.amplitudeProvider;
     this.peek = this.peekTarget = opts.peek ? 1 : 0; // 準備中なら最初から頭だけ覗く姿勢
 
-    // preserveDrawingBuffer: クリックスルー判定で描画後バッファの alpha を readPixels するため必須
-    // (描画停止中=ドラッグ中でも最後のフレームを読める)。
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       alpha: true,
       antialias: true,
+      // クリックスルー判定のため、描画後フレームの alpha を readPixels する(シルエット精度)。
       preserveDrawingBuffer: true,
     });
     this.renderer.setClearColor(0x000000, 0); // 透明背景(案A・浮遊)
-    // WebGL コンテキストロスト対策(スリープ復帰/GPU リセット)。既定では一度失うと復帰せず、
-    // 描画が止まり readPixels が透明を返してクリックスルーが全透過に固着し操作不能になる。
-    // preventDefault で復帰を許可し、復帰時に描画を再開する(isHit もロスト中はフォールバック)。
+    // WebGL コンテキストロスト対策(スリープ復帰/GPU リセット)。既定では一度失うと復帰せず描画が止まる。
+    // preventDefault で復帰を許可し、復帰時に描画を再開する。
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
 
@@ -177,7 +188,7 @@ export class VrmRenderer {
     this.camera.updateProjectionMatrix();
   }
 
-  /** VRM モデル(ArrayBuffer)を読み込んでシーンへ。失敗時は例外(呼び出し側が PNG フォールバック)。 */
+  /** VRM モデル(ArrayBuffer)を読み込んでシーンへ。失敗時は例外(呼び出し側 CharacterDisplay が一言メッセージ表示)。 */
   async loadModel(bytes: ArrayBuffer): Promise<void> {
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -272,40 +283,57 @@ export class VrmRenderer {
     this.peekTarget = on ? 1 : 0;
   }
 
+  /**
+   * 表示座標(clientX/clientY)がトリミのピクセル(シルエット)上かを返す(クリックスルー判定)。
+   * mousemove から呼ばれる。CPU 側のアルファマスク(updateMask が定期更新)を参照するだけで GPU には触れない。
+   * マスク未準備(ロード中等)は false=非インタラクティブ(クリックは下のデスクトップへ通す)。
+   */
+  isOpaqueAt(clientX: number, clientY: number): boolean {
+    const buf = this.alphaBuf;
+    if (!buf) return false;
+    const rect = this.canvas.getBoundingClientRect();
+    if (
+      clientX < rect.left ||
+      clientX >= rect.right ||
+      clientY < rect.top ||
+      clientY >= rect.bottom
+    ) {
+      return false;
+    }
+    const px = Math.floor(((clientX - rect.left) / rect.width) * this.maskW);
+    // 描画バッファは左下原点なので Y を反転する(readPixels と同じ向きに合わせる)。
+    const py = Math.floor((1 - (clientY - rect.top) / rect.height) * this.maskH);
+    if (px < 0 || px >= this.maskW || py < 0 || py >= this.maskH) return false;
+    return (buf[(py * this.maskW + px) * 4 + 3] ?? 0) > 8; // alpha>閾値=トリミのピクセル
+  }
+
+  /**
+   * 描画後フレームの alpha を CPU 側マスクへ一括読み出しする(クリックスルー判定の元データ)。
+   * 毎 mousemove ではなく MASK_UPDATE_MS ごと=GPU 同期はこの頻度だけ(旧来の毎 mousemove readPixels より遥かに軽い)。
+   */
+  private updateMask(): void {
+    if (!this.vrm) return;
+    const now = performance.now();
+    if (now - this.lastMaskMs < MASK_UPDATE_MS) return;
+    this.lastMaskMs = now;
+    const gl = this.renderer.getContext();
+    if (gl.isContextLost()) return;
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    if (w === 0 || h === 0) return;
+    if (!this.alphaBuf || this.maskW !== w || this.maskH !== h) {
+      this.alphaBuf = new Uint8Array(w * h * 4);
+      this.maskW = w;
+      this.maskH = h;
+    }
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.alphaBuf);
+  }
+
   private applyEmotion(): void {
     const em = this.vrm?.expressionManager;
     if (!em) return;
     const weights = resolveExpressionWeights(this.expressionMap, this.emotion);
     for (const [name, w] of Object.entries(weights)) em.setValue(name, w);
-  }
-
-  /**
-   * 表示座標(clientX/Y)がキャラのピクセル上か(クリックスルー判定・案A=シルエット精度)。
-   * 描画後バッファの 1px alpha を読む。スキンメッシュへのレイキャストは 31k 三角形のスキニング計算で
-   * 非常に重く、毎 mousemove だとドラッグがカクつくため、激安の readPixels に置き換えている。
-   */
-  isHit(clientX: number, clientY: number): boolean {
-    if (!this.vrm) return false;
-    const rect = this.canvas.getBoundingClientRect();
-    if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) {
-      return false;
-    }
-    const gl = this.renderer.getContext();
-    // 3D パイプラインが不健全なとき(コンテキストロスト中 / 描画すべきなのに止まっている / 未描画)は
-    // readPixels が古い・空バッファを返す。シルエットの代わりにバウンディングボックスで「不透明」と
-    // みなし、ウィンドウが全クリックスルーに固着して操作不能になるのを防ぐ(健全時はシルエット精度)。
-    if (gl.isContextLost()) return true;
-    // 描画が一定時間止まっている/未描画なら readPixels は当てにならない(最小化復帰直後・パイプライン停止)。
-    // running は条件にしない: 可視のはずなのに描画が止まっている場合も固着させない(不確かなら不透明側へ)。
-    if (this.lastRenderMs === 0 || performance.now() - this.lastRenderMs > 1000) return true;
-    const w = gl.drawingBufferWidth;
-    const h = gl.drawingBufferHeight;
-    const px = Math.floor(((clientX - rect.left) / rect.width) * w);
-    // WebGL の描画バッファは左下原点なので Y を反転する。
-    const py = Math.floor((1 - (clientY - rect.top) / rect.height) * h);
-    if (px < 0 || px >= w || py < 0 || py >= h) return false;
-    gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.hitPixel);
-    return this.hitPixel[3] > 8; // alpha>閾値=キャラのピクセル(透明縁・余白は透過)
   }
 
   start(): void {
@@ -342,7 +370,6 @@ export class VrmRenderer {
   };
   private onContextRestored = (): void => {
     // three.js が管理リソースを再アップロードする。可視中ならループを再開して描き直す。
-    this.lastRenderMs = 0; // 復帰直後は未描画 → 描くまで isHit はフォールバック
     if (this.visible) this.start();
   };
 
@@ -397,7 +424,7 @@ export class VrmRenderer {
       this.vrm.update(Math.min(delta, MAX_PHYSICS_DELTA));
     }
     this.renderer.render(this.scene, this.camera);
-    this.lastRenderMs = performance.now();
+    this.updateMask(); // 描画後=このフレームの alpha を読む(クリックスルー判定のマスク)
   };
 
   private updateCamera(delta: number): void {
@@ -432,7 +459,10 @@ export class VrmRenderer {
       this.awayRot = 0;
     } else {
       // 通常/離席: 一定速度でゆっくり回頭(UI改修 段階5/段階6)。真後ろの符号側へ短く回る。
-      const target = this.away ? backTarget : 0;
+      // 後ろ向きは真後ろから AWAY_FACE_OFFSET_DEG だけ同方向へ追い込み、11時方向(上-左)を向かせる。
+      const awayOffset =
+        THREE.MathUtils.degToRad(AWAY_FACE_OFFSET_DEG) * (backTarget >= 0 ? 1 : -1);
+      const target = this.away ? backTarget + awayOffset : 0;
       const step = (Math.PI / 0.7) * delta;
       if (this.awayRot < target) this.awayRot = Math.min(target, this.awayRot + step);
       else if (this.awayRot > target) this.awayRot = Math.max(target, this.awayRot - step);
@@ -460,7 +490,8 @@ export class VrmRenderer {
   private updateNod(delta: number): void {
     const vrm = this.vrm;
     if (!vrm) return;
-    const neck = vrm.humanoid?.getNormalizedBoneNode('neck') ?? vrm.humanoid?.getNormalizedBoneNode('head');
+    const neck =
+      vrm.humanoid?.getNormalizedBoneNode('neck') ?? vrm.humanoid?.getNormalizedBoneNode('head');
     if (!neck) return;
     // 代入で 0→下→0 の一往復(加算は累積して首が下がり続けるので不可)。終了後は中立(0)へ戻す。
     if (this.nodPhase > 0) {
@@ -537,7 +568,8 @@ export class VrmRenderer {
   /** 傾聴の首かしげ(neck.z=roll を lerp)。nod は neck.x なので軸が別=共存する。毎フレーム呼ぶ。 */
   private updateListeningPose(delta: number): void {
     const neck =
-      this.vrm?.humanoid?.getNormalizedBoneNode('neck') ?? this.vrm?.humanoid?.getNormalizedBoneNode('head');
+      this.vrm?.humanoid?.getNormalizedBoneNode('neck') ??
+      this.vrm?.humanoid?.getNormalizedBoneNode('head');
     if (!neck) return;
     this.listeningTilt +=
       (this.listeningTiltTarget - this.listeningTilt) * Math.min(1, delta * LISTENING_TILT_LERP);

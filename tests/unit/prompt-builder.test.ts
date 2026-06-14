@@ -161,6 +161,14 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     expect(sys).toContain('6月12日');
   });
 
+  it('本名(userFullName)があれば長期記憶に出る(名前は正本=スロットから毎ターン注入)', () => {
+    const mc = makeMemoryContext({
+      semantic: { version: 1, userName: '優希', userFullName: '山田 太郎' },
+    });
+    const sys = systemText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(sys).toContain('相手の本名: 山田 太郎');
+  });
+
   // --- P1/P4/P5/P7: moment(いま/気にかけ/まだ知らないこと/誕生日/有限性) ---
   it('moment の各要素が現 user ターンに整形される', () => {
     const mc = makeMemoryContext({

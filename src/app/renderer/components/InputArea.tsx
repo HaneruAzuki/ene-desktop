@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 // 入力欄(設計書 §8.4 / UI改修 2026-06)。Enter で送信、Shift+Enter で改行、ESC で閉じる。
 // UI改修で「キャラ下部の操作オーバーレイに常設するピル」へ変更(従来の「キャラをクリックで展開」は廃止)。
@@ -15,12 +15,28 @@ interface Props {
   onFocusChange?: (focused: boolean) => void;
 }
 
-export const InputArea = forwardRef<HTMLDivElement, Props>(function InputArea(
+/** App から入力欄を操作する公開ハンドル(アイドル退避で blur / 空判定するため)。 */
+export interface InputAreaHandle {
+  blur(): void;
+  isEmpty(): boolean;
+}
+
+export const InputArea = forwardRef<InputAreaHandle, Props>(function InputArea(
   { onSubmit, onClose, autoFocus = false, onActivate, onFocusChange },
   ref,
 ) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // アイドル退避で App が「フォーカスを外す/空かどうか」を呼べるように公開する。
+  useImperativeHandle(
+    ref,
+    () => ({
+      blur: () => inputRef.current?.blur(),
+      isEmpty: () => text.trim() === '',
+    }),
+    [text],
+  );
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
@@ -55,7 +71,7 @@ export const InputArea = forwardRef<HTMLDivElement, Props>(function InputArea(
   }
 
   return (
-    <div ref={ref} className="input-area">
+    <div className="input-area">
       <textarea
         ref={inputRef}
         className="input-field"

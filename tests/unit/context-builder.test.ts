@@ -28,7 +28,6 @@ describe('context-builder (設計書 §3.1)', () => {
     expect(ctx.identity.name).toBe('魚川トリミ');
     expect(ctx.knowledgeDomains.fallback).toBe('medium');
     expect(ctx.fewshot.examples.tech_high.length).toBeGreaterThan(0);
-    expect(ctx.portraitPath).toContain('portrait.png');
     // systemPrompt に AI自称防止(neverCallsSelf)が含まれる
     expect(ctx.systemPrompt).toContain('アシスタント');
     // 今日(環境上 2026-06-01)は ENE の誕生日(8/15)より前 → null

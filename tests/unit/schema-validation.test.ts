@@ -43,6 +43,12 @@ describe('schema-validation (設計書 §3.3)', () => {
     expect(validateSemanticPatch({ userNameReading: 123 }).userNameReading).toBeUndefined();
   });
 
+  it('userFullName(本名)を採用する(文字列のみ)', () => {
+    expect(validateSemanticPatch({ userFullName: '山田 太郎' }).userFullName).toBe('山田 太郎');
+    expect(validateSemanticPatch({ userFullName: 123 }).userFullName).toBeUndefined();
+    expect(validateSemantic({ version: 1, userFullName: '山田 太郎' }).userFullName).toBe('山田 太郎');
+  });
+
   it('userBirthday は月日が範囲内の整数のときだけ採用する', () => {
     expect(validateSemanticPatch({ userBirthday: { month: 6, day: 12 } }).userBirthday).toEqual({ month: 6, day: 12 });
     expect(validateSemanticPatch({ userBirthday: { month: 6, day: 12, year: 1994 } }).userBirthday).toEqual({

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CharacterDisplay, type CharacterDisplayHandle } from './components/CharacterDisplay';
+import { CharacterDisplay } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';
-import { InputArea } from './components/InputArea';
+import { InputArea, type InputAreaHandle } from './components/InputArea';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConversationLog, type LogEntry } from './components/ConversationLog';
 import { ControlBar } from './components/ControlBar';
@@ -18,7 +18,7 @@ import {
 import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
-import { useClickThrough } from './use-click-through';
+import { useInteractionRouting } from './use-interaction-routing';
 import {
   SOFA_AFTER_IDLE_MS,
   MOUTH_FLAP_MS,
@@ -60,7 +60,7 @@ export function App(): React.ReactElement | null {
   const [preparing, setPreparing] = useState(true);
   // 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md): キャラにホバー中 / 明示展開中(トレイ等)/
   //   入力欄フォーカス中 / マイク稼働中 のいずれかで表示。離脱で即消す(透明余白には置かない)。
-  const [inZone, setInZone] = useState(false); // 操作ゾーン(下部の固定矩形)内にマウスがあるか(案A・段階5 修正)
+  const [barHovered, setBarHovered] = useState(false); // トリミ(ヒットボックス)/操作バー上にマウスがあるか(イベント駆動)
   const [forceOpen, setForceOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [volume, setVolume] = useState(1); // トリミの声(出力)の音量 0〜1(段階3)
@@ -78,7 +78,7 @@ export function App(): React.ReactElement | null {
     emotion: 'neutral',
     pose: 'stand',
   });
-  // VRM 表示(F・3D化)。config/model が揃えば VRM、欠ければ PNG フォールバック。
+  // VRM 表示(F・3D化)。config/model が揃えば VRM 描画。欠け/読込失敗時は代替表示を持たず一言メッセージのみ。
   const [vrmConfig, setVrmConfig] = useState<VrmRenderConfig | null>(null);
   const [vrmModel, setVrmModel] = useState<ArrayBuffer | null>(null);
   const [vrmDisplay, setVrmDisplay] = useState<VrmDisplayParams | null>(null);
@@ -86,16 +86,16 @@ export function App(): React.ReactElement | null {
   const [showSettings, setShowSettings] = useState(false); // 統合設定パネル(段階6)
   const [idleTalk, setIdleTalk] = useState<IdleTalkMode>('low'); // 話しかけてくる頻度(段階6)
   const [autoLaunch, setAutoLaunch] = useState(false); // PC起動時に自動起動(段階6)
+  const [ownerName, setOwnerName] = useState(''); // 主人の呼び方(設定で登録/変更)
+  const [ownerReading, setOwnerReading] = useState(''); // 呼び方の読み(かな・音声用)
   const [logOpen, setLogOpen] = useState(false); // 会話ログ(ウィンドウ横拡張・VTuber風)
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]); // 直近のやりとり(セッション内のみ)
   const [idleBack, setIdleBack] = useState(false); // 会話が途切れて退屈→後ろ向き(話しかけで前へ・見た目だけ)
 
-  const charRef = useRef<CharacterDisplayHandle>(null);
-  const bubbleRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const vrmPanelRef = useRef<HTMLDivElement>(null);
-  const logToggleRef = useRef<HTMLButtonElement>(null);
-  const logPanelRef = useRef<HTMLDivElement>(null);
+  const vrmPanelRef = useRef<HTMLDivElement>(null); // 設定パネル(パネル外クリック判定で使用)
+  // トリミ本体のクリックスルー判定(シルエット)。CharacterDisplay がレンダラの isOpaqueAt を差し込む。
+  const charHitTestRef = useRef<((x: number, y: number) => boolean) | null>(null);
+  const inputApiRef = useRef<InputAreaHandle>(null); // 入力欄の blur / 空判定(アイドル退避で使用)
   const warmedRef = useRef(false); // 入力フォーカス時のキャッシュウォームを一度だけ発火
   const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,7 +131,7 @@ export function App(): React.ReactElement | null {
     window.ene.onAppReady(() => markReady());
   }, []);
 
-  // VRM 表示(F): 設定とモデルを取得(両方揃えば VRM、欠ければ PNG フォールバック)。
+  // VRM 表示(F): 設定とモデルを取得(両方揃えば VRM 描画。欠け/失敗時は一言メッセージのみ=立ち絵フォールバック廃止)。
   useEffect(() => {
     void window.ene.getVrmConfig().then((cfg) => {
       setVrmConfig(cfg);
@@ -158,6 +158,14 @@ export function App(): React.ReactElement | null {
   // 自動起動の状態を読み込み(段階6・設定パネルの初期表示用)。
   useEffect(() => {
     void window.ene.getAutoLaunch().then(setAutoLaunch);
+  }, []);
+
+  // 主人の呼び方＋読みを読み込み(設定パネルの初期表示用)。
+  useEffect(() => {
+    void window.ene.getOwnerName().then(({ name, reading }) => {
+      setOwnerName(name);
+      setOwnerReading(reading);
+    });
   }, []);
 
   // ユーザー発話(ハンズフリー音声・コアレッシング含む)を会話ログへ＋アイドル計時リセット(表示専用イベント)。
@@ -201,7 +209,9 @@ export function App(): React.ReactElement | null {
       if (index === 0) spokenRef.current = [];
       spokenRef.current.push(text);
       setBubble(spokenRef.current.join(''));
-      setCharState((s) => (s.activity === 'talking' ? s : { ...s, activity: 'talking', pose: 'stand' }));
+      setCharState((s) =>
+        s.activity === 'talking' ? s : { ...s, activity: 'talking', pose: 'stand' },
+      );
     });
   }, []);
 
@@ -331,51 +341,19 @@ export function App(): React.ReactElement | null {
     return () => clearTimeout(id);
   }, [charState.activity, charState.pose]);
 
-  // 操作バーの表示/非表示は「バーの実矩形(=ボタンの両端)＋余白」で判定する(キャラ形状に依存しない＝固着しない・
-  //   絶対pxでなくバー基準=ウィンドウ幅やバー幅が変わっても追従・案A/B 段階5 修正)。
-  //   バーが出ている間: その矩形＋余白(上方向は音量ノブのポップを含む)で「畳むか」を決める。
-  //   バー未表示時(通常のアイドル): 持ち上げ用トリガはウィンドウ相対(下部中央)。
-  useEffect(() => {
-    const MARGIN_X = 10; // 左右の許容(バー端＋少し)。これを超えて左右に外れると畳む。
-    const MARGIN_TOP = 130; // 上方向(音量ノブのポップを含む)
-    const MARGIN_BOTTOM = 12;
-    const onMove = (e: MouseEvent): void => {
-      const x = e.clientX;
-      const y = e.clientY;
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      if (x < 0 || x >= w || y < 0 || y >= h) {
-        setInZone(false);
-        return;
-      }
-      const el = overlayRef.current;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        setInZone(
-          x >= r.left - MARGIN_X &&
-            x < r.right + MARGIN_X &&
-            y >= r.top - MARGIN_TOP &&
-            y < r.bottom + MARGIN_BOTTOM,
-        );
-      } else {
-        // バー未表示=持ち上げ用トリガ(ウィンドウ相対の下部中央)。バー矩形より小さくしてフリップ防止。
-        setInZone(y >= h * 0.68 && Math.abs(x - w / 2) <= w * 0.34);
-      }
-    };
-    const onLeave = (): void => setInZone(false);
-    window.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseleave', onLeave);
-    window.addEventListener('blur', onLeave);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseleave', onLeave);
-      window.removeEventListener('blur', onLeave);
-    };
-  }, []);
+  // アイドル退避(2026-06): 一定時間 操作が無ければ、操作バー・入力・forceOpen をまとめて畳む。
+  //   ただし入力欄にテキストがある時は畳まない(打ちかけを失わない)。空/未フォーカスなら blur して畳む。
+  function handleIdle(): void {
+    if (inputApiRef.current && !inputApiRef.current.isEmpty()) return; // 入力中(テキストあり)は保持
+    inputApiRef.current?.blur(); // フォーカスを外す → onFocusChange(false) → inputFocused=false
+    setForceOpen(false);
+    setBarHovered(false);
+  }
 
-  // クリックスルー(§8.6): キャラ不透明や各 UI 要素の上なら不透過、それ以外は下の窓へ通す。
-  // 当たり判定の配線(rAF 間引き含む)は専用フックへ分離(振る舞い不変)。
-  useClickThrough({ charRef, bubbleRef, overlayRef, vrmPanelRef, logToggleRef, logPanelRef });
+  // クリックスルー＋操作バーの出現判定(イベント駆動・2026-06 再設計)。
+  //   カーソルがトリミ(シルエット)/各UI(data-interactive)の上か"だけ"で透過/非透過を決める。
+  //   無操作が続いたら handleIdle で畳む(離脱イベントには依存しない)。
+  useInteractionRouting(setBarHovered, charHitTestRef, handleIdle);
 
   // 【開発用】数字キー 1〜6 で表情を強制切替し、VRM の表情レンダリングを会話なしで単体確認する。
   // dev ビルドのみ有効(本番では無効・キーマップは neutral/joy/anger/sorrow/surprise/embarrassed)。
@@ -401,7 +379,9 @@ export function App(): React.ReactElement | null {
   /** 吹き出しを閉じ、talking 中なら idle に戻す。 */
   function dismissBubble(): void {
     setBubble(null);
-    setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
+    setCharState((s) =>
+      s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s,
+    );
   }
 
   /** 会話アクティビティを記録: トリミを前へ向け、IDLE_TURN_BACK_MS 後に後ろを向くタイマーを張り直す(見た目だけ)。 */
@@ -471,7 +451,9 @@ export function App(): React.ReactElement | null {
       Math.max(TALKING_MIN_MS, response.message.length * MOUTH_FLAP_MS),
     );
     talkingTimerRef.current = setTimeout(() => {
-      setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
+      setCharState((s) =>
+        s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s,
+      );
     }, talkMs);
   }
 
@@ -489,7 +471,9 @@ export function App(): React.ReactElement | null {
     // Phase B: 実際に聞かせた発言(再生開始済みの文を連結)を main へ報告し、記憶を切り詰めさせる。
     window.ene.notifyBargeInHeard(spokenRef.current.join(''));
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
-    setCharState((s) => (s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s));
+    setCharState((s) =>
+      s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s,
+    );
     window.ene.setVadSpeaking(false);
   }
 
@@ -617,6 +601,13 @@ export function App(): React.ReactElement | null {
     void window.ene.setAutoLaunch(on);
   }
 
+  /** 主人の呼び方＋読みの保存(設定パネル・意図的変更=会話ロックを通る)。 */
+  function handleOwnerNameSave(name: string, reading: string): void {
+    setOwnerName(name);
+    setOwnerReading(reading);
+    void window.ene.setOwnerName(name, reading);
+  }
+
   /** 会話ログへ1件追記(直近 LOG_MAX_ENTRIES 件だけ保持・セッション内のみ)。 */
   function pushLog(role: 'user' | 'torimi', text: string): void {
     const t = text.trim();
@@ -690,125 +681,138 @@ export function App(): React.ReactElement | null {
     : 'クリックで聞く / 押している間だけ話す';
 
   // フルバーを出す条件=下部ゾーン内 or 明示展開 or 入力中(案A・段階5 修正)。離席は常にサインのみ。
-  const showFull = forceOpen || inputFocused || inZone;
+  const showFull = forceOpen || inputFocused || barHovered;
 
   return (
     <div className={`app${logOpen ? ' app--log-open' : ''}`}>
       {/* トリミ本体＋彼女のUIは常に左260pxの「ステージ」に閉じ込める(会話ログ展開時も隠さない・VTuber風)。 */}
       <div className="stage">
-      {/* 考える間(thinking)の演出。専用スプライトが無いので「…」で示す(F-ANIM-04)。 */}
-      {charState.activity === 'thinking' && <div className="bubble bubble--thinking">…</div>}
-      {/* 準備中(起動ウォーム中)=頭だけ覗く姿勢に添える「ちょっと待って...」(非操作・ready で消える)。 */}
-      {preparing && <div className="bubble bubble--preparing">{PREPARING_MESSAGE}</div>}
-      {bubble !== null && (
-        <SpeechBubble ref={bubbleRef} message={bubble} onClose={dismissBubble} />
-      )}
-      <CharacterDisplay
-        ref={charRef}
-        portraitUrl={characterInfo.portraitUrl}
-        animation={characterInfo.animation}
-        state={charState}
-        nodKey={nodKey}
-        nodStrength={nodStrength}
-        yawnKey={yawnKey}
-        listening={isListening}
-        onClick={openInput}
-        vrmConfig={vrmConfig}
-        vrmModel={vrmModel}
-        vrmDisplay={vrmDisplay ?? undefined}
-        amplitudeProvider={getVoiceAmplitude}
-        visible={visible}
-        away={away || idleBack}
-        preparing={preparing}
-      />
-      {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2/§3)。
+        {/* 考える間(thinking)の演出。専用スプライトが無いので「…」で示す(F-ANIM-04)。 */}
+        {charState.activity === 'thinking' && <div className="bubble bubble--thinking">…</div>}
+        {/* 準備中(起動ウォーム中)=頭だけ覗く姿勢に添える「ちょっと待って...」(非操作・ready で消える)。 */}
+        {preparing && <div className="bubble bubble--preparing">{PREPARING_MESSAGE}</div>}
+        {bubble !== null && (
+          // 吹き出し(閉じるボタンを持つ操作対象)。display:contents の枠で data-interactive を付け、
+          // クリックスルー判定(closest)で「不透過」に倒す(レイアウトは枠なしと同じ)。
+          <div data-interactive style={{ display: 'contents' }}>
+            <SpeechBubble message={bubble} onClose={dismissBubble} />
+          </div>
+        )}
+        <CharacterDisplay
+          hitTestRef={charHitTestRef}
+          state={charState}
+          nodKey={nodKey}
+          nodStrength={nodStrength}
+          yawnKey={yawnKey}
+          listening={isListening}
+          onClick={openInput}
+          vrmConfig={vrmConfig}
+          vrmModel={vrmModel}
+          vrmDisplay={vrmDisplay ?? undefined}
+          amplitudeProvider={getVoiceAmplitude}
+          visible={visible}
+          away={away || idleBack}
+          preparing={preparing}
+        />
+        {/* 操作オーバーレイ(UI改修 2026-06・docs/ui-design.md §1/§2/§3)。
           キャラ下部(胸元の不透明部)にホバーで重ねて出す。離脱で即アンマウント(透明余白には置かない
           =手を伸ばす途中で消えない)。入力中/明示展開中は離れても保持する。
           マイクON 中はホバーを外すと、操作バーの代わりに最小の常駐サイン(緑「聞いてるよ」)を残す。
           段階2: マイクは単一ハイブリッド配線。音量/離席/じゃあねは段階3/5/4 で実装。 */}
-      {!preparing && (showFull || micActive || away) && (
-        <div className="control-overlay" ref={overlayRef}>
-          {away ? (
-            // 離席中はホバーでも操作バーを出さず、戻る用の最小サインのみ(クリックで戻る)。
-            <button
-              className="away-indicator"
-              onClick={handleAway}
-              title="離席中(クリックで戻る)"
-              aria-label="離席を解除"
-            >
-              <span className="mic-indicator__dot">☕</span>
-              <span className="mic-indicator__label">離席中</span>
-            </button>
-          ) : showFull ? (
-            <>
-              <ControlBar
-                micActive={micActive}
-                micHandlers={micHandlers}
-                micTitle={micTitle}
-                volume={volume}
-                muted={muted}
-                onToggleMute={handleToggleMute}
-                onVolume={handleVolume}
-                away={away}
-                onAway={handleAway}
-                onSettings={() => setShowSettings((v) => !v)}
-                onGoodbye={handleGoodbye}
-              />
-              <InputArea
-                autoFocus={forceOpen}
-                onSubmit={handleSubmit}
-                onClose={() => setForceOpen(false)}
-                onActivate={warmCacheOnce}
-                onFocusChange={setInputFocused}
-              />
-            </>
-          ) : micActive ? (
-            // マイクON だがホバー外: 最小の常駐サイン(クリックで切る)。
-            <button
-              className="mic-indicator"
-              onClick={() => void stopHandsFree()}
-              title="聞いてるよ(クリックで切る)"
-              aria-label="音声入力をオフ"
-            >
-              <span className="mic-indicator__dot">🎙️</span>
-              <span className="mic-indicator__label">聞いてるよ</span>
-            </button>
-          ) : null}
-        </div>
-      )}
-      {/* 「じゃあね」ポップ(段階4): トレイにしまう前に一瞬見せる演出。 */}
-      {goodbyePop && <div className="goodbye-pop">＼じゃあね／</div>}
-      {/* 統合設定パネル(段階6・⚙)。話しかけ頻度＋見た目(VRM)＋APIキー/クレジット。
+        {!preparing && (showFull || micActive || away) && (
+          <div className="control-overlay" data-interactive data-hitbox>
+            {away ? (
+              // 離席中はホバーでも操作バーを出さず、戻る用の最小サインのみ(クリックで戻る)。
+              <button
+                className="away-indicator"
+                onClick={handleAway}
+                title="離席中(クリックで戻る)"
+                aria-label="離席を解除"
+              >
+                <span className="mic-indicator__dot">☕</span>
+                <span className="mic-indicator__label">離席中</span>
+              </button>
+            ) : showFull ? (
+              <>
+                <ControlBar
+                  micActive={micActive}
+                  micHandlers={micHandlers}
+                  micTitle={micTitle}
+                  volume={volume}
+                  muted={muted}
+                  onToggleMute={handleToggleMute}
+                  onVolume={handleVolume}
+                  away={away}
+                  onAway={handleAway}
+                  onSettings={() => setShowSettings((v) => !v)}
+                  onGoodbye={handleGoodbye}
+                />
+                <InputArea
+                  ref={inputApiRef}
+                  autoFocus={forceOpen}
+                  onSubmit={handleSubmit}
+                  onClose={() => setForceOpen(false)}
+                  onActivate={warmCacheOnce}
+                  onFocusChange={setInputFocused}
+                />
+              </>
+            ) : micActive ? (
+              // マイクON だがホバー外: 最小の常駐サイン(クリックで切る)。
+              <button
+                className="mic-indicator"
+                onClick={() => void stopHandsFree()}
+                title="聞いてるよ(クリックで切る)"
+                aria-label="音声入力をオフ"
+              >
+                <span className="mic-indicator__dot">🎙️</span>
+                <span className="mic-indicator__label">聞いてるよ</span>
+              </button>
+            ) : null}
+          </div>
+        )}
+        {/* 「じゃあね」ポップ(段階4): トレイにしまう前に一瞬見せる演出。 */}
+        {goodbyePop && <div className="goodbye-pop">＼じゃあね／</div>}
+        {/* 統合設定パネル(段階6・⚙)。話しかけ頻度＋見た目(VRM)＋APIキー/クレジット。
           パネル外クリックで閉じる(上の useEffect)。ref はクリックスルー判定用(開いている間インタラクティブに保つ)。 */}
-      {showSettings && (
-        <SettingsPanel
-          ref={vrmPanelRef}
-          idleTalk={idleTalk}
-          onIdleTalkChange={handleIdleTalkChange}
-          autoLaunch={autoLaunch}
-          onAutoLaunchChange={handleAutoLaunchChange}
-          vrmDisplay={vrmConfig && vrmDisplay ? vrmDisplay : undefined}
-          onVrmChange={handleVrmDisplayChange}
-          onApiKey={() => void window.ene.openApiKeyDialog()}
-          onAbout={() => void window.ene.showAbout()}
-          onOpenDataFolder={() => void window.ene.openDataFolder()}
-          onConsole={() => void window.ene.openConsole()}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
-      {/* 会話ログのトグル(»/«)。ステージ右端の中央に常駐(透明・ホバーで濃く)。 */}
-      <button
-        className="log-toggle"
-        ref={logToggleRef}
-        onClick={toggleLog}
-        title={logOpen ? '会話ログを閉じる' : '会話ログを開く'}
-        aria-label="会話ログ"
-      >
-        {logOpen ? '«' : '»'}
-      </button>
+        {showSettings && (
+          // 設定パネル(操作対象)。display:contents の枠で data-interactive を付ける(ref はパネル外クリック判定用に維持)。
+          <div data-interactive style={{ display: 'contents' }}>
+            <SettingsPanel
+              ref={vrmPanelRef}
+              ownerName={ownerName}
+              ownerReading={ownerReading}
+              onOwnerNameSave={handleOwnerNameSave}
+              idleTalk={idleTalk}
+              onIdleTalkChange={handleIdleTalkChange}
+              autoLaunch={autoLaunch}
+              onAutoLaunchChange={handleAutoLaunchChange}
+              vrmDisplay={vrmConfig && vrmDisplay ? vrmDisplay : undefined}
+              onVrmChange={handleVrmDisplayChange}
+              onApiKey={() => void window.ene.openApiKeyDialog()}
+              onAbout={() => void window.ene.showAbout()}
+              onOpenDataFolder={() => void window.ene.openDataFolder()}
+              onConsole={() => void window.ene.openConsole()}
+              onClose={() => setShowSettings(false)}
+            />
+          </div>
+        )}
+        {/* 会話ログのトグル(»/«)。ステージ右端の中央に常駐(透明・ホバーで濃く)。 */}
+        <button
+          className="log-toggle"
+          data-interactive
+          onClick={toggleLog}
+          title={logOpen ? '会話ログを閉じる' : '会話ログを開く'}
+          aria-label="会話ログ"
+        >
+          {logOpen ? '«' : '»'}
+        </button>
       </div>
       {/* 会話ログ(VTuber風・ウィンドウを右に広げた時のみ表示)。 */}
-      {logOpen && <ConversationLog ref={logPanelRef} entries={logEntries} />}
+      {logOpen && (
+        <div data-interactive style={{ display: 'contents' }}>
+          <ConversationLog entries={logEntries} />
+        </div>
+      )}
     </div>
   );
 }

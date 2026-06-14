@@ -23,35 +23,4 @@ export interface CharacterState {
   pose: CharacterPose;
 }
 
-/** animation.json のタイミング定義(数値は一元管理・F-ANIM-12)。 */
-export interface AnimationTiming {
-  mouthFlapMs?: number;
-  idleSwayMs?: number;
-  sofaAfterIdleMs?: number;
-}
-
-/** 状態→フレームの対応表。 */
-export interface AnimationMap {
-  base: Partial<Record<EmotionLabel, string>>; // emotion → 口閉じフレーム名
-  baseOpen?: Partial<Record<EmotionLabel, string>>; // emotion → 口開きフレーム名(talking 用・任意)
-  thinking?: string; // 考え中(任意・無ければ neutral)
-  sofa?: string; // 寝そべり(idle 専用・任意・無ければ neutral)
-}
-
-/** animation.json のスキーマ(F-ANIM-02)。 */
-export interface CharacterAnimation {
-  characterId: string;
-  frameSize: { width: number; height: number };
-  // フレーム名 → 画像ファイル名({id}/ 配下。task_13 D1: sprites/ サブdirは作らない)
-  frames: Record<string, string>;
-  map: AnimationMap;
-  timing?: AnimationTiming;
-}
-
-/** Renderer へ渡すアニメ(frames を base64 dataURL 化したもの・IPC 用)。 */
-export interface CharacterAnimationData {
-  frameSize: { width: number; height: number };
-  frames: Record<string, string>; // フレーム名 → dataURL
-  map: AnimationMap;
-  timing?: AnimationTiming;
-}
+// PNG 立ち絵フォールバック(アニメ・フレーム差し替え)の型は 2026-06 に撤去した(表示は VRM 一本)。

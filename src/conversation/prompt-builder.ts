@@ -77,6 +77,10 @@ function formatSemantic(semantic: SemanticMemory): string {
       : semantic.userName;
     lines.push(`- 相手の名前: ${name}`);
   }
+  // 本名(フルネーム)。名前の正本はこのスロットだけ=記憶には焼き込まず、毎ターンここから注入する(改名は自動反映)。
+  if (semantic.userFullName) {
+    lines.push(`- 相手の本名: ${semantic.userFullName}`);
+  }
   if (semantic.userBirthday) {
     const b = semantic.userBirthday;
     const y = b.year ? `${b.year}年` : '';

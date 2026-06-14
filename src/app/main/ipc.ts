@@ -1,5 +1,4 @@
 import { ipcMain, type BrowserWindow } from 'electron';
-import { promises as fs } from 'node:fs';
 import { log } from '../../shared/logger';
 import {
   WINDOW_WIDTH,
@@ -14,7 +13,6 @@ import { nowLocalIso } from '../../shared/datetime';
 import { correctNameMishear } from '../../voice/name-correction';
 import { getSemantic } from '../../memory/semantic';
 import { warmPromptCache } from '../../conversation/client';
-import { loadAnimationData } from '../../character/animation-loader';
 import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../character/vrm-loader';
 import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../shared/node/app-settings';
 import { saveWindowPosition } from './window-position';
@@ -44,16 +42,6 @@ function debouncedSavePosition(x: number, y: number): void {
   positionSaveTimer = setTimeout(() => {
     void saveWindowPosition(x, y);
   }, POSITION_SAVE_DEBOUNCE_MS);
-}
-
-/** portrait.png を data URL 化する(CSP 準拠で Renderer に渡すため)。 */
-async function readPortraitDataUrl(portraitPath: string): Promise<string> {
-  try {
-    const buf = await fs.readFile(portraitPath);
-    return `data:image/png;base64,${buf.toString('base64')}`;
-  } catch {
-    return '';
-  }
 }
 
 const ERROR_RESPONSE: ConversationResponse = {
@@ -113,7 +101,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
           await commitTurn(text, response, lastAudioStreamed, runtime, mainWindow);
         },
         emitResponse: (response) => {
-          if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-response', response);
+          if (!mainWindow.isDestroyed())
+            mainWindow.webContents.send('ene:voice-response', response);
         },
         setSilenceWindow: (ms) => applySilenceWindow(ms),
         // barge-in(生成完了後)時に、最新 assistant 記憶を「聞かせた分」へ切り詰める(Phase B)。
@@ -160,30 +149,29 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   ipcMain.on('ene:voice-heard', (_event, heardText: string) => coordinator?.onBargeIn(heardText));
 
   // マイク入力方式の取得(設定・task_17 Phase C)。変更は右クリックメニューから(main が保存＋通知)。
-  ipcMain.handle('ene:get-voice-input-mode', async (): Promise<VoiceInputMode> => runtime.voiceInputMode);
+  ipcMain.handle(
+    'ene:get-voice-input-mode',
+    async (): Promise<VoiceInputMode> => runtime.voiceInputMode,
+  );
 
-  ipcMain.handle('ene:send-message', async (_event, text: string): Promise<ConversationResponse> => {
-    try {
-      return await handleSendMessage(text, runtime, mainWindow);
-    } catch (err) {
-      // IPC ハンドラから例外を漏らさない(Renderer をクラッシュさせない)。
-      log.error('send-message handler failed', { name: (err as Error).name });
-      return ERROR_RESPONSE;
-    }
-  });
+  ipcMain.handle(
+    'ene:send-message',
+    async (_event, text: string): Promise<ConversationResponse> => {
+      try {
+        return await handleSendMessage(text, runtime, mainWindow);
+      } catch (err) {
+        // IPC ハンドラから例外を漏らさない(Renderer をクラッシュさせない)。
+        log.error('send-message handler failed', { name: (err as Error).name });
+        return ERROR_RESPONSE;
+      }
+    },
+  );
 
   ipcMain.handle('ene:get-character-info', async (): Promise<CharacterInfo> => {
     if (runtime.charContext) {
-      // アニメ定義(任意)。無ければ単一 portrait 表示にフォールバック(F-ANIM-11)。
-      const animation =
-        (await loadAnimationData(runtime.charContext.identity.characterId)) ?? undefined;
-      return {
-        name: runtime.charContext.identity.name,
-        portraitUrl: await readPortraitDataUrl(runtime.charContext.portraitPath),
-        animation,
-      };
+      return { name: runtime.charContext.identity.name };
     }
-    return { name: 'ENE', portraitUrl: '' };
+    return { name: 'ENE' };
   });
 
   // --- VRM 表示(F・3D化)。vrm.json が無ければ null=renderer は PNG 立ち絵へフォールバック ---
@@ -207,9 +195,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
 
   // GUI スライダーの調整結果を保存(renderer は即時ローカル反映済み・ここは永続化のみ)。
-  ipcMain.handle('ene:set-vrm-display', async (_event, display: Partial<VrmDisplayParams>): Promise<void> => {
-    await saveVrmDisplay(display);
-  });
+  ipcMain.handle(
+    'ene:set-vrm-display',
+    async (_event, display: Partial<VrmDisplayParams>): Promise<void> => {
+      await saveVrmDisplay(display);
+    },
+  );
 
   // 音量・ミュート(トリミの声=出力・UI改修 段階3)。renderer は即時ローカル反映済み・ここは永続化のみ。
   ipcMain.handle('ene:get-audio-prefs', async (): Promise<{ volume: number; muted: boolean }> => {
@@ -266,7 +257,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     //  best-effort=書き込み失敗しても挨拶表示は続行(会話・起動に影響させない)。
     if (greeting) {
       try {
-        await appendShortTerm({ role: 'assistant', text: greeting, timestamp: nowLocalIso(), extracted: false });
+        await appendShortTerm({
+          role: 'assistant',
+          text: greeting,
+          timestamp: nowLocalIso(),
+          extracted: false,
+        });
       } catch (e) {
         log.warn('greeting short-term append failed', { name: (e as Error).name });
       }

@@ -61,6 +61,7 @@ export function validateSemanticPatch(raw: unknown): Partial<SemanticMemory> {
   const o = raw as Record<string, unknown>;
   if (typeof o.userName === 'string') result.userName = o.userName;
   if (typeof o.userNameReading === 'string') result.userNameReading = o.userNameReading;
+  if (typeof o.userFullName === 'string') result.userFullName = o.userFullName;
   const birthday = pickUserBirthday(o.userBirthday);
   if (birthday) result.userBirthday = birthday;
   if (isStringRecord(o.preferences)) result.preferences = o.preferences;

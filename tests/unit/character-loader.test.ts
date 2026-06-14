@@ -26,7 +26,6 @@ describe('character loader (設計書 §3.1)', () => {
     expect(p.identity.name).toBe('魚川トリミ');
     expect(p.knowledgeDomains.fallback).toBe('medium');
     expect(p.fewshot.examples.tech_high.length).toBeGreaterThan(0);
-    expect(p.portraitPath).toContain(path.join('ene', 'portrait.png'));
   });
 
   it('ファイルが欠けていれば例外を throw する', async () => {

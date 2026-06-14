@@ -18,7 +18,6 @@ export interface LoadedCharacterProfile {
   background: CharacterBackground;
   knowledgeDomains: CharacterKnowledgeDomains;
   fewshot: CharacterFewshot;
-  portraitPath: string; // 絶対パス(存在チェックはしない)
   currentState: CurrentState | null; // task_16・任意(不在可)
 }
 
@@ -26,9 +25,7 @@ interface HasCharacterId {
   characterId: string;
 }
 
-export async function loadCharacterProfile(
-  characterId: string,
-): Promise<LoadedCharacterProfile> {
+export async function loadCharacterProfile(characterId: string): Promise<LoadedCharacterProfile> {
   const dir = getCharacterDir(characterId);
 
   const [identity, background, knowledgeDomains, fewshot] = await Promise.all([
@@ -73,7 +70,6 @@ export async function loadCharacterProfile(
     background,
     knowledgeDomains,
     fewshot,
-    portraitPath: join(dir, 'portrait.png'),
     currentState: currentState ?? null,
   };
 }
