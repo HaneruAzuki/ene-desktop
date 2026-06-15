@@ -166,8 +166,6 @@ export class VadRuntime {
   }
 
   private onSpeechStart(): void {
-    // 計器化(barge-in 診断): 発話開始が拾えているか＋その時の barge-in 窓/エコーガード状態を残す(§6.2: 状態のみ)。
-    log.info(`VAD speech-start (responseActive=${this.responseActive} speaking=${this.speaking})`);
     if (this.responseActive) {
       // 応答ターンの進行中に発話開始 = 割り込み(明滅しない responseActive で確実に拾う)。
       this.send('ene:voice-barge-in');
