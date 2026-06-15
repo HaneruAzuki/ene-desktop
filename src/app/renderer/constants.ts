@@ -22,4 +22,11 @@ export const IDLE_TURN_BACK_MS = 10 * 60_000; // 10分
 // 口パクの総時間 ≈ 文字数 × MOUTH_FLAP_MS(「一文字1口パク」)。話し終えたら idle に戻す。
 export const TALKING_MIN_MS = 400; // 最短(短い相槌でも少し口が動く)
 export const TALKING_MAX_MS = 6000; // 最長(長文でも口パクが延々続かない上限)
+
+// 考え中(thinking)の最終安全網(2026-06-16・N-LAT-8)。
+//   不変条件:「考え中」は必ず解決(=第一声で talking へ / 失敗で idle へ)に向かう。生成がハング・失敗して
+//   応答も解除合図も来ない時、考え中が永久に残る(=フリーズ→強制終了)のを防ぐ。第一声が出れば activity が
+//   talking に変わり自動で解除されるので、これは「第一声すら出ない異常」だけを拾う。
+//   main 側の第一声監視(FIRST_AUDIO_TIMEOUT_MS=12s)より長く取り、正当な遅延応答を誤って切らない。
+export const THINKING_WATCHDOG_MS = 15_000;
 // まばたきは 0.2 では実装しない(フルフレーム方式では枚数が増えるため後回し)

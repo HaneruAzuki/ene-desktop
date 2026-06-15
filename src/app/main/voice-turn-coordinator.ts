@@ -11,6 +11,7 @@ import {
   LISTENING_MAX_CHARS,
   LISTENING_YAWN_MS,
   TURN_TIMEOUT_MS,
+  FIRST_AUDIO_TIMEOUT_MS,
 } from '../../shared/constants';
 
 /** 傾聴入室後、この時間ユーザの発話が無ければ自動退室する(姿勢を戻す・固着回避・listening-mode)。 */
@@ -285,9 +286,17 @@ export class VoiceTurnCoordinator {
     // ハング自動復帰(穴C): 上限時間で生成を打ち切る。unref でテスト/プロセスを延命しない。
     const timer = setTimeout(() => ctrl.abort(), TURN_TIMEOUT_MS);
     timer.unref?.();
+    // 第一声が出るまでの短い救済(N-LAT-8): 第一声すら出ない=ハング/失敗とみなして早めに打ち切る。
+    //   60s も「考え中」を見せ続けない＋諦めた後に遅れて喋り出す事故を防ぐ(レンダラ側ウォッチドッグより前に切る)。
+    //   第一声が出たら(committed)解除し、後続合成の長さは TURN_TIMEOUT_MS 側に委ねる。
+    const firstAudioTimer = setTimeout(() => {
+      if (!g.committed) ctrl.abort();
+    }, FIRST_AUDIO_TIMEOUT_MS);
+    firstAudioTimer.unref?.();
     try {
       const response = await this.deps.generate(text, ctrl.signal, () => {
         g.committed = true;
+        clearTimeout(firstAudioTimer); // 第一声が出た=ハング救済の監視は終了
         // 第一声が出た=このターンは確定。以降の発話(barge-in 等)は新ターン=連結しない。
         this.pendingText = '';
         // トリミが実際に喋った=「連続」サイレントキャンセルが途切れた → カウンタを戻す。
@@ -314,6 +323,7 @@ export class VoiceTurnCoordinator {
       if (this.gen === g) this.gen = null;
     } finally {
       clearTimeout(timer); // タイムアウトタイマーを解放(穴C)
+      clearTimeout(firstAudioTimer); // 第一声監視も解放(N-LAT-8)
     }
   }
 }

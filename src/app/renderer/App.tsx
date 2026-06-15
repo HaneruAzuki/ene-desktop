@@ -29,6 +29,7 @@ import {
   LOG_PANEL_WIDTH,
   LOG_MAX_ENTRIES,
   IDLE_TURN_BACK_MS,
+  THINKING_WATCHDOG_MS,
 } from './constants';
 import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
@@ -350,6 +351,21 @@ export function App(): React.ReactElement | null {
     const id = setTimeout(() => setCharState((s) => ({ ...s, pose: 'sofa' })), SOFA_AFTER_IDLE_MS);
     return () => clearTimeout(id);
   }, [charState.activity, charState.pose]);
+
+  // 考え中(thinking)の最終安全網(N-LAT-8)。第一声が出れば setSentenceHandler / applyResponseUI が
+  //   activity を talking に変える=この effect は解除される。THINKING_WATCHDOG_MS を過ぎても考え中のまま=
+  //   生成がハング/失敗して応答も解除合図も来なかった異常。考え中を idle へ戻し、トリミ口調で一言詫びる
+  //   (永久フリーズ→強制終了を防ぐ・経路に依らない単一の不変条件)。
+  useEffect(() => {
+    if (charState.activity !== 'thinking') return;
+    const id = setTimeout(() => {
+      setCharState((s) =>
+        s.activity === 'thinking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s,
+      );
+      setBubble('…ごめん、ちょっと言葉に詰まっちゃった。もう一回言ってくれる?');
+    }, THINKING_WATCHDOG_MS);
+    return () => clearTimeout(id);
+  }, [charState.activity]);
 
   // アイドル退避(2026-06): 一定時間 操作が無ければ、操作バー・入力・forceOpen をまとめて畳む。
   //   ただし入力欄にテキストがある時は畳まない(打ちかけを失わない)。空/未フォーカスなら blur して畳む。
