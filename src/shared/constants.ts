@@ -185,6 +185,12 @@ export const VAD_MIN_SILENCE_MS = 800;
  */
 export const COALESCE_ENABLED_ENV = 'ENE_COALESCE';
 /**
+ * 1ターンの生成(Claude＋TTS)の上限時間(ms・穴C)。これを超えたら ctrl.abort() で打ち切り、
+ * ハング時に自動復帰する(放置でも次ターンに進める)。正当な長文応答(直列TTSで20秒級)を
+ * 殺さないよう余裕を持たせる。テキスト経路(ipc)と音声経路(coordinator)の両方に適用。
+ */
+export const TURN_TIMEOUT_MS = 60_000;
+/**
  * コアレッシング時の**暫定**ターン終了とみなす無音(ms)。短くして投機生成を早く始める
  * (どのみち Claude の応答に時間がかかる=その死に時間が「発話再開を待つ窓」になる)。
  * 第一声(コミット)が出る前にユーザが再開すれば静かにキャンセルして連結し直す。

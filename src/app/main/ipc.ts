@@ -7,6 +7,7 @@ import {
   LISTENING_ENABLED_ENV,
   VAD_PROVISIONAL_SILENCE_MS,
   GREETING_GENERATION_TIMEOUT_MS,
+  TURN_TIMEOUT_MS,
 } from '../../shared/constants';
 import { replaceLastAssistantText, appendShortTerm } from '../../memory/short-term';
 import { nowLocalIso } from '../../shared/datetime';
@@ -83,11 +84,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   const coordinator = coalesceOn
     ? new VoiceTurnCoordinator({
         generate: async (text, signal, onFirstAudio) => {
-          // 音声(投機)ターン開始=進行中のテキストターンを畳む(相互排他・single-flight)。
-          runtime.textTurn?.ctrl.abort();
-          runtime.textTurn = null;
-          const gen = await generateResponse(text, runtime, mainWindow, signal, onFirstAudio, {
+          // 音声が「第一声=コミット」した時だけテキストターンを畳む(相互排他)。投機段階では畳まない=
+          // タイピング中のマイク雑音由来の投機gen で誤ってテキストターンを中断しない(穴G)。
+          const onCommitted = (): void => {
+            runtime.textTurn?.ctrl.abort();
+            runtime.textTurn = null;
+            onFirstAudio();
+          };
+          runtime.generating = true; // 抽出をこの生成中は見送らせる(穴D)
+          const gen = await generateResponse(text, runtime, mainWindow, signal, onCommitted, {
             playFiller: false, // 投機中は出さない(コミット前のちらつき回避)
+          }).finally(() => {
+            runtime.generating = false;
           });
           if (!gen) throw new Error('not ready');
           lastAudioStreamed = gen.audioStreamed;
@@ -154,6 +162,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // barge-in: renderer が「実際に聞かせた発言(再生済みの文を連結)」を報告する(Phase B)。テキスト発話中なら
   // 中断＋「ユーザ＋聞かせた分」をコミット(全文は記憶しない)、音声/生成完了後は coordinator に委ねる(切り詰め)。
   ipcMain.on('ene:voice-heard', (_event, heardText: string) => {
+    // 自発発話/挨拶(ターン機構の外)も止める(穴A)。
+    runtime.selfSpeech?.abort();
+    runtime.selfSpeech = null;
     const tt = runtime.textTurn;
     if (tt) {
       tt.ctrl.abort();
@@ -170,14 +181,16 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     'ene:send-message',
     async (_event, text: string): Promise<ConversationResponse | null> => {
       const ctrl = beginTextTurn(text);
+      const timer = setTimeout(() => ctrl.abort(), TURN_TIMEOUT_MS); // ハング自動復帰(穴C)
       try {
         return await handleSendMessage(text, runtime, mainWindow, ctrl.signal);
       } catch (err) {
-        if (ctrl.signal.aborted) return null; // 中断(barge-in / supersede)=破棄
+        if (ctrl.signal.aborted) return null; // 中断(barge-in / supersede / タイムアウト)=破棄
         // IPC ハンドラから例外を漏らさない(Renderer をクラッシュさせない)。
         log.error('send-message handler failed', { name: (err as Error).name });
         return ERROR_RESPONSE;
       } finally {
+        clearTimeout(timer);
         if (runtime.textTurn?.ctrl === ctrl) runtime.textTurn = null;
       }
     },
@@ -289,7 +302,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       // 吹き出し表示のみで無音だったため配線する。fire-and-forget=テキスト返却(吹き出し)を待たせない。
       // tts/voiceConfig が揃っている時だけ(オフライン/エンジン未配置なら従来どおり無音テキスト)。emotion は neutral。
       if (runtime.tts && runtime.voiceConfig) {
-        void speakResponse(greeting, 'neutral', runtime.tts, runtime.voiceConfig, mainWindow);
+        // 起動挨拶も barge-in で止められるよう中断ハンドルを張り替えて signal を渡す(穴A)。
+        runtime.selfSpeech?.abort();
+        const ctrl = new AbortController();
+        runtime.selfSpeech = ctrl;
+        void speakResponse(greeting, 'neutral', runtime.tts, runtime.voiceConfig, mainWindow, ctrl.signal);
       }
     }
     return greeting;

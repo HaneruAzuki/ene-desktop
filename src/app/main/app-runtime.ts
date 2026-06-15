@@ -36,4 +36,15 @@ export interface AppRuntime {
    * テキスト開始時に reset、音声生成開始時に textTurn を中断して相互排他にする。
    */
   textTurn?: { ctrl: AbortController; userText: string } | null;
+  /**
+   * 自発発話/起動挨拶(ユーザー入力に紐づかない発話)の中断ハンドル(穴A)。これらは speakResponse 直呼びで
+   * ターン機構の外にあるため、barge-in で止められるよう signal をここから渡す。発話開始で張り替え、barge-in で abort。
+   */
+  selfSpeech?: AbortController | null;
+  /**
+   * 会話応答の生成(Claude＋TTS)が進行中か(穴D)。バックグラウンドの記憶抽出は API 輻輳を避けるため、
+   * これが true の間は開始を見送る(best-effort=生成中に始まらない。既に走行中の抽出は止めない)。
+   * テキスト/音声どちらの経路も相互 abort で同時1本のため boolean で足りる。
+   */
+  generating?: boolean;
 }

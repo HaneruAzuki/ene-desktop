@@ -95,7 +95,7 @@ export async function generateResponse(
     } catch (e) {
       if (signal.aborted) throw e; // 中断は破棄のため上位(coordinator)へ伝える(フォールバックしない)
       log.warn('voice streaming failed; falling back to non-streaming', { name: (e as Error).name });
-      response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model);
+      response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model, signal);
     }
   } else {
     response = await chat(text, charContext, memoryContext, routerResult, apiKey, { onAuthError }, model);
@@ -144,7 +144,8 @@ export async function commitTurn(
     const hint = id ? buildNameMishearHint(id.selfRecognition.callsSelf, id.sttAliases ?? []) : '';
     const complete = withNameMishearHint(makeLlmComplete(apiKey), hint);
     await enforceShortTermCap(complete);
-    requestExtraction(complete);
+    // 会話生成中は抽出を見送る(穴D・API輻輳の best-effort 回避)。
+    requestExtraction(complete, () => Boolean(runtime.generating));
   }
 
   // 6. OS コマンドなら実行(失敗時はキャラ口調フォールバックに差し替え＋エラー発話)。
@@ -199,12 +200,15 @@ export async function handleSendMessage(
 ): Promise<ConversationResponse | null> {
   if (!runtime.charContext || !runtime.apiKey) return NOT_READY;
   let gen: { response: ConversationResponse; audioStreamed: boolean } | null;
+  runtime.generating = true; // 抽出をこの生成中は見送らせる(穴D)
   try {
     gen = await generateResponse(text, runtime, mainWindow, signal, NOOP, { playFiller: true });
   } catch (e) {
     // 中断(barge-in / supersede)は破棄=null(遅延して返った応答は使わない)。それ以外は上位へ。
     if (signal.aborted) return null;
     throw e;
+  } finally {
+    runtime.generating = false;
   }
   if (signal.aborted) return null;
   if (!gen) return NOT_READY;

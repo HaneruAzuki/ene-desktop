@@ -10,6 +10,7 @@ import {
   LISTENING_ENTER_SILENT_CANCELS,
   LISTENING_MAX_CHARS,
   LISTENING_YAWN_MS,
+  TURN_TIMEOUT_MS,
 } from '../../shared/constants';
 
 /** 傾聴入室後、この時間ユーザの発話が無ければ自動退室する(姿勢を戻す・固着回避・listening-mode)。 */
@@ -281,6 +282,9 @@ export class VoiceTurnCoordinator {
     const ctrl = new AbortController();
     const g: ActiveGen = { ctrl, committed: false, text, bargedIn: false };
     this.gen = g;
+    // ハング自動復帰(穴C): 上限時間で生成を打ち切る。unref でテスト/プロセスを延命しない。
+    const timer = setTimeout(() => ctrl.abort(), TURN_TIMEOUT_MS);
+    timer.unref?.();
     try {
       const response = await this.deps.generate(text, ctrl.signal, () => {
         g.committed = true;
@@ -308,6 +312,8 @@ export class VoiceTurnCoordinator {
       }
       // 破棄(pending は保持し次の end で連結)。自分が最新なら掃除。
       if (this.gen === g) this.gen = null;
+    } finally {
+      clearTimeout(timer); // タイムアウトタイマーを解放(穴C)
     }
   }
 }

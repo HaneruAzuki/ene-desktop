@@ -176,8 +176,13 @@ export class IdleTalkManager {
     }
     // 音声があれば喋る(通常応答と同じ speakResponse→voice-chunk 経路=エコーガードは相槌で実証済みの経路を継承)。
     // push-to-talk(既定)はマイクが押下中のみ=自声を拾わない。ハンズフリーは相槌と同じ再生ガードで保護される。
-    if (tts && voiceConfig)
-      void speakResponse(msg.message, emotion, tts, voiceConfig, this.mainWindow);
+    // 自発発話も barge-in で止められるよう、中断ハンドルを張り替えて signal を渡す(穴A)。
+    if (tts && voiceConfig) {
+      this.runtime.selfSpeech?.abort();
+      const ctrl = new AbortController();
+      this.runtime.selfSpeech = ctrl;
+      void speakResponse(msg.message, emotion, tts, voiceConfig, this.mainWindow, ctrl.signal);
+    }
     log.info('idle talk emitted');
   }
 

@@ -75,18 +75,25 @@ function toMessagesParam(messages: BuiltPrompt['messages']): Anthropic.Beta.Prom
   );
 }
 
-function makeDefaultDeps(apiKey: string, model: string = CONVERSATION_MODEL): ChatDeps {
+function makeDefaultDeps(
+  apiKey: string,
+  model: string = CONVERSATION_MODEL,
+  signal?: AbortSignal, // 中断(barge-in / supersede)。非ストリーミング fallback でも HTTP を打ち切れるように。
+): ChatDeps {
   const client = createClient(apiKey);
   return {
     callModel: async ({ system, messages }) => {
       // 0.30.1 のプロンプトキャッシュはベータ名前空間(N-14)。Tier0 を固定プレフィックスとして使い回す。
-      const resp = await client.beta.promptCaching.messages.create({
-        model, // 二段生成(B-15b): Haiku/Sonnet をターンごとに切替可。既定=Sonnet。
-        max_tokens: MAX_TOKENS,
-        temperature: TEMPERATURE,
-        system: toSystemParam(system),
-        messages: toMessagesParam(messages),
-      });
+      const resp = await client.beta.promptCaching.messages.create(
+        {
+          model, // 二段生成(B-15b): Haiku/Sonnet をターンごとに切替可。既定=Sonnet。
+          max_tokens: MAX_TOKENS,
+          temperature: TEMPERATURE,
+          system: toSystemParam(system),
+          messages: toMessagesParam(messages),
+        },
+        signal ? { signal } : undefined,
+      );
       // キャッシュ命中状況をログ(トークン数のみ・会話内容や PII は載せない・CLAUDE §6.2)。
       const u = resp.usage;
       log.info(
@@ -189,9 +196,10 @@ function resolveDeps(
   apiKey: string,
   deps?: Partial<ChatDeps>,
   model: string = CONVERSATION_MODEL,
+  signal?: AbortSignal,
 ): ChatDeps {
   const hasCustomModel = Boolean(deps?.callModel);
-  const base = hasCustomModel ? null : makeDefaultDeps(apiKey, model);
+  const base = hasCustomModel ? null : makeDefaultDeps(apiKey, model, signal);
   return {
     callModel: deps?.callModel ?? (base as ChatDeps).callModel,
     checkTokens: deps?.checkTokens ?? (hasCustomModel ? skipTokenCheck : (base as ChatDeps).checkTokens),
@@ -207,8 +215,9 @@ export async function chat(
   apiKey: string,
   deps?: Partial<ChatDeps>,
   model: string = CONVERSATION_MODEL, // 二段生成(B-15b)。既定=Sonnet。
+  signal?: AbortSignal, // 中断(barge-in / supersede)。fallback の非ストリーミング呼び出しでも HTTP を打ち切る。
 ): Promise<ConversationResponse> {
-  const { callModel, checkTokens, onAuthError } = resolveDeps(apiKey, deps, model);
+  const { callModel, checkTokens, onAuthError } = resolveDeps(apiKey, deps, model, signal);
   const neverCallsSelf = charContext.identity.selfRecognition.neverCallsSelf;
 
   // 第1防御: プロンプトに neverCallsSelf を明示(buildPrompt 内)

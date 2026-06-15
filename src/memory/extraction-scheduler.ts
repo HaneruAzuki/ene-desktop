@@ -30,9 +30,9 @@ let pending = false;
  * 返り値の Promise は「現在の抽出サイクルの完了」を表す。
  * 本番の会話経路は **await しない**(レイテンシに影響させない)。テストは await して観測する。
  */
-export function requestExtraction(complete: LlmComplete): Promise<void> {
+export function requestExtraction(complete: LlmComplete, isBusy?: () => boolean): Promise<void> {
   if (!inFlight) {
-    inFlight = runCycle(complete);
+    inFlight = runCycle(complete, isBusy);
   } else {
     pending = true;
   }
@@ -74,10 +74,12 @@ export async function flushExtraction(complete: LlmComplete): Promise<void> {
  * 1サイクル = 「閾値を満たす限り抽出を繰り返す」。
  * ただし1回の抽出ごとに pending を見て、外から来た追走要求がなければ抜ける。
  */
-async function runCycle(complete: LlmComplete): Promise<void> {
+async function runCycle(complete: LlmComplete, isBusy?: () => boolean): Promise<void> {
   try {
     do {
       pending = false;
+      // 会話応答の生成中は抽出を見送る(穴D・API輻輳の best-effort 回避)。次の requestExtraction で再試行される。
+      if (isBusy?.()) break;
       const unextracted = await getUnextractedEntries();
       if (unextracted.length < EXTRACTION_BATCH_THRESHOLD) break;
       // 計測:抽出にかかった ms を残す。これは**会話の total には乗らない**(背景・B-01)ことを示す。

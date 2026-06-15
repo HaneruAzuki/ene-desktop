@@ -7,6 +7,19 @@ import type { ShortTermEntry } from '../shared/types/memory';
 // 短期記憶(設計書 §3.3)。セッション内の直近会話を保持する。
 // 逐語ログではなく、抽出済みフラグ付きの一時バッファ(終了時に削除される)。
 
+// read-modify-write の直列化ロック(穴E)。barge-in コミットと次ターンのコミットが同時に
+// short-term.json を読み書きすると、後勝ちで片方の追記が失われる。全ての書き込み操作を
+// この鎖に通して原子性を保つ(読み取り getShortTerm 単体は対象外=書き込みは原子的に行われる)。
+let writeLock: Promise<unknown> = Promise.resolve();
+function withWriteLock<T>(op: () => Promise<T>): Promise<T> {
+  const run = writeLock.then(op, op); // 直前が成功/失敗どちらでも続行
+  writeLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function getShortTerm(): Promise<ShortTermEntry[]> {
   return (await readJson<ShortTermEntry[]>(getShortTermPath())) ?? [];
 }
@@ -39,12 +52,14 @@ function trimExtractedOverflow(list: ShortTermEntry[]): void {
  * (設計書 §3.3)。中期記憶への抽出は呼出側がバックグラウンドで行う(B-01・extraction-scheduler)。
  */
 export async function appendShortTerm(entry: ShortTermEntry): Promise<void> {
-  const list = await getShortTerm();
-  list.push(entry);
-  if (list.length > SHORT_TERM_MAX_ENTRIES) {
-    trimExtractedOverflow(list);
-  }
-  await saveShortTerm(list);
+  return withWriteLock(async () => {
+    const list = await getShortTerm();
+    list.push(entry);
+    if (list.length > SHORT_TERM_MAX_ENTRIES) {
+      trimExtractedOverflow(list);
+    }
+    await saveShortTerm(list);
+  });
 }
 
 /**
@@ -53,16 +68,18 @@ export async function appendShortTerm(entry: ShortTermEntry): Promise<void> {
  * **抽出済み(extracted=true)なら触らない**(既に中期記憶へ移った内容を後から改変しない・安全側)。
  */
 export async function replaceLastAssistantText(text: string): Promise<void> {
-  const list = await getShortTerm();
-  for (let i = list.length - 1; i >= 0; i--) {
-    const e = list[i];
-    if (e && e.role === 'assistant') {
-      if (e.extracted || e.text === text) return; // 抽出済み/変化なしは何もしない
-      e.text = text;
-      await saveShortTerm(list);
-      return;
+  return withWriteLock(async () => {
+    const list = await getShortTerm();
+    for (let i = list.length - 1; i >= 0; i--) {
+      const e = list[i];
+      if (e && e.role === 'assistant') {
+        if (e.extracted || e.text === text) return; // 抽出済み/変化なしは何もしない
+        e.text = text;
+        await saveShortTerm(list);
+        return;
+      }
     }
-  }
+  });
 }
 
 /** 短期記憶ファイルを削除する(アプリ終了時・設計書 §7.2)。 */
@@ -77,16 +94,18 @@ export async function getUnextractedEntries(): Promise<ShortTermEntry[]> {
 
 /** 指定 timestamp のエントリの extracted を true にする(重複抽出防止)。 */
 export async function markAsExtracted(timestamps: string[]): Promise<void> {
-  const targets = new Set(timestamps);
-  const list = await getShortTerm();
-  let changed = false;
-  for (const e of list) {
-    if (targets.has(e.timestamp) && !e.extracted) {
-      e.extracted = true;
-      changed = true;
+  return withWriteLock(async () => {
+    const targets = new Set(timestamps);
+    const list = await getShortTerm();
+    let changed = false;
+    for (const e of list) {
+      if (targets.has(e.timestamp) && !e.extracted) {
+        e.extracted = true;
+        changed = true;
+      }
     }
-  }
-  if (changed) {
-    await saveShortTerm(list);
-  }
+    if (changed) {
+      await saveShortTerm(list);
+    }
+  });
 }

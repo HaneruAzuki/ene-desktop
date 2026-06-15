@@ -455,13 +455,10 @@ export function App(): React.ReactElement | null {
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
-    if (setBubbleToo) {
-      setBubble(response.message);
-      // 非ストリーミング音声(全文を一度に表示)は setSentenceHandler が呼ばれず spokenRef が空のまま。
-      // barge-in 時に「聞かせた分」が空=記憶を空に切り詰める不具合(A4)を防ぐため全文を種として置く
-      // (途中で割り込まれても全文を記憶=割り込み無しと同じ=安全側)。ストリーミング時は index=0 で上書きされる。
-      spokenRef.current = [response.message];
-    }
+    // 吹き出しの全文表示は非ストリーミング(全文を一度に出す)用。spokenRef はここで触らない:
+    // ストリーミングでは setSentenceHandler が再生に同期して積むので、ここで種を置くと再生中の残り文が
+    // 後から push されて「1,2,3,2,3」と重複する。非ストリーミングの barge-in は heardText 空→A3 ガードが全文保持。
+    if (setBubbleToo) setBubble(response.message);
 
     const talkMs = Math.min(
       TALKING_MAX_MS,
