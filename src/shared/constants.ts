@@ -251,7 +251,7 @@ export const VAD_SPEECH_PAD_MS = 200;
  * (docs/listening-mode-design.md §6-1)。非対称(長い答えを失う ≫ 一拍の重なり)ゆえ切らない側に倒す。
  * 実機調整可(500〜800の範囲が目安。元320はエコー対策で実機調整した値)。
  */
-export const VAD_BARGE_IN_MIN_SPEECH_MS = 500;
+export const VAD_BARGE_IN_MIN_SPEECH_MS = 220;
 
 // --- 能動的リスニング(相槌エンジン・task_18 Phase A) ---
 // 既存 VAD の発話確率列(silero-vad / vad-segmenter)に相乗りして、
