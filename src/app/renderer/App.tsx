@@ -85,7 +85,7 @@ export function App(): React.ReactElement | null {
   const [vrmDisplay, setVrmDisplay] = useState<VrmDisplayParams | null>(null);
   const [visible, setVisible] = useState(true); // ウィンドウ可視性(非表示で VRM 描画停止)
   const [showSettings, setShowSettings] = useState(false); // 統合設定パネル(段階6)
-  const [idleTalk, setIdleTalk] = useState<IdleTalkMode>('low'); // 話しかけてくる頻度(段階6)
+  const [idleTalk, setIdleTalk] = useState<IdleTalkMode>('on'); // 自分から話しかける する/しない(段階6)
   const [autoLaunch, setAutoLaunch] = useState(false); // PC起動時に自動起動(段階6)
   const [ownerName, setOwnerName] = useState(''); // 主人の呼び方(設定で登録/変更)
   const [ownerReading, setOwnerReading] = useState(''); // 呼び方の読み(かな・音声用)

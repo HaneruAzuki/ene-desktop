@@ -13,9 +13,10 @@ import type { AppRuntime } from './app-runtime';
 // 設定の保存先は app-settings.json(平文・§6.1)。lifecycle から registerSettingsIpc で登録する。
 
 export function registerSettingsIpc(mainWindow: BrowserWindow, runtime: AppRuntime): void {
-  // 話しかけてくる頻度(自発発話・P7)。idle-talk-manager が loadAppSettings で都度参照する。
+  // 自発発話を する/しない(P7)。idle-talk-manager が loadAppSettings で都度参照する。
+  // 旧値(low/normal)は on に丸めて返す(2026-06: 頻度段階→する/しないへ簡素化・後方互換)。
   ipcMain.handle('ene:get-idle-talk', async (): Promise<IdleTalkMode> => {
-    return (await loadAppSettings()).idleTalk ?? 'low';
+    return (await loadAppSettings()).idleTalk === 'off' ? 'off' : 'on';
   });
   ipcMain.handle('ene:save-idle-talk', async (_event, mode: IdleTalkMode): Promise<void> => {
     await saveIdleTalk(mode);
@@ -29,9 +30,12 @@ export function registerSettingsIpc(mainWindow: BrowserWindow, runtime: AppRunti
   });
   // 設定からの「意図的な」登録/変更。会話/抽出のロック(lockOwnerName)は extraction-trigger 側だけなので、
   // この updateSemantic 直呼び経路は通る=ここでだけ呼び方を確定/改名できる。読みが空なら読みを消す。
-  ipcMain.handle('ene:set-owner-name', async (_event, name: string, reading: string): Promise<void> => {
-    await updateSemantic({ userName: name.trim(), userNameReading: reading.trim() || undefined });
-  });
+  ipcMain.handle(
+    'ene:set-owner-name',
+    async (_event, name: string, reading: string): Promise<void> => {
+      await updateSemantic({ userName: name.trim(), userNameReading: reading.trim() || undefined });
+    },
+  );
 
   // APIキーを変更(ダイアログを開く)。保存成功時は実行時 apiKey を更新し、即座に会話可能にする。
   ipcMain.handle('ene:open-api-key-dialog', async (): Promise<void> => {

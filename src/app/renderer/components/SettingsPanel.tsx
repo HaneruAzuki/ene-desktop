@@ -29,9 +29,8 @@ interface Props {
 }
 
 const IDLE_OPTIONS: { value: IdleTalkMode; label: string }[] = [
+  { value: 'on', label: 'する' },
   { value: 'off', label: 'しない' },
-  { value: 'low', label: '控えめ' },
-  { value: 'normal', label: 'ふつう' },
 ];
 
 // 調整範囲(2026-06 ユーザー指定)。腕下げは -70 固定でスライダーを出さない。数値は表示しない。
@@ -113,7 +112,7 @@ export const SettingsPanel = forwardRef<HTMLDivElement, Props>(function Settings
       </div>
 
       <div className="settings-panel__section">
-        <div className="settings-panel__label">話しかけてくる頻度</div>
+        <div className="settings-panel__label">自分から話しかける</div>
         <div className="settings-seg">
           {IDLE_OPTIONS.map((o) => (
             <button

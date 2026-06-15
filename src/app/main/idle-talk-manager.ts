@@ -92,9 +92,9 @@ export class IdleTalkManager {
       if (this.runtime.away) return; // 離席中は自分から話しかけない(UI改修 段階5)
 
       const settings = await loadAppSettings();
-      // 設定 off か env で明示無効なら黙る。既定は low(有効)。
+      // 設定 off か env で明示無効なら黙る。既定は on(有効)。旧 low/normal は !== 'off' で on 相当。
       const enabled =
-        (settings.idleTalk ?? 'low') !== 'off' && process.env[IDLE_TALK_ENABLED_ENV] !== '0';
+        (settings.idleTalk ?? 'on') !== 'off' && process.env[IDLE_TALK_ENABLED_ENV] !== '0';
 
       const now = Date.now();
       const d = new Date();
