@@ -9,7 +9,7 @@ import {
 import { log } from '../shared/logger';
 import { localIsoFromParts, nowLocalIso, todayLocalYmd } from '../shared/datetime';
 import { loadAllEpisodicFiles, saveEpisodic, deleteEpisodicById } from './episodic';
-import { indexEpisodic, rebuildInvertedIndex } from './index-inverted';
+import { rebuildInvertedIndex } from './index-inverted';
 import { pruneVectorIndex } from './index-vector';
 import { planConsolidation, type SummaryTier } from './consolidation-policy';
 import { summarizePeriod, type PeriodSummary } from './summarizer';
@@ -106,8 +106,9 @@ export async function runForgetting(
     try {
       const s = await summarizePeriod(job.toSummarize, job.label, complete);
       const mem = buildSummaryMemory(s, job.tier, job.year, job.month, job.importance, job.toSummarize.length);
-      const id = await saveEpisodic(mem);
-      await indexEpisodic(id, mem);
+      await saveEpisodic(mem);
+      // 索引はこのループ後の rebuildInvertedIndex() でまとめて作り直す(削除済みIDの掃除も含め一括が真実)。
+      // ここで indexEpisodic を呼んでも結果は直後の rebuild で捨てられる=無駄なファイル読み書き(2026-06 整理)。
       summaries++;
       // 要約できた期間だけ削除する(失敗時はここに来ない=記憶を温存)。
       for (const delId of job.toDelete) {

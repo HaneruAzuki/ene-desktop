@@ -66,6 +66,13 @@ function looselyMatches(key: string, needle: string): boolean {
  * - entities キー: クエリ文に含まれる / 渡された entities と緩く一致
  * - keywords キー: クエリ文に含まれる
  * 戻り値は出現順(重複排除)。
+ *
+ * 設計上の割り切り(2026-06 監査で確認・意図的):
+ * - 日本語は語境界が無いため、キーをハッシュ参照せず全キーを走査して部分一致で引く(O(キー数))。
+ *   個人記憶の規模(数百〜数千記録)では sub-ms で、想起の支配項(Claude API・埋め込み)に対し無視できる。
+ *   形態素解析器の導入(トークン化索引)は新規依存＝§4.3 軽量原則に反し、体感利得も無いため採らない。
+ * - 部分一致は過剰一致しうる(短いキーが多くの文に当たる)が、語彙アームは RRF で意味アームと融合し
+ *   importance/recency で整列されるため許容範囲。真実の源は episodic 本体(索引は派生キャッシュ)。
  */
 export async function queryInverted(text: string, entities: string[] = []): Promise<string[]> {
   const index = await loadInvertedIndex();
