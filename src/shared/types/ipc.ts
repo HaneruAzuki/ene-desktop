@@ -31,7 +31,8 @@ export interface VoiceChunk {
 
 export interface EneAPI {
   // 会話関連
-  sendMessage(text: string): Promise<ConversationResponse>;
+  // 中断(barge-in / 新ターンによる supersede)で破棄されたターンは null を返す(renderer は UI 反映しない)。
+  sendMessage(text: string): Promise<ConversationResponse | null>;
 
   // キャラクター関連
   getCharacterInfo(): Promise<CharacterInfo>;

@@ -56,8 +56,12 @@ export interface TtsStyle {
  * 実装は localhost のローカル API を叩く(外部通信ではない・§4.2維持)。
  */
 export interface TtsEngine {
-  /** 1文を合成して音声バイト(WAV)を返す。 */
-  speak(text: string, opts: TtsOptions): Promise<ArrayBuffer>;
+  /**
+   * 1文を合成して音声バイト(WAV)を返す。
+   * signal: 中断(ターンの supersede / barge-in)。abort されたら進行中の合成 HTTP を打ち切り、
+   * 捨てたはずの合成がエンジンに残って後続を詰まらせない(single-flight・連続リクエストの輻輳防止)。
+   */
+  speak(text: string, opts: TtsOptions, signal?: AbortSignal): Promise<ArrayBuffer>;
   /** 利用可能なスタイル一覧を取得(/speakers)。 */
   listStyles(): Promise<TtsStyle[]>;
 }

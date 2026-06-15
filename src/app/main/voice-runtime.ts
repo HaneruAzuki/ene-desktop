@@ -120,6 +120,7 @@ export async function speakResponse(
   tts: TtsEngine,
   voiceConfig: VoiceConfig,
   mainWindow: BrowserWindow,
+  signal?: AbortSignal, // 中断(ターンの supersede / barge-in)。abort で合成を打ち切り、孤児を残さない。
 ): Promise<void> {
   try {
     await speakText(spokenText, emotion, {
@@ -130,8 +131,10 @@ export async function speakResponse(
       onAudio: (wav) => {
         if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-chunk', { wav });
       },
+      signal,
     });
   } catch (e) {
+    if (signal?.aborted) return; // 中断は想定内(barge-in / supersede)=無言で破棄
     log.warn(`voice synthesis failed: ${(e as Error).name}`);
   }
 }

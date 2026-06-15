@@ -71,7 +71,8 @@ export async function runVoiceChat(
     }
     // 中断(投機キャンセル)済みなら、この文は合成も発話もしない(音声を漏らさない)。
     if (deps.signal?.aborted) throwAborted();
-    const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion));
+    // signal を合成HTTPへ渡す=中断時に進行中の合成も即打ち切り(孤児リクエストを残さない=詰まり防止)。
+    const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion), deps.signal);
     if (deps.signal?.aborted) throwAborted(); // 合成中に中断されたら発話しない
     deps.onAudio(wav, display); // display=ルビ除去済の表示テキスト(再生同期で吹き出しに出す)
     spoken.push(display);
@@ -117,6 +118,8 @@ export interface SpeakTextDeps {
   voiceConfig: VoiceConfig;
   neverCallsSelf: string[];
   onAudio: (wav: ArrayBuffer) => void;
+  /** 中断(ターンの supersede / barge-in)。abort されたら以降の文を合成せず、進行中の合成も打ち切る。 */
+  signal?: AbortSignal;
 }
 
 export interface SpeakTextResult {
@@ -141,10 +144,11 @@ export async function speakText(
 
   const spoken: string[] = [];
   for (const s of sentences) {
+    if (deps.signal?.aborted) break; // 中断(supersede / barge-in)されたら以降の文を合成しない
     if (detectAiSelfReference(s, deps.neverCallsSelf).detected) {
       return { spokenText: spoken.join(''), blockedBySelfCheck: true };
     }
-    const wav = await deps.tts.speak(s, opts);
+    const wav = await deps.tts.speak(s, opts, deps.signal);
     deps.onAudio(wav);
     spoken.push(s);
   }

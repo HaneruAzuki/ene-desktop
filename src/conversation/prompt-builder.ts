@@ -166,6 +166,35 @@ function assistantTurn(message: string): string {
 }
 
 /**
+ * STT がキャラ名「callsSelf」を同音異字(取り身・鳥身 等)へ誤変換する問題への指示文を作る(§5.4 と同様、
+ * 検知綴りは identity.json から渡す・ハードコード禁止)。機械置換はせず、唐突/不自然な文脈での誤変換を
+ * Claude に**文脈で読み替え**させる。会話プロンプトと記憶サマリ(抽出/要約)の両方で使う。空なら指示を出さない。
+ */
+export function buildNameMishearHint(callsSelf: string, aliases: string[]): string {
+  const list = aliases.filter(Boolean);
+  if (!callsSelf || list.length === 0) return '';
+  const quoted = list.map((a) => `「${a}」`).join('');
+  return [
+    `# 名前「${callsSelf}」の聞き取りについて`,
+    `音声認識は固有名「${callsSelf}」を ${quoted} 等(同じ読み)へ誤変換することがあります。`,
+    `文脈的に唐突・不自然な位置にこれらの語が現れたら、キャラクター名「${callsSelf}」のことだと解釈・表記してください。`,
+    '「鳥見に行く」のように自然な文では、元の意味のまま扱います。',
+  ].join('\n');
+}
+
+/** LLM 呼び出し関数(memory の LlmComplete と同形)。型レイヤーを跨がないよう構造で表す。 */
+type CompleteFn = (req: { system: string; user: string; maxTokens?: number }) => Promise<string>;
+
+/**
+ * 記憶サマリ(抽出/期間要約)の LLM 呼び出しに、同音異字の読み替え指示を system へ前置きして包む。
+ * short-term 以外の記憶(episodic/サマリ)に「取り身」等が焼き付かないようにする。hint が空なら素通し。
+ */
+export function withNameMishearHint<C extends CompleteFn>(complete: C, hint: string): C {
+  if (!hint) return complete;
+  return ((req) => complete({ ...req, system: `${req.system}\n\n${hint}` })) as C;
+}
+
+/**
  * Tier0(不変・cacheable):人格＋出力形式＋自称制約。キャラ単位で毎ターン同一バイト列。
  * クリック起点ウォーム(task_14 Phase 3)が本会話と**同一の Tier0** を温めるため export する。
  */
@@ -173,6 +202,10 @@ export function buildTier0(charContext: CharacterContext): SystemBlock {
   const neverList = charContext.identity.selfRecognition.neverCallsSelf
     .map((w) => `「${w}」`)
     .join('');
+  const nameHint = buildNameMishearHint(
+    charContext.identity.selfRecognition.callsSelf,
+    charContext.identity.sttAliases ?? [],
+  );
   const text = [
     charContext.systemPrompt,
     '',
@@ -182,6 +215,7 @@ export function buildTier0(charContext: CharacterContext): SystemBlock {
     '',
     '# 重要(自称の制約)',
     `あなたは絶対に ${neverList} と自称しません。`,
+    ...(nameHint ? ['', nameHint] : []),
   ].join('\n');
   return { type: 'text', text, cacheable: true };
 }

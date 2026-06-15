@@ -8,6 +8,7 @@ import { buildConversationMemory } from '../../memory/context-builder';
 import { requestExtraction, enforceShortTermCap } from '../../memory/extraction-scheduler';
 import { classifyTopicLocal } from '../../knowledge/local-classifier';
 import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../conversation/client';
+import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
 import { chooseModelTier } from '../../conversation/model-selector';
 import { shouldPlayThinkingFiller } from '../../voice/thinking-filler';
 import { executeOsCommand } from './os/executor';
@@ -35,8 +36,6 @@ const NOT_READY: ConversationResponse = {
   message: '…ちょっと待ってね、まだ準備ができてないみたい。',
 };
 
-/** テキスト経路など「中断しない」呼び出し用の never-abort シグナル。 */
-const NEVER_ABORT = new AbortController();
 const NOOP = (): void => {};
 
 /**
@@ -122,10 +121,11 @@ export async function commitTurn(
   audioStreamed: boolean,
   runtime: AppRuntime,
   mainWindow: BrowserWindow,
+  signal?: AbortSignal, // ターンの中断(barge-in / supersede)。非ストリーミングの確定発話を打ち切れるよう渡す。
 ): Promise<ConversationResponse> {
   const speakOut = (spokenText: string, emo: EmotionLabel): void => {
     const { tts, voiceConfig } = runtime;
-    if (tts && voiceConfig) void speakResponse(spokenText, emo, tts, voiceConfig, mainWindow);
+    if (tts && voiceConfig) void speakResponse(spokenText, emo, tts, voiceConfig, mainWindow, signal);
   };
 
   // 1. user を短期記憶へ ＋ 関係の事実を記録(ターンが確定したら=コミット時・task_16)。
@@ -139,8 +139,12 @@ export async function commitTurn(
   // 5b/5c. 短期上限の死守＋記憶抽出(背景・await しない)。apiKey はコミット時点で存在する。
   const { apiKey } = runtime;
   if (apiKey) {
-    await enforceShortTermCap(makeLlmComplete(apiKey));
-    requestExtraction(makeLlmComplete(apiKey));
+    // 同音異字の読み替え指示を抽出 LLM の system に前置き(short-term 以外の記憶を汚染させない・§4.5)。
+    const id = runtime.charContext?.identity;
+    const hint = id ? buildNameMishearHint(id.selfRecognition.callsSelf, id.sttAliases ?? []) : '';
+    const complete = withNameMishearHint(makeLlmComplete(apiKey), hint);
+    await enforceShortTermCap(complete);
+    requestExtraction(complete);
   }
 
   // 6. OS コマンドなら実行(失敗時はキャラ口調フォールバックに差し替え＋エラー発話)。
@@ -191,9 +195,18 @@ export async function handleSendMessage(
   text: string,
   runtime: AppRuntime,
   mainWindow: BrowserWindow,
-): Promise<ConversationResponse> {
+  signal: AbortSignal, // 現在ターンの中断シグナル(barge-in / 新ターンによる supersede)。
+): Promise<ConversationResponse | null> {
   if (!runtime.charContext || !runtime.apiKey) return NOT_READY;
-  const gen = await generateResponse(text, runtime, mainWindow, NEVER_ABORT.signal, NOOP, { playFiller: true });
+  let gen: { response: ConversationResponse; audioStreamed: boolean } | null;
+  try {
+    gen = await generateResponse(text, runtime, mainWindow, signal, NOOP, { playFiller: true });
+  } catch (e) {
+    // 中断(barge-in / supersede)は破棄=null(遅延して返った応答は使わない)。それ以外は上位へ。
+    if (signal.aborted) return null;
+    throw e;
+  }
+  if (signal.aborted) return null;
   if (!gen) return NOT_READY;
-  return commitTurn(text, gen.response, gen.audioStreamed, runtime, mainWindow);
+  return commitTurn(text, gen.response, gen.audioStreamed, runtime, mainWindow, signal);
 }

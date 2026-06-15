@@ -29,4 +29,11 @@ export interface AppRuntime {
   triggerIdleTalk?: () => void;
   /** 離席中か(UI改修 段階5・☕ボタン)。true の間は自発発話を止める(誰もいない椅子に話しかけない)。 */
   away?: boolean;
+  /**
+   * 進行中のテキスト発話ターン(#8 単一中断機構)。新ターン/barge-in で ctrl.abort() し、Claudeストリーム＋
+   * TTS合成を signal で打ち切る(遅延応答の無視・連続リクエストの詰まり防止)。userText は barge-in 時の
+   * 「ユーザ＋聞かせた分」記憶コミットに使う。音声(コアレッシング)ターンは VoiceTurnCoordinator が別途管理し、
+   * テキスト開始時に reset、音声生成開始時に textTurn を中断して相互排他にする。
+   */
+  textTurn?: { ctrl: AbortController; userText: string } | null;
 }

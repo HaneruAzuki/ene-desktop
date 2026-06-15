@@ -15,6 +15,7 @@ interface FetchInit {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
+  signal?: AbortSignal; // 中断(ターンの supersede / barge-in)。abort で進行中の合成HTTPを打ち切る。
 }
 export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>;
 
@@ -84,14 +85,15 @@ export class AivisSpeechTtsEngine implements TtsEngine {
     this.fetchFn = fetchFn;
   }
 
-  async speak(text: string, opts: TtsOptions): Promise<ArrayBuffer> {
-    const query = await this.audioQuery(text, opts.styleId);
+  async speak(text: string, opts: TtsOptions, signal?: AbortSignal): Promise<ArrayBuffer> {
+    const query = await this.audioQuery(text, opts.styleId, signal);
     applyVoiceParams(query, opts);
     applyAccent(query, opts.accent); // 語ごとのアクセント上書き(相槌/フィラー調律)
     const res = await this.fetchFn(`${this.baseUrl}/synthesis?speaker=${opts.styleId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'audio/wav' },
       body: JSON.stringify(query),
+      signal, // abort で合成を打ち切る(孤児リクエストを残さない=詰まり防止)
     });
     if (!res.ok) throw new Error(`synthesis failed: ${res.status}`);
     return res.arrayBuffer();
@@ -103,9 +105,13 @@ export class AivisSpeechTtsEngine implements TtsEngine {
     return parseSpeakers(await res.json());
   }
 
-  private async audioQuery(text: string, styleId: number): Promise<Record<string, unknown>> {
+  private async audioQuery(
+    text: string,
+    styleId: number,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
     const url = `${this.baseUrl}/audio_query?speaker=${styleId}&text=${encodeURIComponent(text)}`;
-    const res = await this.fetchFn(url, { method: 'POST' });
+    const res = await this.fetchFn(url, { method: 'POST', signal });
     if (!res.ok) throw new Error(`audio_query failed: ${res.status}`);
     const json = await res.json();
     return (typeof json === 'object' && json !== null ? json : {}) as Record<string, unknown>;

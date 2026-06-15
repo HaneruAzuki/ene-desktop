@@ -10,7 +10,6 @@ import {
 } from '../../shared/constants';
 import { replaceLastAssistantText, appendShortTerm } from '../../memory/short-term';
 import { nowLocalIso } from '../../shared/datetime';
-import { correctNameMishear } from '../../voice/name-correction';
 import { getSemantic } from '../../memory/semantic';
 import { warmPromptCache } from '../../conversation/client';
 import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../character/vrm-loader';
@@ -73,12 +72,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // 文字起こしして確定テキストを renderer へ返す(renderer はそれを send-message に流す)。
   // ENE_LISTEN_ONLY=1: 相槌テスト用に応答(Claude/記憶=レイテンシ源)を止め、VAD＋相槌だけ動かす(task_18)。
   const listenOnly = process.env['ENE_LISTEN_ONLY'] === '1';
-  // STT 確定テキストの名前誤認補正(発話全体が名前エイリアスのときだけ自称へ・B-10 Part4)。
-  // identity は charContext からその都度読む(エイリアス/自称はキャラ依存値・§4.5)。STT 経路のみ。
-  const correctTranscript = (text: string): string => {
-    const id = runtime.charContext?.identity;
-    return id ? correctNameMishear(text, id.sttAliases ?? [], id.selfRecognition.callsSelf) : text;
-  };
 
   // コアレッシング(段階①): 投機生成＋連結。**既定ON**(ENE_COALESCE=0 で無効化=従来の renderer 駆動経路)。
   //   暫定ターン終了(短い無音)で generateResponse を投機実行し、発話再開で静かにキャンセル＋連結。
@@ -90,6 +83,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   const coordinator = coalesceOn
     ? new VoiceTurnCoordinator({
         generate: async (text, signal, onFirstAudio) => {
+          // 音声(投機)ターン開始=進行中のテキストターンを畳む(相互排他・single-flight)。
+          runtime.textTurn?.ctrl.abort();
+          runtime.textTurn = null;
           const gen = await generateResponse(text, runtime, mainWindow, signal, onFirstAudio, {
             playFiller: false, // 投機中は出さない(コミット前のちらつき回避)
           });
@@ -130,7 +126,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     : undefined;
   if (coalesceOn) log.info('coalescing ON (speculative generation; provisional turn-end)');
 
-  const vad = new VadRuntime(mainWindow, backchannel, listenOnly, correctTranscript, coalesce);
+  const vad = new VadRuntime(mainWindow, backchannel, listenOnly, coalesce);
   // 適応(段階②): coordinator が算出した無音窓を segmenter へ反映(§6.2: ms のみ・本文なし)。
   if (coalesceOn) {
     applySilenceWindow = (ms: number): void => {
@@ -144,19 +140,45 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
   ipcMain.on('ene:vad-stop', () => vad.stop());
   ipcMain.on('ene:vad-speaking', (_event, speaking: boolean) => vad.setSpeaking(speaking));
-  // barge-in 時に renderer が「実際に聞かせた発言(再生済みの文を連結)」を報告する(Phase B)。
-  // coordinator が生成中なら中断＋切り詰めコミット、生成完了済みなら最新 assistant を上書きする。
-  ipcMain.on('ene:voice-heard', (_event, heardText: string) => coordinator?.onBargeIn(heardText));
+  // 現在ターンの単一管理(#8/#9): テキスト/音声の発話を1つの「現在ターン」に保つ。新ターンは前ターンを
+  // supersede(中断)し、barge-in も同じ機構で止める。中断は Claude ストリーム＋TTS合成を signal で打ち切る
+  // ので、捨てた生成が API/エンジンに残って次を詰まらせない(遅延して返った応答は無視する)。
+  const beginTextTurn = (text: string): AbortController => {
+    runtime.textTurn?.ctrl.abort(); // 前のテキストターンを破棄(supersede)
+    coordinator?.reset(); // 音声(投機)ターンも畳む(相互排他)
+    const ctrl = new AbortController();
+    runtime.textTurn = { ctrl, userText: text };
+    return ctrl;
+  };
+
+  // barge-in: renderer が「実際に聞かせた発言(再生済みの文を連結)」を報告する(Phase B)。テキスト発話中なら
+  // 中断＋「ユーザ＋聞かせた分」をコミット(全文は記憶しない)、音声/生成完了後は coordinator に委ねる(切り詰め)。
+  ipcMain.on('ene:voice-heard', (_event, heardText: string) => {
+    const tt = runtime.textTurn;
+    if (tt) {
+      tt.ctrl.abort();
+      runtime.textTurn = null;
+      // audioStreamed=true で commit 内の再発話を抑止(停止は renderer の stopPlayback 済み)。空なら記憶を壊さない。
+      if (heardText)
+        void commitTurn(tt.userText, { type: 'chat', message: heardText }, true, runtime, mainWindow);
+    } else {
+      coordinator?.onBargeIn(heardText);
+    }
+  });
 
   ipcMain.handle(
     'ene:send-message',
-    async (_event, text: string): Promise<ConversationResponse> => {
+    async (_event, text: string): Promise<ConversationResponse | null> => {
+      const ctrl = beginTextTurn(text);
       try {
-        return await handleSendMessage(text, runtime, mainWindow);
+        return await handleSendMessage(text, runtime, mainWindow, ctrl.signal);
       } catch (err) {
+        if (ctrl.signal.aborted) return null; // 中断(barge-in / supersede)=破棄
         // IPC ハンドラから例外を漏らさない(Renderer をクラッシュさせない)。
         log.error('send-message handler failed', { name: (err as Error).name });
         return ERROR_RESPONSE;
+      } finally {
+        if (runtime.textTurn?.ctrl === ctrl) runtime.textTurn = null;
       }
     },
   );

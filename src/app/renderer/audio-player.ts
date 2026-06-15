@@ -109,6 +109,11 @@ export function isMuted(): boolean {
   return outputMuted;
 }
 
+/** いま実際に音声を再生中か(テキスト送信が「割り込み」かどうかの判定に使う・#8 単一中断機構)。 */
+export function isPlaying(): boolean {
+  return playing;
+}
+
 /**
  * いま再生中の音声の開口量(0〜1)。非再生時は 0。
  * VRM のリップシンク(口形 aa の weight)を駆動する純データ取得(F・設計 §11.1 振幅ドリブン)。

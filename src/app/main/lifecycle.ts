@@ -18,6 +18,7 @@ import { warmEmbedder } from '../../memory/embedder';
 import { warmStt } from '../../voice/stt-transcriber';
 import { warmLocalRouter } from '../../knowledge/local-classifier';
 import { makeLlmComplete } from '../../conversation/client';
+import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
 import { generateOffscreenLife } from '../../conversation/offscreen-life';
 import { describeElapsed, timeOfDayLabel } from '../../shared/moment';
 import { openApiKeyDialog } from './api-key-dialog';
@@ -123,12 +124,19 @@ export async function runStartupSequence(
     throw e;
   }
 
+  // 同音異字の読み替え指示(STTの「取り身」「鳥身」等→キャラ名)。記憶サマリ(抽出/期間要約)の LLM 呼び出しに
+  // 前置きし、short-term 以外の記憶に誤変換が焼き付かないようにする(§4.5・綴りは identity.json 由来)。
+  const nameHint = buildNameMishearHint(
+    charContext.identity.selfRecognition.callsSelf,
+    charContext.identity.sttAliases ?? [],
+  );
+
   // Step 8: 記憶ディレクトリ初期化 + 異常終了対策(残った短期記憶の抽出)
   await ensureMemoryDirectories();
   const orphaned = await getUnextractedEntries();
   if (orphaned.length > 0) {
     try {
-      await extractFromShortTerm('shutdown', makeLlmComplete(apiKey));
+      await extractFromShortTerm('shutdown', withNameMishearHint(makeLlmComplete(apiKey), nameHint));
       await clearShortTerm();
       log.info(`recovered ${orphaned.length} orphaned short-term entries`);
     } catch (e) {
@@ -147,7 +155,7 @@ export async function runStartupSequence(
   // 破壊的(物理削除)のため、実データでの有効化はレビュー後。
   if (isForgettingEnabled()) {
     log.info('forgetting mechanism enabled; running consolidation in background');
-    void requestForgetting(makeLlmComplete(apiKey));
+    void requestForgetting(withNameMishearHint(makeLlmComplete(apiKey), nameHint));
   }
 
   // Step 9: 誕生日判定

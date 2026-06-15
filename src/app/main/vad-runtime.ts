@@ -67,8 +67,6 @@ export class VadRuntime {
     private readonly win: BrowserWindow,
     private readonly backchannel?: BackchannelController,
     private readonly listenOnly = false,
-    // STT 確定テキストの後処理(名前誤認の保守補正など・任意)。STT 経路のみ・テキスト入力には適用しない。
-    private readonly correctTranscript?: (text: string) => string,
     // コアレッシング(段階①・ENE_COALESCE)。指定時は話終わりを暫定扱いにして coordinator を駆動する。
     private readonly coalesce?: CoalesceHooks,
   ) {
@@ -212,9 +210,7 @@ export class VadRuntime {
     //   この前に必ず VAD_MIN_SILENCE_MS の無音待ちが入る(喋り終わってから死に時間=無音 + stt)。
     const t = performance.now();
     try {
-      const raw = await transcribe(audio);
-      // 名前誤認の保守補正(発話全体が名前エイリアスのときだけ自称へ・B-10 Part4)。STT 経路のみ。
-      const text = this.correctTranscript ? this.correctTranscript(raw) : raw;
+      const text = await transcribe(audio);
       if (text && this.active) {
         // §6.2: 本文は出さない(文字数と ms のみ)。
         const silenceMs = this.coalesce?.minSilenceMs ?? VAD_MIN_SILENCE_MS;

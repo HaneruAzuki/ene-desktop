@@ -12,6 +12,7 @@ import {
   setPlaybackHandlers,
   setSentenceHandler,
   getVoiceAmplitude,
+  isPlaying,
   setOutputVolume as audioSetVolume,
   setMuted as audioSetMuted,
 } from './audio-player';
@@ -439,7 +440,8 @@ export function App(): React.ReactElement | null {
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' }));
     const response = await window.ene.sendMessage(text);
-    applyResponseUI(response);
+    // 中断(barge-in / 新ターンによる supersede)で破棄されたターンは null=UI へ反映しない(遅延応答無視)。
+    if (response) applyResponseUI(response);
   }
 
   /**
@@ -476,6 +478,8 @@ export function App(): React.ReactElement | null {
     playClick();
     setForceOpen(false);
     pushLog('user', text);
+    // 喋っている最中の送信=割り込み(現在の発話を止め、進行中の生成を畳んでから新ターンへ・#8 統一 barge-in)。
+    if (isPlaying()) handleBargeIn();
     await respond(text);
   }
 
