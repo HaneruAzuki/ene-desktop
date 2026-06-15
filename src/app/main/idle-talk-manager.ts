@@ -181,6 +181,7 @@ export class IdleTalkManager {
       this.runtime.selfSpeech?.abort();
       const ctrl = new AbortController();
       this.runtime.selfSpeech = ctrl;
+      this.runtime.setResponseActive?.(true); // 自発発話中も barge-in で止められるよう窓を開く
       void speakResponse(msg.message, emotion, tts, voiceConfig, this.mainWindow, ctrl.signal);
     }
     log.info('idle talk emitted');

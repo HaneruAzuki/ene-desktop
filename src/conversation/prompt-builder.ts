@@ -175,10 +175,11 @@ export function buildNameMishearHint(callsSelf: string, aliases: string[]): stri
   if (!callsSelf || list.length === 0) return '';
   const quoted = list.map((a) => `「${a}」`).join('');
   return [
-    `# 名前「${callsSelf}」の聞き取りについて`,
-    `音声認識は固有名「${callsSelf}」を ${quoted} 等(同じ読み)へ誤変換することがあります。`,
-    `文脈的に唐突・不自然な位置にこれらの語が現れたら、キャラクター名「${callsSelf}」のことだと解釈・表記してください。`,
-    '「鳥見に行く」のように自然な文では、元の意味のまま扱います。',
+    `# 名前「${callsSelf}」の聞き取り(重要)`,
+    `音声認識は固有名「${callsSelf}」を ${quoted} 等(同じ読み)へ誤変換します。`,
+    `これらが呼びかけ・指し示しとして現れたら、**必ず**キャラクター名「${callsSelf}」のことと解釈し、`,
+    `応答でも記録でも「${callsSelf}」と表記してください。誤変換に言及して「取り身?」のように聞き返さないこと。`,
+    `ただし「鳥見に行く(野鳥観察)」のように明らかに別語の自然な文だけは、元の意味のまま扱います。`,
   ].join('\n');
 }
 

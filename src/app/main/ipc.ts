@@ -89,6 +89,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
           const onCommitted = (): void => {
             runtime.textTurn?.ctrl.abort();
             runtime.textTurn = null;
+            runtime.setResponseActive?.(true); // 音声応答の第一声=barge-in 窓を開く
             onFirstAudio();
           };
           runtime.generating = true; // 抽出をこの生成中は見送らせる(穴D)
@@ -135,6 +136,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   if (coalesceOn) log.info('coalescing ON (speculative generation; provisional turn-end)');
 
   const vad = new VadRuntime(mainWindow, backchannel, listenOnly, coalesce);
+  // barge-in 判定窓を main の応答ターンで駆動する(構造的修正)。第一声(コミット)で true、barge-in/次ターンで false。
+  runtime.setResponseActive = (active: boolean): void => vad.setResponseActive(active);
   // 適応(段階②): coordinator が算出した無音窓を segmenter へ反映(§6.2: ms のみ・本文なし)。
   if (coalesceOn) {
     applySilenceWindow = (ms: number): void => {
@@ -154,6 +157,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   const beginTextTurn = (text: string): AbortController => {
     runtime.textTurn?.ctrl.abort(); // 前のテキストターンを破棄(supersede)
     coordinator?.reset(); // 音声(投機)ターンも畳む(相互排他)
+    runtime.setResponseActive?.(false); // 新ターン開始=前の応答の barge-in 窓を閉じる(第一声で開き直す)
     const ctrl = new AbortController();
     runtime.textTurn = { ctrl, userText: text };
     return ctrl;
@@ -162,6 +166,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // barge-in: renderer が「実際に聞かせた発言(再生済みの文を連結)」を報告する(Phase B)。テキスト発話中なら
   // 中断＋「ユーザ＋聞かせた分」をコミット(全文は記憶しない)、音声/生成完了後は coordinator に委ねる(切り詰め)。
   ipcMain.on('ene:voice-heard', (_event, heardText: string) => {
+    runtime.setResponseActive?.(false); // barge-in=この応答の窓を閉じる
     // 自発発話/挨拶(ターン機構の外)も止める(穴A)。
     runtime.selfSpeech?.abort();
     runtime.selfSpeech = null;
@@ -302,10 +307,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       // 吹き出し表示のみで無音だったため配線する。fire-and-forget=テキスト返却(吹き出し)を待たせない。
       // tts/voiceConfig が揃っている時だけ(オフライン/エンジン未配置なら従来どおり無音テキスト)。emotion は neutral。
       if (runtime.tts && runtime.voiceConfig) {
-        // 起動挨拶も barge-in で止められるよう中断ハンドルを張り替えて signal を渡す(穴A)。
+        // 起動挨拶も barge-in で止められるよう中断ハンドルを張り替えて signal を渡し、barge-in 窓を開く(穴A)。
         runtime.selfSpeech?.abort();
         const ctrl = new AbortController();
         runtime.selfSpeech = ctrl;
+        runtime.setResponseActive?.(true);
         void speakResponse(greeting, 'neutral', runtime.tts, runtime.voiceConfig, mainWindow, ctrl.signal);
       }
     }

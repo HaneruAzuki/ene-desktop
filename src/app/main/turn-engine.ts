@@ -36,7 +36,6 @@ const NOT_READY: ConversationResponse = {
   message: '…ちょっと待ってね、まだ準備ができてないみたい。',
 };
 
-const NOOP = (): void => {};
 
 /**
  * 応答を**生成**する(副作用なし=投機実行・中断に耐える)。記憶構築・ローカル判別・モデル選択・生成のみ。
@@ -202,7 +201,15 @@ export async function handleSendMessage(
   let gen: { response: ConversationResponse; audioStreamed: boolean } | null;
   runtime.generating = true; // 抽出をこの生成中は見送らせる(穴D)
   try {
-    gen = await generateResponse(text, runtime, mainWindow, signal, NOOP, { playFiller: true });
+    // 第一声(コミット)で barge-in 窓を開く=テキスト発話中の割り込みを確実に拾う(構造的修正)。
+    gen = await generateResponse(
+      text,
+      runtime,
+      mainWindow,
+      signal,
+      () => runtime.setResponseActive?.(true),
+      { playFiller: true },
+    );
   } catch (e) {
     // 中断(barge-in / supersede)は破棄=null(遅延して返った応答は使わない)。それ以外は上位へ。
     if (signal.aborted) return null;

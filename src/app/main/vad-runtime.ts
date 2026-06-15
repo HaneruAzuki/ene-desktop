@@ -55,7 +55,8 @@ export class VadRuntime {
   private loading: Promise<void> | null = null;
   private busy = false;
   private recording = false;
-  private speaking = false; // ENE が発話中(barge-in 判定用)
+  private speaking = false; // 実再生中(エコーガード=strict VAD 用・renderer 由来で明滅しうる)
+  private responseActive = false; // 応答ターンが進行中(barge-in 判定の唯一の真実・main 由来で安定=明滅しない)
   private lastSpeechEndAt = 0; // 直近の speech-end の時刻(案①: barge-in の早い/遅い分類=無音開始からの経過)
   private recorded: Float32Array[] = [];
   private ring: Float32Array[] = []; // 直近フレーム(先読みパディング用)
@@ -87,6 +88,7 @@ export class VadRuntime {
     this.recorded = [];
     this.ring = [];
     this.speaking = false;
+    this.responseActive = false;
     if (!this.loading) this.loading = this.vad.load();
     try {
       await this.loading;
@@ -106,6 +108,7 @@ export class VadRuntime {
   stop(): void {
     this.active = false;
     this.recording = false;
+    this.responseActive = false;
     this.recorded = [];
     this.ring = [];
     this.seg.reset();
@@ -118,6 +121,14 @@ export class VadRuntime {
   setSpeaking(speaking: boolean): void {
     this.speaking = speaking;
     this.seg.setStrict(speaking);
+  }
+
+  /**
+   * 応答ターンが進行中か(barge-in 判定の唯一の真実)。main の「第一声(コミット)」で true、
+   * 「barge-in/次ターン開始」で false。再生の明滅(speaking)から分離=安定して被せ割り込みを拾える。
+   */
+  setResponseActive(active: boolean): void {
+    this.responseActive = active;
   }
 
   /** 暫定ターン終了の無音窓(ms)を更新する(コアレッシングの適応・段階②・coordinator から呼ぶ)。 */
@@ -155,8 +166,8 @@ export class VadRuntime {
   }
 
   private onSpeechStart(): void {
-    if (this.speaking) {
-      // ENE が喋っている最中の発話開始 = 割り込み。
+    if (this.responseActive) {
+      // 応答ターンの進行中に発話開始 = 割り込み(明滅しない responseActive で確実に拾う)。
       this.send('ene:voice-barge-in');
       // 案①: barge-in の早い/遅いを分類して窓を伸縮(早い=無音開始=直近 speech-end から MAX窓以内)。
       if (this.coalesce && this.lastSpeechEndAt) {

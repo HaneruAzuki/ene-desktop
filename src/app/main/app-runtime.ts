@@ -47,4 +47,9 @@ export interface AppRuntime {
    * テキスト/音声どちらの経路も相互 abort で同時1本のため boolean で足りる。
    */
   generating?: boolean;
+  /**
+   * barge-in 判定窓を駆動する(構造的修正)。応答の第一声(コミット)で true、barge-in/次ターン開始で false。
+   * VadRuntime.setResponseActive を ipc 配線時に注入する。renderer の再生明滅から分離=確実に被せ割り込みを拾う。
+   */
+  setResponseActive?: (active: boolean) => void;
 }
