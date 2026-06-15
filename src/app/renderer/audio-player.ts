@@ -15,8 +15,12 @@ interface QueueItem {
 
 let ctx: AudioContext | null = null;
 const queue: QueueItem[] = [];
+// 「ENE が実際に喋っている」唯一の真実(SSOT)。main の VAD speaking フラグや相槌ダッキングは
+// この playing(onPlayStart/onPlayEnd 経由)に従属する。文間ギャップで明滅させないため下の猶予で平滑化する。
 let playing = false;
 let currentSource: AudioBufferSourceNode | null = null;
+// 文間ギャップで「再生終了」を即断しないための猶予タイマー(発話中フラグの明滅防止)。
+let endGraceTimer: ReturnType<typeof setTimeout> | null = null;
 let onPlayStart: (() => void) | null = null;
 let onPlayEnd: (() => void) | null = null;
 // 文の再生が始まった瞬間の通知(Phase A: 再生同期で吹き出しを1文ずつ伸ばす/「聞かせた文」の確定)。
@@ -46,6 +50,13 @@ let outputMuted = false;
 let ampData = new Float32Array(0);
 /** RMS(発話で概ね 0〜0.3)を開口量へ写すゲイン。大きすぎると常時フルオープン(口ガバガバ)になる。 */
 const VOICE_AMP_GAIN = 3;
+
+/**
+ * 文の再生が終わってキューが一時的に空になっても、この時間だけ「再生終了」を遅らせる(文間ギャップ吸収)。
+ * 猶予内に次チャンクが届けば終了をキャンセルして継続する=発話中フラグ(playing→VAD speaking)が文間で
+ * false→true に明滅して barge-in を取りこぼす/自声に相槌を打つのを防ぐ。実機の文間ギャップ実測に合わせ調整。
+ */
+const PLAYBACK_END_GRACE_MS = 220;
 
 function getCtx(): AudioContext {
   ctx ??= new AudioContext();
@@ -116,11 +127,19 @@ export function getVoiceAmplitude(): number {
 function playNext(): void {
   const item = queue.shift();
   if (!item) {
-    // キューが尽きた=再生終了。
-    if (playing) {
-      playing = false;
-      currentSource = null;
-      onPlayEnd?.();
+    // キューが一時的に空。ストリーミングの文間ギャップかもしれないので即「終了」とせず猶予を置く。
+    // 猶予内に次チャンクが届けば継続(enqueueAudio が timer を解除して再開)、届かなければ終了。
+    if (playing && !endGraceTimer) {
+      endGraceTimer = setTimeout(() => {
+        endGraceTimer = null;
+        if (queue.length > 0) {
+          playNext(); // 猶予中に届いていた=継続(onPlayStart は再発火しない=発話中フラグを保つ)
+          return;
+        }
+        playing = false;
+        currentSource = null;
+        onPlayEnd?.();
+      }, PLAYBACK_END_GRACE_MS);
     }
     return;
   }
@@ -146,6 +165,13 @@ export async function enqueueAudio(wav: ArrayBuffer, text?: string, index?: numb
   // decodeAudioData は渡した ArrayBuffer を detach するため、コピーを渡す。
   const buf = await c.decodeAudioData(wav.slice(0));
   queue.push({ buf, text, index });
+  if (endGraceTimer) {
+    // 文間ギャップの猶予中に次チャンク到着=継続。終了をキャンセルし、onPlayStart は再発火しない。
+    clearTimeout(endGraceTimer);
+    endGraceTimer = null;
+    if (!currentSource) playNext();
+    return;
+  }
   if (!playing) {
     // 新しい再生セッションの開始。
     playing = true;
@@ -160,6 +186,10 @@ export async function enqueueAudio(wav: ArrayBuffer, text?: string, index?: numb
  */
 export function stopPlayback(): void {
   queue.length = 0;
+  if (endGraceTimer) {
+    clearTimeout(endGraceTimer); // 猶予中の終了予約を破棄(onPlayEnd の二重発火を防ぐ)
+    endGraceTimer = null;
+  }
   if (currentSource) {
     currentSource.onended = null; // playNext を呼ばせない
     try {

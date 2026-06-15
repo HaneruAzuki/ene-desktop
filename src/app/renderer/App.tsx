@@ -453,7 +453,13 @@ export function App(): React.ReactElement | null {
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
-    if (setBubbleToo) setBubble(response.message);
+    if (setBubbleToo) {
+      setBubble(response.message);
+      // 非ストリーミング音声(全文を一度に表示)は setSentenceHandler が呼ばれず spokenRef が空のまま。
+      // barge-in 時に「聞かせた分」が空=記憶を空に切り詰める不具合(A4)を防ぐため全文を種として置く
+      // (途中で割り込まれても全文を記憶=割り込み無しと同じ=安全側)。ストリーミング時は index=0 で上書きされる。
+      spokenRef.current = [response.message];
+    }
 
     const talkMs = Math.min(
       TALKING_MAX_MS,

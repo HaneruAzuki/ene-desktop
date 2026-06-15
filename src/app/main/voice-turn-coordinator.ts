@@ -230,6 +230,8 @@ export class VoiceTurnCoordinator {
       log.info(`barge-in mid-gen: aborted, memorize heard ${heardText.length} chars`); // §6.2: 文字数のみ
       void this.deps.commit(g.text, { type: 'chat', message: heardText });
     } else if (!g) {
+      // 聞かせた分が空(非ストリーミングの取りこぼし等)なら、既に記憶済みの全文を空へ切り詰めない(A3/A4 連動の保険)。
+      if (!heardText) return;
       log.info(`barge-in post-gen: truncate last assistant to ${heardText.length} chars`);
       this.deps.updateLastAssistant?.(heardText);
     }

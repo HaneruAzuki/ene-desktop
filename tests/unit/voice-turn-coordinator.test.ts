@@ -191,6 +191,19 @@ describe('VoiceTurnCoordinator (段階① 投機＋コアレッシング)', () =
     expect(updates).toEqual(['文0文1']); // 聞かせた分へ上書き
   });
 
+  it('barge-in(生成完了後): 聞かせた分が空なら記憶を切り詰めない(A4 連動・空 truncate 防止)', async () => {
+    const { deps, calls } = harness();
+    const updates: string[] = [];
+    deps.updateLastAssistant = (t) => updates.push(t);
+    const c = new VoiceTurnCoordinator(deps);
+    c.onProvisionalEnd('質問');
+    calls[0].onFirstAudio();
+    calls[0].resolve(chat('文0文1の全文')); // 完了 → 全文コミット済み
+    await flush();
+    c.onBargeIn(''); // 非ストリーミング等で「聞かせた分」が空
+    expect(updates).toEqual([]); // 空では上書きしない(全文を保持)
+  });
+
   it('第一声前(未コミット)の onBargeIn は何もしない', () => {
     const { deps, calls, commits } = harness();
     const updates: string[] = [];
