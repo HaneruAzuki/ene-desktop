@@ -932,6 +932,13 @@
 - **検証**: typecheck 緑・`prompt-builder.test.ts` に provenance 分離の回帰テスト追加(14件緑)・実機で鈴木混同の解消を確認。
 - **✅ 設計書反映済(2026-06-09)**: §3.4 プロンプト構成に「episodic は provenance(self/user)で2セクション分離」を明記。
 
+### N-RECALL-2 🟢 ベクトル想起の恒久ラッチを廃止し自己回復化(横断監査 A5・2026-06-16)
+- **該当**: `src/memory/retriever.ts`(`tryVectorRanking`・旧 `defaultVectorDisabled`)。
+- **症状(横断監査で発見)**: 意味検索が**一過性の失敗1回**(embed 例外・`syncVectorIndex` 例外)で `defaultVectorDisabled=true` の**恒久ラッチ**になり、以後そのプロセスでは**プロセス再起動まで語彙のみへ永久退化**。語彙フォールバックで無音劣化するため**気づけない**(沈黙の品質低下)。復帰経路なし(grep で 3 箇所・reset なし確認)。
+- **修正(自己回復つき一時停止)**: 恒久ブール → **連続失敗カウンタ**。`VECTOR_PAUSE_AFTER_FAILURES=3` を超えた時だけ一時停止し(単発の一過性では止めない)、停止中も `VECTOR_RETRY_INTERVAL=20` 回ごとに1回試して回復を探る。埋め込み＋同期が成功したら**完全リセット**(`vectorFailureStreak=0`)。ログは停止に入るまでは回数つき、停止後は抑制(氾濫防止)。注入 embedder(テスト)経路は対象外=決定論維持。
+- **検証**: typecheck/lint/**506テスト**緑(retriever-heart 4件含む・注入経路ゆえラッチ挙動は不変)。
+- **位置づけ**: 横断監査の「実害ある残り」の最重要1件。残る監査項目: C2(音声可否4箇所)/C3(visible 2経路)/disclosureLevel(user記憶へ未配線・要設計判断)/E2(軽微)/D群(索引性能=別タスク)は未着手。
+
 ---
 
 ## VRM キャラ表示(F・3D化・2026-06-12)

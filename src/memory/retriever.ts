@@ -35,7 +35,14 @@ export interface RetrieverDeps {
   recallPool?: EpisodicRecord[];
 }
 
-let defaultVectorDisabled = false;
+// ベクトル想起の自己回復つき一時停止(A5・N-RECALL-2)。
+//   旧実装は失敗1回で恒久フラグを true にし、語彙のみへ**永久退化**していた(一過性のエンジン不調でも
+//   プロセス再起動まで意味検索が死に、語彙フォールバックで無音劣化=気づけない)。
+//   連続失敗が閾値を超えた時だけ一時停止し、停止中も一定間隔で1回試して自己回復する。成功で完全リセット。
+let vectorFailureStreak = 0; // 連続失敗数(成功で 0)
+let recallsWhilePaused = 0; // 一時停止後の想起回数(再試行間隔の計数)
+const VECTOR_PAUSE_AFTER_FAILURES = 3; // 連続失敗がこれを超えたら一時停止(単発の一過性失敗では止めない)
+const VECTOR_RETRY_INTERVAL = 20; // 一時停止中もこの回数ごとに1回試して回復を探る
 
 /** importance 降順 → recency(date)降順。 */
 function byImportanceThenRecency(a: EpisodicMemory, b: EpisodicMemory): number {
@@ -93,7 +100,12 @@ async function tryVectorRanking(
 ): Promise<string[]> {
   const usingDefault = !injected;
   if (usingDefault) {
-    if (defaultVectorDisabled) return [];
+    // 連続失敗が閾値超え=一時停止中。ただし恒久ラッチにせず、一定間隔で1回だけ試して回復を探る(A5)。
+    if (
+      vectorFailureStreak >= VECTOR_PAUSE_AFTER_FAILURES &&
+      recallsWhilePaused++ % VECTOR_RETRY_INTERVAL !== 0
+    )
+      return [];
     if (!(await isEmbeddingModelAvailable())) return [];
   }
   const embedder = injected ?? getDefaultEmbedder();
@@ -101,13 +113,27 @@ async function tryVectorRanking(
     const [queryVector] = await embedder.embed([text], 'query');
     if (!queryVector) return [];
     const index = await syncVectorIndex(current, embedder);
+    // ここまで到達=埋め込み＋同期が成功=エンジン健全 → 失敗ストリークを完全リセット(自己回復)。
+    if (usingDefault) {
+      vectorFailureStreak = 0;
+      recallsWhilePaused = 0;
+    }
     if (index.entries.length === 0) return [];
     return searchVectors(queryVector, index, Math.max(limit * 4, 20))
       .map((s) => s.id)
       .filter((id) => byId.has(id));
   } catch (e) {
-    log.warn(`vector recall unavailable, lexical only: ${(e as Error).name}`);
-    if (usingDefault) defaultVectorDisabled = true;
+    if (usingDefault) {
+      vectorFailureStreak += 1;
+      // 停止に入る瞬間までは回数つきで警告し、停止後は黙る(ログ氾濫を防ぐ)。再試行で回復すれば上で reset。
+      if (vectorFailureStreak <= VECTOR_PAUSE_AFTER_FAILURES)
+        log.warn(
+          `vector recall failed (${vectorFailureStreak}/${VECTOR_PAUSE_AFTER_FAILURES}), lexical only: ${(e as Error).name}`,
+        );
+      if (vectorFailureStreak === VECTOR_PAUSE_AFTER_FAILURES) recallsWhilePaused = 0;
+    } else {
+      log.warn(`vector recall unavailable, lexical only: ${(e as Error).name}`);
+    }
     return [];
   }
 }
