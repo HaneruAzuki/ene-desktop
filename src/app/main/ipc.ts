@@ -27,7 +27,7 @@ import type { ConversationResponse } from '../../shared/types/conversation';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { TranscribeResult } from '../../shared/types/stt';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
-import type { VoiceInputMode } from '../../shared/types/settings';
+import type { EqBand } from '../../shared/types/voice';
 import type { AppRuntime } from './app-runtime';
 
 // IPC ハンドラ集約(設計書 §4)。ターンの司令塔(generateResponse/commitTurn/handleSendMessage)は
@@ -148,12 +148,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // coordinator が生成中なら中断＋切り詰めコミット、生成完了済みなら最新 assistant を上書きする。
   ipcMain.on('ene:voice-heard', (_event, heardText: string) => coordinator?.onBargeIn(heardText));
 
-  // マイク入力方式の取得(設定・task_17 Phase C)。変更は右クリックメニューから(main が保存＋通知)。
-  ipcMain.handle(
-    'ene:get-voice-input-mode',
-    async (): Promise<VoiceInputMode> => runtime.voiceInputMode,
-  );
-
   ipcMain.handle(
     'ene:send-message',
     async (_event, text: string): Promise<ConversationResponse> => {
@@ -213,6 +207,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       await saveAudioPrefs(volume, muted);
     },
   );
+
+  // 声色補正 EQ(voice.json 由来・§4.5)。renderer が起動時に取得し再生グラフへ挟む。音声無効なら空配列。
+  ipcMain.handle('ene:get-voice-eq', async (): Promise<EqBand[]> => runtime.voiceConfig?.eq ?? []);
 
   // じゃあね(UI改修 段階4): タスクバーへ最小化する(クリックで戻る)。常時タスクバー表示なのでボタンは常にある。
   // 完全終了はキャラ右クリック「アプリを終了」or タスクバー右クリック「閉じる」(window-all-closed→quit)。

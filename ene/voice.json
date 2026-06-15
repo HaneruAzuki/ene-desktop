@@ -12,5 +12,9 @@
       "tempoDynamicsScale": 1.0,
       "volumeScale": 1.0
     }
-  }
+  },
+  "eq": [
+    { "type": "highshelf", "frequency": 3500, "gain": -4 },
+    { "type": "lowshelf", "frequency": 220, "gain": 2.5 }
+  ]
 }

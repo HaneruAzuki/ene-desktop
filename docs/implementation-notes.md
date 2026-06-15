@@ -1069,7 +1069,19 @@
 - **却下した案(取消済み)**: `ConversationResponse.speaker` 追加＋commitTurn 永続化ゲート＋`gateMemoryForGuest`
   想起ゲート＋`runtime.currentSpeaker`。複雑さに見合わずユーザが取消。声紋(speaker embedding)は元々不採用。
 - 検証: `lockOwnerName` 単体5件＋extraction-trigger 統合2件(空→確定/確定後は別名を無視・名前以外は素通し)。
-  **518 テスト全グリーン**・typecheck・lint・lint:deps・build 成功。**未コミット**。SSOT(02_req/03_design)未反映=承認待ち(§14)。
+  **518 テスト全グリーン**・typecheck・lint・lint:deps・build 成功。push 済(453cb60)。SSOT(03_design)反映済(N-OWNER-2 で実施)。
+
+---
+
+### N-OWNER-2 🟢 呼び方の設定UI ＋ 本名(userFullName)＝会話で覚える正規化(2026-06-15)
+- **役割の3層分け(ユーザ合意)**:
+  - **呼び方(`userName`＋読み `userNameReading`)** = 設定UIで登録/変更・会話/抽出ではロック([[owner-name-lock-2026-06]] N-OWNER-1)。トリミが毎会話で口に出す名前。
+  - **本名(`userFullName`・新フィールド)** = 会話で出たら覚える**完全パッシブ**(トリミから本名は聞かない)。設定UIには出さない。identity 属性で忘却外(semantic)。直すのは会話で言い直す or 平文 `semantic.json` 編集。
+  - **他者のあだ名(田中=「とりみん」等)** = フィールド化せず **episodic**(出所=entities つき)に委ねる(source memory・件数可変)。
+- **名前を記憶に焼き込まない正規化(改名を移行不要にする鍵)**: 名前の正本は semantic スロットのみ。`formatSemantic` が毎ターン最新値を注入。抽出器プロンプトに「**ユーザー本人は名前でなく『ユーザー』と書く・本人の呼び名/本名を summary・entities に焼き込まない**」を明示。→ 設定で改名してもスロット更新だけで全想起へ自動反映、**過去記憶が古い名前を出さない**。一括置換パスは不要(ユーザ決定)。
+- **実装**: `SemanticMemory.userFullName?: string` 追加＋`validateSemanticPatch` で文字列検証。抽出器に userFullName 捕捉＋正規化ルール。`formatSemantic` に「- 相手の本名」を注入。設定IPC `ene:get-owner-name`/`ene:set-owner-name`(`settings-ipc.ts`・`updateSemantic` 直呼び=ロックを通る意図的変更)。preload/`EneAPI.OwnerName`/App.tsx 状態＋ロード＋保存ハンドラ/`SettingsPanel` に「呼び方＋読み」入力＋保存(変更なしで disabled「保存済み」)/global.css に入力欄・主ボタン。
+- **聞いてくる挙動(知識ギャップ N-PRES-5)**: 名前=段1 / 読み・好きなもの=段2 / 誕生日=段3。**本名は知識ギャップに入れない**(=自分から聞かない・完全パッシブ)。設定で埋めた項目は `isSlotFilled` で聞かれなくなる。
+- 検証: schema-validation/prompt-builder にテスト追加・505 テスト全グリーン(他テストはユーザ並行編集で増減)・typecheck・lint・lint:deps・build 成功。SSOT(03_design §3 SemanticMemory)反映済。
 
 ---
 

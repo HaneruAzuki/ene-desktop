@@ -60,7 +60,7 @@ export async function loadVrmConfig(characterId: string): Promise<VrmConfig | nu
   const raw = await readJson<unknown>(getVrmConfigPath(characterId));
   const validated = raw === null ? null : validateVrmConfig(raw);
   if (raw !== null && !validated) {
-    log.warn(`vrm.json invalid for ${characterId}; falling back to portrait`);
+    log.warn(`vrm.json invalid for ${characterId}; VRM disabled (no display)`);
   }
   vrmConfigCache.set(characterId, validated);
   return validated;

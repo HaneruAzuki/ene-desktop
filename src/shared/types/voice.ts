@@ -19,6 +19,19 @@ export interface VoiceStyleParams {
   accent?: number;
 }
 
+/**
+ * 出力音声の声色補正(EQ)の1バンド。Web Audio の BiquadFilterNode に1対1で対応する。
+ * **声の高さ(F0)は変えず、音色(明るさ/太さ)だけを整える**ため、ピッチシフト由来の劣化が出ない
+ * (AivisSpeech の pitchScale を強めると劣化する問題の回避策・voice.ts 上部 §参照)。
+ * キャラ依存値なので voice.json に外出し(§4.5)。実行時は renderer の再生グラフへ直列に挟む。
+ */
+export interface EqBand {
+  type: 'lowshelf' | 'highshelf' | 'peaking' | 'lowpass' | 'highpass'; // フィルタ種別
+  frequency: number; // 中心/コーナー周波数(Hz)
+  gain?: number; // 増減(dB・lowshelf/highshelf/peaking のみ・負で減衰=落ち着き)
+  q?: number; // Q(peaking/lowpass/highpass の鋭さ・任意)
+}
+
 /** {id}/voice.json のスキーマ。emotion ラベル→スタイル/パラメータ。 */
 export interface VoiceConfig {
   engine: string; // 'aivisspeech' 等(将来 VOICEVOX 等へ差し替え)
@@ -26,6 +39,7 @@ export interface VoiceConfig {
   model?: string; // 採用音声モデル識別(任意・記録用)
   credit?: string; // 必須ライセンス文言(about/クレジット画面に常時表示・つくよみコーパス規約)
   styles: Partial<Record<EmotionLabel, VoiceStyleParams>>; // neutral は必須(フォールバック先)
+  eq?: EqBand[]; // 出力音声の音色補正(任意・声を落ち着かせる等。F0 は変えない=劣化なし)
 }
 
 /** TtsEngine.speak へ渡す解決済みオプション(VoiceStyleParams と同形)。 */

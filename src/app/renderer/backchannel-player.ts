@@ -9,12 +9,23 @@
 // ユーザが割り込むと声が重なる。stopBackchannel() で再生中の相槌を即停止し、重なりを防ぐ。
 
 import { isMuted } from './audio-player';
+import { buildEqChain } from './voice-eq';
 
 let ctx: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
+// 声色補正 EQ の入口(あれば source をここへ繋ぐ)。応答音声と声色を揃えるため相槌にも同じ EQ を通す。
+let eqInput: AudioNode | null = null;
 
 function getCtx(): AudioContext {
-  ctx ??= new AudioContext();
+  if (!ctx) {
+    ctx = new AudioContext();
+    // EQ(voice.json 由来・任意)を destination の前段に挟む。無ければ従来どおり直結。
+    const eq = buildEqChain(ctx);
+    if (eq) {
+      eq.output.connect(ctx.destination);
+      eqInput = eq.input;
+    }
+  }
   return ctx;
 }
 
@@ -27,7 +38,7 @@ export async function playBackchannel(wav: ArrayBuffer): Promise<void> {
   const buf = await c.decodeAudioData(wav.slice(0));
   const src = c.createBufferSource();
   src.buffer = buf;
-  src.connect(c.destination);
+  src.connect(eqInput ?? c.destination); // EQ があれば経由(声色を応答音声と揃える)
   // 自然終了で currentSource を解放(stopBackchannel の対象から外す)。
   src.onended = (): void => {
     if (currentSource === src) currentSource = null;

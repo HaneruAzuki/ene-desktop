@@ -1,3 +1,5 @@
+import { buildEqChain } from './voice-eq';
+
 // 音声チャンク(WAV)の逐次再生(task_17 Phase A / design-revision-voice §1)。
 // main から届く WAV を AudioContext で順番に再生する。
 // barge-in(task_17 Phase C)では stopPlayback() で再生を即停止する。
@@ -34,6 +36,8 @@ export function setSentenceHandler(cb: (text: string, index: number) => void): v
 // リップシンク用の振幅解析(F・B-05)。再生グラフに AnalyserNode を1つ挟み、
 // VRM レンダラが毎フレーム getVoiceAmplitude() で開口量を取得する(母音判定は不要・開口量だけで十分自然)。
 let analyser: AnalyserNode | null = null;
+// 声色補正 EQ がある場合に source が接続する入口ノード(EQ チェーンの先頭)。無ければ analyser。
+let graphInput: AudioNode | null = null;
 // 出力音量/ミュート(UI改修 段階3)。analyser の後段に GainNode を挟んで実効音量を制御する。
 let gain: GainNode | null = null;
 let outputVolume = 1; // 0〜1
@@ -60,8 +64,23 @@ function getAnalyser(): AnalyserNode {
     gain.gain.value = outputMuted ? 0 : outputVolume;
     analyser.connect(gain);
     gain.connect(c.destination);
+    // 声色補正 EQ(voice.json 由来・任意)を analyser の前段に挟む。
+    // source → [EQ...] → analyser → gain → destination。F0 は変えず音色だけ整える(劣化なし)。
+    const eq = buildEqChain(c);
+    if (eq) {
+      eq.output.connect(analyser);
+      graphInput = eq.input;
+    } else {
+      graphInput = analyser;
+    }
   }
   return analyser;
+}
+
+/** source が接続すべき入口ノード(EQ があればその先頭・なければ analyser)。グラフ構築を保証する。 */
+function getGraphInput(): AudioNode {
+  const a = getAnalyser();
+  return graphInput ?? a;
 }
 
 /** トリミの声(出力)の音量を設定する 0〜1(UI改修 段階3)。ミュート中は値だけ保持。 */
@@ -107,7 +126,8 @@ function playNext(): void {
   }
   const src = getCtx().createBufferSource();
   src.buffer = item.buf;
-  src.connect(getAnalyser()); // destination へは analyser 経由(リップシンクの振幅取得のため)
+  // destination へは EQ(あれば)→ analyser 経由(リップシンクの振幅取得＋声色補正のため)。
+  src.connect(getGraphInput());
   src.onended = (): void => {
     if (currentSource === src) currentSource = null;
     playNext();

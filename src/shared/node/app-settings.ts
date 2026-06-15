@@ -1,11 +1,6 @@
 import { getAppSettingsPath } from './paths';
 import { readJson, writeJson } from './json-store';
-import {
-  DEFAULT_APP_SETTINGS,
-  type AppSettings,
-  type VoiceInputMode,
-  type IdleTalkMode,
-} from '../types/settings';
+import { DEFAULT_APP_SETTINGS, type AppSettings, type IdleTalkMode } from '../types/settings';
 import type { VrmDisplayParams } from '../types/vrm';
 
 // アプリ設定の読み書き(task_17 Phase C)。平文JSON(data/config/app-settings.json)。
@@ -14,11 +9,6 @@ import type { VrmDisplayParams } from '../types/vrm';
 export async function loadAppSettings(): Promise<AppSettings> {
   const data = await readJson<Partial<AppSettings>>(getAppSettingsPath());
   return { ...DEFAULT_APP_SETTINGS, ...(data ?? {}) };
-}
-
-export async function saveVoiceInputMode(mode: VoiceInputMode): Promise<void> {
-  const current = await loadAppSettings();
-  await writeJson(getAppSettingsPath(), { ...current, voiceInputMode: mode });
 }
 
 /** VRM 表示パラメータのユーザー上書きを保存する(GUI スライダーの調整結果・F)。 */

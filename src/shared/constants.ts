@@ -4,6 +4,10 @@
 /** 1日のミリ秒(日数換算の共通定数・心情/親しさの導出で共用)。 */
 export const DAY_MS = 86_400_000;
 
+/** 同梱キャラの ID(ブートストラップ時の初期 active キャラ・SSOT)。キャラ属性のハードコードではなく初期値。
+ *  ここ(import 無しの leaf)に置くことで、paths をモックするテストでも値が消えない(層結合も避ける)。 */
+export const DEFAULT_CHARACTER_ID = 'ene';
+
 // --- 記憶レイヤー ---
 /**
  * 短期記憶の最大保持件数(超過時に抽出→トリム)。設計書 §3.3。
@@ -430,12 +434,13 @@ export const USER_ATTRIBUTE_IMPORTANCE = IMPORTANCE_MAX;
  * 名前は初対面から、読み・好きなものは少し慣れてから、誕生日はある程度親しくなってから。
  * 段階(familiarityStage)は接触の事実から導出される(FAMILIARITY_THRESHOLDS)。
  */
-export const KNOWLEDGE_GAP_GATES: ReadonlyArray<{ slot: string; label: string; minStage: number }> = [
-  { slot: 'userName', label: '相手の名前', minStage: 1 },
-  { slot: 'userNameReading', label: '相手の名前の読み(かな)', minStage: 2 },
-  { slot: 'likes', label: '相手の好きなもの', minStage: 2 },
-  { slot: 'userBirthday', label: '相手の誕生日', minStage: 3 },
-];
+export const KNOWLEDGE_GAP_GATES: ReadonlyArray<{ slot: string; label: string; minStage: number }> =
+  [
+    { slot: 'userName', label: '相手の名前', minStage: 1 },
+    { slot: 'userNameReading', label: '相手の名前の読み(かな)', minStage: 2 },
+    { slot: 'likes', label: '相手の好きなもの', minStage: 2 },
+    { slot: 'userBirthday', label: '相手の誕生日', minStage: 3 },
+  ];
 /** 1ターンに注入する知識ギャップは1件まで(会話に偽装したフォームにしない)。 */
 export const KNOWLEDGE_GAP_SURFACE_MAX = 1;
 

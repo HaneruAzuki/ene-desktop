@@ -1,14 +1,12 @@
 import { getActiveCharacterPath } from '../shared/node/paths';
 import { readJson, writeJson } from '../shared/node/json-store';
+import { DEFAULT_CHARACTER_ID } from '../shared/constants';
 import { nowLocalIso } from '../shared/datetime';
 import type { ActiveCharacter } from '../shared/types/character';
 
 // active-character.json の管理(設計書 §5.4・最小状態管理)。
 // 感情パラメータ等の複雑な状態は持たず、「機能上必要な事実」のみ記録する。
-
-// 初回生成時のデフォルトキャラ ID。設計書 §5.4 で定められた「同梱キャラ」の ID。
-// (キャラ属性のハードコードではなく、ブートストラップ時の初期 active キャラ指定)
-const DEFAULT_CHARACTER_ID = 'ene';
+// 初回生成時のデフォルトキャラ ID は paths.ts の DEFAULT_CHARACTER_ID(SSOT)を使う。
 
 /**
  * active-character.json を読み込む。存在しなければデフォルト値で生成して保存する。

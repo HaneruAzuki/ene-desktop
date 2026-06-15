@@ -2,7 +2,7 @@ import { getVoiceConfigPath } from '../shared/node/paths';
 import { readJson } from '../shared/node/json-store';
 import { log } from '../shared/logger';
 import type { EmotionLabel } from '../shared/types/animation';
-import type { TtsOptions, VoiceConfig, VoiceStyleParams } from '../shared/types/voice';
+import type { EqBand, TtsOptions, VoiceConfig, VoiceStyleParams } from '../shared/types/voice';
 
 // 音声設定(voice.json)のロード(task_17 / design-revision-voice §4.2)。
 // emotion→スタイル/パラメータは {id}/voice.json に外出し(§4.5・ハードコード禁止)。
@@ -51,6 +51,30 @@ function validateStyle(raw: unknown): VoiceStyleParams | null {
   return style;
 }
 
+// EQ(声色補正)で許可するフィルタ種別。Web Audio の BiquadFilterType の安全な部分集合のみ通す。
+const ALLOWED_EQ_TYPES = ['lowshelf', 'highshelf', 'peaking', 'lowpass', 'highpass'] as const;
+
+/**
+ * EQ バンド配列を検証する(任意フィールド)。不正な要素は捨て、1件も残らなければ undefined。
+ * type は許可種別のみ・frequency は必須数値・gain/q は任意数値。
+ */
+function validateEqBands(raw: unknown): EqBand[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: EqBand[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue;
+    const o = item as Record<string, unknown>;
+    if (typeof o.type !== 'string') continue;
+    if (!ALLOWED_EQ_TYPES.includes(o.type as (typeof ALLOWED_EQ_TYPES)[number])) continue;
+    if (typeof o.frequency !== 'number') continue;
+    const band: EqBand = { type: o.type as EqBand['type'], frequency: o.frequency };
+    if (typeof o.gain === 'number') band.gain = o.gain;
+    if (typeof o.q === 'number') band.q = o.q;
+    out.push(band);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 /** voice.json を検証して VoiceConfig に正規化する。不正なら null。 */
 export function validateVoiceConfig(raw: unknown): VoiceConfig | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -68,12 +92,16 @@ export function validateVoiceConfig(raw: unknown): VoiceConfig | null {
   // neutral はフォールバック先として必須。
   if (!styles.neutral) return null;
 
+  // EQ(声色補正)は任意。1件も無ければキー自体を付けない(従来挙動・厳密等価テストを壊さない)。
+  const eq = validateEqBands(o.eq);
+
   return {
     engine: o.engine,
     baseUrl: o.baseUrl,
     model: typeof o.model === 'string' ? o.model : undefined,
     credit: typeof o.credit === 'string' ? o.credit : undefined,
     styles,
+    ...(eq ? { eq } : {}),
   };
 }
 

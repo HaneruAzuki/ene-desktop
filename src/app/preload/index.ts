@@ -13,6 +13,7 @@ const eneAPI: EneAPI = {
   setVrmDisplay: (display) => ipcRenderer.invoke('ene:set-vrm-display', display),
   getAudioPrefs: () => ipcRenderer.invoke('ene:get-audio-prefs'),
   saveAudioPrefs: (volume, muted) => ipcRenderer.invoke('ene:save-audio-prefs', volume, muted),
+  getVoiceEq: () => ipcRenderer.invoke('ene:get-voice-eq'),
   goodbye: () => ipcRenderer.invoke('ene:goodbye'),
   setAway: (away) => ipcRenderer.send('ene:set-away', away),
   getIdleTalk: () => ipcRenderer.invoke('ene:get-idle-talk'),
@@ -64,20 +65,15 @@ const eneAPI: EneAPI = {
   onProactiveMessage: (cb) => {
     // 自発発話(P7)。二重登録防止で単一リスナーへ張り替える。
     ipcRenderer.removeAllListeners('ene:proactive-message');
-    ipcRenderer.on('ene:proactive-message', (_event, response: ConversationResponse) => cb(response));
+    ipcRenderer.on('ene:proactive-message', (_event, response: ConversationResponse) =>
+      cb(response),
+    );
   },
   onVoiceBargeIn: (cb) => {
     ipcRenderer.removeAllListeners('ene:voice-barge-in');
     ipcRenderer.on('ene:voice-barge-in', () => cb());
   },
   notifyBargeInHeard: (text) => ipcRenderer.send('ene:voice-heard', text),
-  getVoiceInputMode: () => ipcRenderer.invoke('ene:get-voice-input-mode'),
-  onVoiceInputModeChanged: (cb) => {
-    ipcRenderer.removeAllListeners('ene:voice-input-mode-changed');
-    ipcRenderer.on('ene:voice-input-mode-changed', (_event, mode: 'push-to-talk' | 'hands-free') =>
-      cb(mode),
-    );
-  },
   onVoiceChunk: (cb) => {
     // 二重登録防止: dev の StrictMode で effect が2回走るとリスナーが累積し、
     // 各センテンスが2回再生される。常に単一リスナーへ張り替える。

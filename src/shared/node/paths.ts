@@ -1,7 +1,12 @@
 import { app } from 'electron';
 import path from 'node:path';
 import { readJson } from './json-store';
-import { VAD_MODEL_FILE, VOICE_ENGINE_DIR, VOICE_ENGINE_EXE } from '../constants';
+import {
+  VAD_MODEL_FILE,
+  VOICE_ENGINE_DIR,
+  VOICE_ENGINE_EXE,
+  DEFAULT_CHARACTER_ID,
+} from '../constants';
 
 // ファイルパスの統一管理(設計書 §3.6 / §5.5)。
 //
@@ -13,7 +18,6 @@ import { VAD_MODEL_FILE, VOICE_ENGINE_DIR, VOICE_ENGINE_EXE } from '../constants
 // refreshActiveCharacterId() でモジュール内キャッシュへ反映し、getter は同期で返す。
 // これにより Memory Layer 等はキャラを意識せず同期的にパスを取得できる(疎結合)。
 
-const DEFAULT_CHARACTER_ID = 'ene';
 let activeCharacterId = DEFAULT_CHARACTER_ID;
 
 /** 現在キャッシュしている active キャラ ID を返す。 */

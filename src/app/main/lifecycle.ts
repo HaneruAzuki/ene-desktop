@@ -4,9 +4,11 @@ import { log, initLogger } from '../../shared/logger';
 import { getPortableDataDir, getLogsDir } from '../../shared/node/paths';
 import { isCloudSyncFolder } from '../../shared/node/cloud-warning';
 import { loadAndDecryptApiKey } from '../../shared/node/encryption';
-import { loadAppSettings } from '../../shared/node/app-settings';
 import { todayLocalYmd, nowLocalIso } from '../../shared/datetime';
-import { loadOrCreateActiveCharacter, markFirstLaunchCompleted } from '../../character/active-character';
+import {
+  loadOrCreateActiveCharacter,
+  markFirstLaunchCompleted,
+} from '../../character/active-character';
 import { buildCharacterContext } from '../../character/context-builder';
 import { checkBirthday } from '../../character/birthday-checker';
 import { getUnextractedEntries, clearShortTerm } from '../../memory/short-term';
@@ -150,7 +152,10 @@ export async function runStartupSequence(
 
   // Step 9: 誕生日判定
   const today = todayLocalYmd();
-  charContext = { ...charContext, birthdayHint: checkBirthday(charContext.identity, active, today) };
+  charContext = {
+    ...charContext,
+    birthdayHint: checkBirthday(charContext.identity, active, today),
+  };
   runtime.charContext = charContext;
 
   // Step 10: 透過ウィンドウ(位置復元)+ IPC(トレイは廃止・常時タスクバー表示=UI改修 段階4)
@@ -193,9 +198,6 @@ export async function runStartupSequence(
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:app-ready');
       log.info('app fully ready (voice engine + embedder + STT + local router warmed)');
     });
-
-  // マイク入力方式(設定)を読み込む(task_17 Phase C・既定 push-to-talk)。
-  runtime.voiceInputMode = (await loadAppSettings()).voiceInputMode;
 
   // Step 10.5: 音声を best-effort 初期化(エンジンは Step 4.5 で背景起動済み・task_17 Phase A)。
   // この時点ではまだヘルス到達前のことが多いので listStyles は失敗しうるが、その場合は

@@ -1,7 +1,8 @@
 import type { ConversationResponse } from './conversation';
 import type { TranscribeResult } from './stt';
-import type { VoiceInputMode, IdleTalkMode } from './settings';
+import type { IdleTalkMode } from './settings';
 import type { VrmRenderConfig, VrmDisplayParams } from './vrm';
+import type { EqBand } from './voice';
 
 // IPC 通信の契約(設計書 §4.2)。Renderer 側は window.ene.* で呼ぶ。
 
@@ -46,6 +47,9 @@ export interface EneAPI {
   // --- 音量・ミュート(トリミの声=出力・UI改修 段階3) ---
   getAudioPrefs(): Promise<{ volume: number; muted: boolean }>;
   saveAudioPrefs(volume: number, muted: boolean): Promise<void>;
+
+  // 声色補正 EQ(voice.json 由来・キャラ依存)。renderer が再生グラフへ挟む。空配列=EQ なし。
+  getVoiceEq(): Promise<EqBand[]>;
 
   // じゃあね(UI改修 段階4): ウィンドウをタスクバーへ最小化する(クリックで戻る)。完全終了は右クリック。
   goodbye(): Promise<void>;
@@ -116,10 +120,6 @@ export interface EneAPI {
   // barge-in 時に「実際に聞かせた発言(再生済みの文を連結)」を main へ報告する(renderer → main・Phase B)。
   // main は記憶を聞かせた分へ切り詰める(トリミが言っていない内容を覚えない)。
   notifyBargeInHeard(text: string): void;
-
-  // マイク入力方式(設定)。取得 ＋ 右クリックメニューでの変更通知(task_17 Phase C)。
-  getVoiceInputMode(): Promise<VoiceInputMode>;
-  onVoiceInputModeChanged(callback: (mode: VoiceInputMode) => void): void;
 
   // 相槌受信(main → renderer・task_18 Phase B)。wav があれば再生、null でも**うなずき**は出す。
   onBackchannel(callback: (wav: ArrayBuffer | null) => void): void;

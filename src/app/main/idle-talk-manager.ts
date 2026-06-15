@@ -2,6 +2,7 @@ import { powerMonitor, type BrowserWindow } from 'electron';
 import { log } from '../../shared/logger';
 import { nowLocalIso } from '../../shared/datetime';
 import { timeOfDayLabel } from '../../shared/moment';
+import { normalizeEmotion } from '../../shared/llm-parse';
 import {
   IDLE_TALK_CHECK_INTERVAL_MS,
   IDLE_TALK_ENABLED_ENV,
@@ -36,12 +37,9 @@ import type { AppRuntime } from './app-runtime';
 //  - ハンズフリー: 相槌(待受中にトリミが音を出す)で実証済みのエコーガード(再生中はマイク入力を無視)を継承する。
 // 判定は純粋(idle-talk.ts)・本クラスは配線のみ。すべて best-effort:失敗しても会話・起動に影響させない。
 
-const VALID_EMOTIONS: ReadonlyArray<EmotionLabel> = [
-  'neutral', 'joy', 'anger', 'sorrow', 'surprise', 'embarrassed',
-];
-
+// emotion ラベルの正規化は共通実装(EMOTION_LABELS が SSOT)に委ね、未知/欠落は neutral へ寄せる。
 function toEmotion(v: string | undefined): EmotionLabel {
-  return v && (VALID_EMOTIONS as readonly string[]).includes(v) ? (v as EmotionLabel) : 'neutral';
+  return normalizeEmotion(v ?? '') ?? 'neutral';
 }
 
 interface Material {
@@ -95,7 +93,8 @@ export class IdleTalkManager {
 
       const settings = await loadAppSettings();
       // 設定 off か env で明示無効なら黙る。既定は low(有効)。
-      const enabled = (settings.idleTalk ?? 'low') !== 'off' && process.env[IDLE_TALK_ENABLED_ENV] !== '0';
+      const enabled =
+        (settings.idleTalk ?? 'low') !== 'off' && process.env[IDLE_TALK_ENABLED_ENV] !== '0';
 
       const now = Date.now();
       const d = new Date();
@@ -163,7 +162,12 @@ export class IdleTalkManager {
     }
 
     // 短期記憶に assistant ターンとして残す(以降の会話に接続できる)。
-    await appendShortTerm({ role: 'assistant', text: msg.message, timestamp: nowLocalIso(), extracted: false });
+    await appendShortTerm({
+      role: 'assistant',
+      text: msg.message,
+      timestamp: nowLocalIso(),
+      extracted: false,
+    });
 
     const emotion = toEmotion(msg.emotion);
     const response: ConversationResponse = { type: 'chat', message: msg.message, emotion };
@@ -172,7 +176,8 @@ export class IdleTalkManager {
     }
     // 音声があれば喋る(通常応答と同じ speakResponse→voice-chunk 経路=エコーガードは相槌で実証済みの経路を継承)。
     // push-to-talk(既定)はマイクが押下中のみ=自声を拾わない。ハンズフリーは相槌と同じ再生ガードで保護される。
-    if (tts && voiceConfig) void speakResponse(msg.message, emotion, tts, voiceConfig, this.mainWindow);
+    if (tts && voiceConfig)
+      void speakResponse(msg.message, emotion, tts, voiceConfig, this.mainWindow);
     log.info('idle talk emitted');
   }
 
@@ -214,7 +219,11 @@ export class IdleTalkManager {
       openLoops: material.openLoops,
       recentLife: material.recentLife,
     });
-    const raw = await makeLlmComplete(apiKey)({ system: prompt.system, user: prompt.user, maxTokens: 256 });
+    const raw = await makeLlmComplete(apiKey)({
+      system: prompt.system,
+      user: prompt.user,
+      maxTokens: 256,
+    });
     return parseIdleTalkResponse(raw);
   }
 }

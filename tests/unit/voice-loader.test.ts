@@ -58,6 +58,44 @@ describe('validateVoiceConfig', () => {
     expect(c?.credit).toBe('つくよみクレジット');
   });
 
+  // 声色補正 EQ(任意)。許可種別のみ通し、frequency 必須・gain/q は任意。
+  it('妥当な EQ バンドを保持する(type/frequency/gain/q)', () => {
+    const c = validateVoiceConfig({
+      ...valid,
+      eq: [
+        { type: 'highshelf', frequency: 3500, gain: -4 },
+        { type: 'peaking', frequency: 500, gain: -2, q: 1.2 },
+      ],
+    });
+    expect(c?.eq).toEqual([
+      { type: 'highshelf', frequency: 3500, gain: -4 },
+      { type: 'peaking', frequency: 500, gain: -2, q: 1.2 },
+    ]);
+  });
+
+  it('EQ が無ければ eq キーを付けない(従来挙動)', () => {
+    const c = validateVoiceConfig(valid);
+    expect(c && 'eq' in c).toBe(false);
+  });
+
+  it('不正な EQ 要素は捨てる(未知の type / frequency 欠落 / 非配列)', () => {
+    const c = validateVoiceConfig({
+      ...valid,
+      eq: [
+        { type: 'allpass', frequency: 1000 }, // 未許可種別 → 捨てる
+        { type: 'lowshelf' }, // frequency 欠落 → 捨てる
+        { type: 'lowshelf', frequency: 200, gain: 3 }, // 妥当 → 残す
+      ],
+    });
+    expect(c?.eq).toEqual([{ type: 'lowshelf', frequency: 200, gain: 3 }]);
+    // 全部不正なら eq キー自体を付けない。
+    const none = validateVoiceConfig({ ...valid, eq: [{ type: 'allpass', frequency: 1 }] });
+    expect(none && 'eq' in none).toBe(false);
+    // 配列でなければ無視。
+    const notArray = validateVoiceConfig({ ...valid, eq: { type: 'lowshelf', frequency: 200 } });
+    expect(notArray && 'eq' in notArray).toBe(false);
+  });
+
   // baseUrl の URL 検証(SSRF 面の縮小・公開前監査指摘)。http/https の整形式のみ許可。
   it('http(s) のローカル baseUrl は通る(http://127.0.0.1:10101 / localhost)', () => {
     expect(validateVoiceConfig(valid)?.baseUrl).toBe('http://127.0.0.1:10101');

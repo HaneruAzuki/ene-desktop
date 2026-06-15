@@ -16,6 +16,7 @@ import {
   setMuted as audioSetMuted,
 } from './audio-player';
 import { playBackchannel, stopBackchannel } from './backchannel-player';
+import { setEqBands } from './voice-eq';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { useInteractionRouting } from './use-interaction-routing';
@@ -148,6 +149,12 @@ export function App(): React.ReactElement | null {
       audioSetVolume(v);
       audioSetMuted(m);
     });
+  }, []);
+
+  // 声色補正 EQ(voice.json 由来)を再生グラフへ適用する。再生グラフは初回再生時に遅延構築されるため、
+  // ユーザー操作より前のマウント時に設定しておけば確実に間に合う(以後は変更しない)。
+  useEffect(() => {
+    void window.ene.getVoiceEq().then(setEqBands);
   }, []);
 
   // 話しかけてくる頻度を読み込み(段階6・設定パネルの初期表示用)。

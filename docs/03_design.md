@@ -796,7 +796,10 @@ export interface Correction {
 export interface SemanticMemory {
   // === コアフィールド(スキーマ検証対象・型不一致なら拒否) ===
   version: number;                    // スキーマバージョン(MVPは 1)
-  userName?: string;
+  userName?: string;                  // 呼び方(主人を呼ぶ名前)。設定で登録/変更・会話/抽出では不変(lockOwnerName)
+  userNameReading?: string;           // 呼び方の読み(かな)。呼びかけTTS用(P5)
+  userFullName?: string;              // 本名(フルネーム)。会話で覚える完全パッシブ(設定UIには出さない)・N-OWNER-2
+  // userBirthday?: UserBirthday も保持(P5・構造化スロット・型は src/shared/types/memory.ts)
   preferences?: Record<string, string>;
   longTermGoals?: string[];
   personality?: string[];
