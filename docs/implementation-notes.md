@@ -891,6 +891,15 @@
 - **実機検証**: keyword 経路(domain=high / none)、embed 経路(domain=high sim=0.81 等)で話題別 few-shot 復活を確認。**B-03 解消**。
 - **🟡 要反映(済)**: 設計書 §3.2 に本番=ローカル判別器、Haiku=legacy を明記。backlog B-03 ✅解決・B-15(a) ✅実装済へ更新。
 
+### N-LAT-10 🟢 「考え中」が永久に残るフリーズを解消(第一声監視＋考え中ウォッチドッグ・2026-06-16)
+- **該当**: `voice-turn-coordinator.ts`(`startGeneration` に第一声監視タイマー)/ `App.tsx`(考え中ウォッチドッグ effect)/ `shared/constants.ts`(`FIRST_AUDIO_TIMEOUT_MS=12000`)/ `renderer/constants.ts`(`THINKING_WATCHDOG_MS=15000`)。
+- **症状(実機ログで確定)**: voice の mid-gen barge-in 直後の新ターンが router 到達後に第一声を出さず、「考え中」が約5分半残って強制終了に至った(2026-06-16 04:34 のログ)。
+- **診断(憶測せず単独再現で切り分け)**: ①Claude は streaming 済み(`stream:true`・無実)②**進行中の合成 fetch を abort しても AivisSpeech は wedge しない**(単独再現: 中断後の合成は ~1.1s で成功・孤児合成を ~0.8s 引きずるのみ)③**undici 接続も wedge しない**(単独再現: 中断直後の次要求は 2-3ms・5連続でも蓄積なし)。→ AivisSpeech / HTTP の「物理的に詰まる」説は**両方とも実測で反証**。`barge-in mid-gen` はログ全体で n=1(`post-gen` は10件すべて正常)で、60秒ハングは一過性=systematic なローカル原因は特定できず(断定保留)。
+- **本質(=本実装の欠陥)**: トリガが何であれ、「考え中」(`vad-runtime` が `transcribing` で点灯)を**解決(発話 or 失敗)が来たら必ず消す不変条件が無かった**。生成が abort/timeout/失敗すると coordinator は何も emit せず 'listening' も来ない→永久に残る(テキスト経路も `sendMessage` の null で解除なし)。一過性のもたつきを永久フリーズ化させていた。
+- **修正(経路に依らない単一の不変条件)**: ①レンダラ=考え中ウォッチドッグ(15s)。第一声で activity が `talking` に変われば自動解除、出ないまま超過で idle へ戻しトリミ口調で一言詫びる。テキスト/音声/PTT 共通の最終安全網。②coordinator=第一声監視(12s)。ハングした voice 生成を早期に打ち切り、60秒待たず＋諦めた後に遅れて喋り出す事故を防ぐ(後続合成の長さは `TURN_TIMEOUT_MS=60s` 側で見る)。
+- **ハング根治**: 発生パターンが見えた時に対応(ユーザー判断で保留)。本修正は「一過性を永久フリーズに変えない」堅牢化。
+- **検証**: typecheck/lint/**506テスト**緑。⚠️ コミット `68af03c` のメッセージは誤って "N-LAT-8" と記載(push 済のため本文は訂正せず、コード/本書は **N-LAT-10** に統一)。
+
 ### N-16-2 🟢 キャラ名を ENE→魚川トリミ に改名(B-10)＋STT名前補正＋productName
 - **該当**: `identity.json`(name=魚川トリミ・nameReading=うおかわ とりみ・callsSelf=トリミ・sttAliases)/ `fewshot.json` / `system-prompt-builder.ts` / UI(`InputArea` プレースホルダ・`ApiKeyDialog`・`CharacterDisplay` alt・両 `index.html` title)/ `electron-builder.yml`(productName=魚川トリミ・artifactName=Torimi)/ `index.ts`(app.setName)。
 - **方針**: ユーザー可視の "ENE" を全廃。ENE は**コードネーム/プログラム内コメント/Philosophy/appId/characterId** にのみ残す(`characterId="ene"` 維持=識別子churn回避)。表示名は full=魚川トリミ、カジュアル自称=トリミ。

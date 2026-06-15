@@ -286,7 +286,7 @@ export class VoiceTurnCoordinator {
     // ハング自動復帰(穴C): 上限時間で生成を打ち切る。unref でテスト/プロセスを延命しない。
     const timer = setTimeout(() => ctrl.abort(), TURN_TIMEOUT_MS);
     timer.unref?.();
-    // 第一声が出るまでの短い救済(N-LAT-8): 第一声すら出ない=ハング/失敗とみなして早めに打ち切る。
+    // 第一声が出るまでの短い救済(N-LAT-10): 第一声すら出ない=ハング/失敗とみなして早めに打ち切る。
     //   60s も「考え中」を見せ続けない＋諦めた後に遅れて喋り出す事故を防ぐ(レンダラ側ウォッチドッグより前に切る)。
     //   第一声が出たら(committed)解除し、後続合成の長さは TURN_TIMEOUT_MS 側に委ねる。
     const firstAudioTimer = setTimeout(() => {
@@ -323,7 +323,7 @@ export class VoiceTurnCoordinator {
       if (this.gen === g) this.gen = null;
     } finally {
       clearTimeout(timer); // タイムアウトタイマーを解放(穴C)
-      clearTimeout(firstAudioTimer); // 第一声監視も解放(N-LAT-8)
+      clearTimeout(firstAudioTimer); // 第一声監視も解放(N-LAT-10)
     }
   }
 }
