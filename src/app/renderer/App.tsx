@@ -102,6 +102,7 @@ export function App(): React.ReactElement | null {
   const audioSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTurnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 後ろ向きまでのアイドル計時
+  const goodbyeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 「じゃあね」ポップ→最小化の遅延
   const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
   const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
   const pressHeldRef = useRef(false); // マイク押下が長押し(PTT)に確定したか
@@ -299,6 +300,7 @@ export function App(): React.ReactElement | null {
       if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
       if (audioSaveTimerRef.current) clearTimeout(audioSaveTimerRef.current);
+      if (goodbyeTimerRef.current) clearTimeout(goodbyeTimerRef.current);
     };
   }, []);
 
@@ -656,7 +658,10 @@ export function App(): React.ReactElement | null {
   function handleGoodbye(): void {
     if (handsFreeOn) stopHandsFree();
     setGoodbyePop(true);
-    setTimeout(() => {
+    // 連打でタイマーが多重化しないよう、前回分を破棄してから張り直す(ref 保持でアンマウント時も解放できる)。
+    if (goodbyeTimerRef.current) clearTimeout(goodbyeTimerRef.current);
+    goodbyeTimerRef.current = setTimeout(() => {
+      goodbyeTimerRef.current = null;
       void window.ene.goodbye();
       setGoodbyePop(false); // 再表示時に残らないようリセット
     }, GOODBYE_POP_MS);
