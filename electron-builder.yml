@@ -33,13 +33,27 @@ asarUnpack:
   - 'resources/silero_vad.onnx' # VAD モデルは native onnxruntime-node が直接読む=asar 外が必須(task_17 Phase C)
 win:
   target:
-    - target: portable
+    # ポータブル配布(2026-06): 展開フォルダを zip 1個で配る。
+    # ユーザは zip を任意の書込可能な場所へ展開 → Torimi.exe を実行 → フォルダ削除で完全アンインストール。
+    # (自己展開 portable exe は %TEMP% 展開で 1.5GB 同梱に不向きなため zip フォルダ方式へ・N-REL)
+    - target: zip
       arch:
         - x64
   icon: resources/icon.ico
-portable:
-  # exe ファイル名は ASCII 安全に保つ(日本語ファイル名は配布/DL で文字化け・破損リスク)。
-  artifactName: Torimi-${version}.exe
+# 配布物の ASCII 安全名(日本語ファイル名は DL で文字化け・破損リスク)。
+artifactName: Torimi-${version}.${ext}
+# モデル/音声エンジン(計約1.5GB)を **asar 外の素ファイル**として exe 隣の data/ へ同梱する。
+# transformers.js / AivisSpeech エンジンは実体ファイルを直接読むため asar には入れられない。
+# 同梱先は dev と同じ相対パス(data/models・data/voice/engine)=getModelsDir/getVoiceEngineDir は無改修。
+# ⚠️ 同梱元(下記 from)は配置済みであること(npm run download:model / download:stt-model / setup:voice-engine)。
+# ⚠️ AivisSpeech のモデル登録(torimi.aivmx)が data/voice/engine 内に永続しているか要確認(別所保存なら初回登録実装が必要)。
+extraFiles:
+  - from: data/models/whisper-small
+    to: data/models/whisper-small
+  - from: data/models/ruri-v3-310m
+    to: data/models/ruri-v3-310m
+  - from: data/voice/engine
+    to: data/voice/engine
 # 配布サイズ削減: 同梱するロケールを絞る(NF-SIZE-01)
 electronLanguages:
   - ja
