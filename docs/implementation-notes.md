@@ -1020,7 +1020,7 @@
 - **C3 ウィンドウ可視性(`App.tsx`)**: `visible` を2経路(main の hide/minimize/show/restore IPC ＋ renderer の `visibilitychange`)が **last-write-wins で奪い合っていた**(VRM 描画の start/stop を駆動する重要フラグ)。両信号をクロージャ変数に持ち、**両者の AND を単一の recompute で導出**する形へ(`visible = windowVisible && docVisible`)。どちらかが「隠れ」と言えば描画停止=取りこぼし無し・競合無し・occlusion 停止も維持。真実点=導出結果ひとつ。
 - **C2 音声可否(`tts && voiceConfig`)**: 同一述語が4+箇所(backchannel-controller / turn-engine×2 / idle-talk-manager / ipc 起動挨拶)に手コピーされていた。`app-runtime.ts` に **`resolveVoice(tts, voiceConfig)`**(揃えば narrowing 済みの組、欠ければ null)を新設し全箇所を集約。将来「ミュート中は不可」等の条件追加もこの1箇所で済む。backbone(DI getter の backchannel)も runtime 直参照も同じ呼び口。
 - **残(意図的に据置)**: C1 は barge-in 判定を `responseActive`(main駆動)で単一化済みだが `speaking` は今も renderer→main IPC ミラー(役割分離は明文化済み=エコーガード/strict VAD 用)。C5 は逆引き索引の増分/全再生成/ベクトルの3経路が「派生キャッシュ・真実の源=episodic本体」として明文化済みの割り切り(性能の作り直し=D1 とともに別タスク)。
-- **検証**: typecheck / eslint / lint:deps(違反0・150 modules)/ **506 テスト** 全グリーン。⚠️ C3 のウィンドウ可視性は **実機 smoke 推奨**(最小化/復帰/隠蔽での VRM 描画 start/stop・本環境では Electron 実行不可)。
+- **検証**: typecheck / eslint / lint:deps(違反0・150 modules)/ **506 テスト** 全グリーン。✅ C3 のウィンドウ可視性は **実機検証済**(2026-06-16・最小化で描画停止/復帰で即再開=固着なし・ユーザー確認)。
 
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。
