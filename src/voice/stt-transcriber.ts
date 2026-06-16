@@ -67,8 +67,25 @@ async function loadPipeline(): Promise<AsrPipeline> {
   log.info(
     `loading STT model from ${getModelsDir()}/${modelDir} (encoder=${encoderDtype} decoder=${decoderDtype})`,
   );
+  // 型定義不在(lib のオーバーロードが広すぎ本用途に過剰)のため二段キャストでシグネチャを絞る。
   const asr = await pipeline('automatic-speech-recognition', modelDir, { dtype });
   return asr as unknown as AsrPipeline;
+}
+
+/**
+ * パイプラインを遅延ロードして返す(シングルトン)。
+ * **ロード失敗時はキャッシュ(pipelinePromise)を null に戻す**ことで、次回呼び出しで再試行できる。
+ * rejected Promise を握り続けると、一過性のロード失敗(ファイルロック/一時的 OOM 等)が
+ * 再起動まで治らない「恒久故障」になってしまう。silero-vad の load() が再試行可能なのと同方針。
+ */
+async function getPipeline(): Promise<AsrPipeline> {
+  if (!pipelinePromise) pipelinePromise = loadPipeline();
+  try {
+    return await pipelinePromise;
+  } catch (e) {
+    pipelinePromise = null; // 次回 transcribe/warm で再ロードを試みる
+    throw e;
+  }
 }
 
 /**
@@ -87,8 +104,7 @@ export async function isSttModelAvailable(): Promise<boolean> {
 export async function warmStt(): Promise<void> {
   try {
     if (!(await isSttModelAvailable())) return;
-    if (!pipelinePromise) pipelinePromise = loadPipeline();
-    const asr = await pipelinePromise;
+    const asr = await getPipeline();
     // 0.5秒の無音で1回だけ推論し、ONNX セッションの初回実行コストも前倒しする(出力は捨てる)。
     const silence = new Float32Array(Math.floor(STT_SAMPLE_RATE / 2));
     await asr(silence, {
@@ -109,8 +125,7 @@ export async function warmStt(): Promise<void> {
  */
 export async function transcribe(samples: Float32Array): Promise<string> {
   if (samples.length === 0) return '';
-  if (!pipelinePromise) pipelinePromise = loadPipeline();
-  const asr = await pipelinePromise;
+  const asr = await getPipeline();
   const out = await asr(samples, {
     language: STT_LANGUAGE,
     task: 'transcribe',

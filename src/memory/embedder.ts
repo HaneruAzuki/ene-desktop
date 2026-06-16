@@ -44,6 +44,22 @@ async function loadExtractor(): Promise<FeatureExtractor> {
   return extractor as unknown as FeatureExtractor;
 }
 
+/**
+ * 抽出器を遅延ロードして返す(シングルトン)。
+ * **ロード失敗時はキャッシュ(extractorPromise)を null に戻す**ことで、次回呼び出しで再試行できる。
+ * rejected Promise を握り続けると、一過性のロード失敗が再起動まで治らない「恒久故障」になり、
+ * 意味検索(ベクトル想起)が永久に語彙のみへ退化する。stt-transcriber と同方針。
+ */
+async function getExtractor(): Promise<FeatureExtractor> {
+  if (!extractorPromise) extractorPromise = loadExtractor();
+  try {
+    return await extractorPromise;
+  } catch (e) {
+    extractorPromise = null; // 次回 embed で再ロードを試みる
+    throw e;
+  }
+}
+
 function prefixOf(kind: EmbeddingKind): string {
   // ruri は入力プレフィックス必須(付け忘れ＝精度劣化)。
   return kind === 'query' ? EMBEDDING_QUERY_PREFIX : EMBEDDING_DOCUMENT_PREFIX;
@@ -68,8 +84,7 @@ const queryCache = new Map<string, number[]>();
 
 /** 実推論(モデル遅延ロード→特徴抽出)。 */
 async function runEmbed(texts: string[], kind: EmbeddingKind): Promise<number[][]> {
-  if (!extractorPromise) extractorPromise = loadExtractor();
-  const extractor = await extractorPromise;
+  const extractor = await getExtractor();
   const prefixed = texts.map((t) => prefixOf(kind) + t);
   const output = await extractor(prefixed, { pooling: 'mean', normalize: true });
   return output.tolist();

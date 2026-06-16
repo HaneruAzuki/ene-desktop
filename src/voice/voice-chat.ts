@@ -145,12 +145,16 @@ export async function speakText(
   const spoken: string[] = [];
   for (const s of sentences) {
     if (deps.signal?.aborted) break; // 中断(supersede / barge-in)されたら以降の文を合成しない
-    if (detectAiSelfReference(s, deps.neverCallsSelf).detected) {
+    // ルビ(漢字《よみ》)は **自称検知・記録は除去後**、**音声は読み下し**で扱う(runVoiceChat と同方針)。
+    // 揃えないと、reading 無しの経路(起動挨拶/自発発話/ストリーミング失敗フォールバック)で
+    // TTS が《》や読み仮名をそのまま読み上げ/誤読し、自称検知の入力もストリーミング経路とズレる。
+    const display = stripRuby(s);
+    if (detectAiSelfReference(display, deps.neverCallsSelf).detected) {
       return { spokenText: spoken.join(''), blockedBySelfCheck: true };
     }
-    const wav = await deps.tts.speak(s, opts, deps.signal);
+    const wav = await deps.tts.speak(rubyToReading(s), opts, deps.signal);
     deps.onAudio(wav);
-    spoken.push(s);
+    spoken.push(display);
   }
   return { spokenText: spoken.join(''), blockedBySelfCheck: false };
 }

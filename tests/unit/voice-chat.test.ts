@@ -141,4 +141,16 @@ describe('speakText', () => {
     await speakText('最後', 'neutral', { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} });
     expect(calls.map((c) => c.text)).toEqual(['最後']);
   });
+
+  it('ルビ(漢字《よみ》)を音声は読み下し・記録は除去する(runVoiceChat と同方針)', async () => {
+    const { tts, calls } = recordingTts();
+    const r = await speakText('心《こころ》を読んだ。', 'neutral', {
+      tts,
+      voiceConfig: config,
+      neverCallsSelf: [],
+      onAudio: () => {},
+    });
+    expect(calls.map((c) => c.text)).toEqual(['こころを読んだ。']); // TTS は読み下し(《》や読み仮名を読み上げない)
+    expect(r.spokenText).toBe('心を読んだ。'); // 記録はルビ除去
+  });
 });
