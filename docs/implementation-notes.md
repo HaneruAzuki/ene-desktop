@@ -1027,7 +1027,15 @@
 - **E2②(非原子的 save)**: `app-settings.ts` の4 save が read-modify-write で、設定パネルの素早い複数トグルで後勝ち取りこぼしの縁。`updateSettings` で promise チェーン直列化(短期記憶 withWriteLock と同方針)。
 - **E2③(cosine 二重実装)**: `local-classifier`(内積版)と `index-vector`(フル版)の cosine を `shared/vector-math.ts` の `cosineSimilarity` に集約(index-vector は後方互換で再エクスポート)。正規化済みでは同値=挙動不変・ドリフト解消。
 - **disclosureLevel(設計判断・ユーザー確認)**: user 記憶が常に level 1=開示ゲートが canon にのみ効く件は **配線漏れではなく意図的**と確定。ゲートは「トリミが自分のことをどれだけ打ち明けるか(canon の段階的自己開示)」の機構で、user が話したことに親密度ゲートをかけるのは無意味(覚えていないように見える逆効果)。`retriever.ts` の該当行にコメント明文化=再検出防止。**コード変更なし**。
-- **横断監査の到達点**: 実バグ(A群=A5 まで)・死蔵(B/E1)・SSOT 本丸(C2/C3)・軽微(E2)・設計確認(disclosureLevel)=**クローズ**。**残=性能(D1 索引の線形走査 / D2 想起毎の全ベクトルロード / D3 抽出経路の二重フルスキャン)と C5/C1(明文化済みの割り切り)=設計を練ってからの別タスク**。
+- **横断監査の到達点**: 実バグ(A群=A5 まで)・死蔵(B/E1)・SSOT 本丸(C2/C3)・軽微(E2)・設計確認(disclosureLevel)=**クローズ**。**残=性能(D群)=設計を練ってからの別タスク**(→ 下記 D群 段階0+1 で着手)。
+- **検証**: typecheck / eslint / lint:deps(違反0・151 modules)/ **506 テスト** 緑。
+
+### 横断監査 D群 🟢 段階0+1(I/O 無駄取り＋ベクトル索引のメモリ常駐・2026-06-16)
+- **設計判断(ユーザーと確認)**: 忘却機構が episodic を常時 ≤1000 件に有界化(ビジョン柱1)→ B木/ANN/posting-list 等の「N 青天井向け索引」は不要。本質は「有界な同じデータを毎ターン読み直す」無駄。可搬性(平文JSON §6.1)・軽量(§4.3)を守るため **索引の作り直しではなくキャッシュ路線**を採用。段階0(安価な無駄取り)＋段階1(ベクトル索引の常駐)まで。**段階2(pool/inverted 常駐)は整合の規律に対し利得が薄く不採用**。
+- **段階0a(D3)**: `extraction-trigger` の二重フルスキャン解消。`retrieveRecords` 内部の `loadRecallPool` と open-loop 走査が `loadAllEpisodicFiles` を**2回**呼んでいた → プールを1回ロードして共有(`retrieveRecords(query, { recallPool })`＋open-loop は pool の user 部分集合 `provenance!=='self'` から)。背景経路だが episodic フルロードが半減。
+- **段階0b(D4)**: `embedder` の queryCache を FIFO → **真の LRU**(ヒット時に Map 末尾へ昇格・eviction は先頭=最古)。クエリ多様性が 32 を超える時のヒット率を改善。
+- **段階1(D2)**: `index-vector` にメモリ常駐キャッシュ。想起ごとに数MBのベクトル索引JSONを毎回 parse(変化の無いターンでも)していた → **パスをキー**にした module キャッシュで毎ターンの parse を消す。書き手は syncVectorIndex / pruneVectorIndex(→ saveVectorIndex)のみ＝自分の書込で更新し整合が閉じる。テストの一時ディレクトリ切替はパス不一致で自然に miss(テスト改変・リセット不要)、手動編集(§6.1)は再起動で反映。
+- **未着手(意図的・有界ゆえ実害なし)**: D1(逆引き索引の線形走査)/ C5 / 段階2(pool・inverted 常駐)。
 - **検証**: typecheck / eslint / lint:deps(違反0・151 modules)/ **506 テスト** 緑。
 
 ---

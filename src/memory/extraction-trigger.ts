@@ -1,7 +1,8 @@
 import { log } from '../shared/logger';
 import { nowLocalIso } from '../shared/datetime';
 import { getUnextractedEntries, markAsExtracted } from './short-term';
-import { saveEpisodic, loadAllEpisodicFiles } from './episodic';
+import { saveEpisodic } from './episodic';
+import { loadRecallPool } from './recall-pool';
 import { indexEpisodic } from './index-inverted';
 import { retrieveRecords } from './retriever';
 import { applyCorrections } from './update';
@@ -33,13 +34,15 @@ export async function extractFromShortTerm(
     .filter((e) => e.role === 'user')
     .map((e) => e.text)
     .join('\n');
-  const relevantMemories = await retrieveRecords({ text: conversationText });
+  // 想起と「気にかけ」走査で同じ episodic を二重ロードしない(D3)。プールを1回だけ作って共有する。
+  const pool = await loadRecallPool();
+  const relevantMemories = await retrieveRecords({ text: conversationText }, { recallPool: pool });
 
   // P4: 現在「気にかけている」未解決の事柄を抽出器に見せ、結末が会話に出たら閉じてもらう。
-  // 想起(話題依存)では拾えない未解決ループも閉じられるよう、全件から未解決を直接集める(canon に openLoop は無い)。
-  const allRecords = await loadAllEpisodicFiles();
-  const openLoopRecords = allRecords.filter(
-    (r) => r.memory.openLoop && !r.memory.openLoop.resolvedAt,
+  // 想起(話題依存)では拾えない未解決ループも閉じられるよう、未解決を直接集める。
+  // user 記録のみ対象(canon=provenance:'self' に openLoop は無い)＝旧 loadAllEpisodicFiles と同集合をプールから再利用。
+  const openLoopRecords = pool.filter(
+    (r) => r.memory.provenance !== 'self' && r.memory.openLoop && !r.memory.openLoop.resolvedAt,
   );
 
   const { episodic, semanticPatch, corrections, loopClosures } = await extractMemoryFromConversation(

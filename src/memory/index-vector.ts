@@ -30,14 +30,29 @@ function emptyIndex(): VectorIndex {
   return { dim: EMBEDDING_DIM, entries: [] };
 }
 
+// メモリ常駐キャッシュ(段階1・D2)。索引は派生キャッシュで真実の源は episodic 本体だが、
+//   想起ごとに数MBのベクトルJSONを毎回 parse していた(変化が無いターンでも)。書き手はこのモジュールだけ
+//   (syncVectorIndex / pruneVectorIndex → saveVectorIndex)なので、自分の書込でキャッシュを最新化すれば
+//   整合が閉じる。**パスをキー**にすることで、テストの一時ディレクトリ切替では自然に miss し(本番はパス固定で
+//   ヒット)、テスト側の改変もキャッシュリセットも不要。手動編集(可搬性 §6.1)は再起動で反映。
+let cache: { path: string; index: VectorIndex } | null = null;
+
 export async function loadVectorIndex(): Promise<VectorIndex> {
-  const raw = await readJson<VectorIndex>(getVectorIndexPath());
-  if (!raw || !Array.isArray(raw.entries)) return emptyIndex();
-  return { dim: raw.dim ?? EMBEDDING_DIM, entries: raw.entries };
+  const path = getVectorIndexPath();
+  if (cache && cache.path === path) return cache.index; // 常駐ヒット=毎ターンの parse を回避
+  const raw = await readJson<VectorIndex>(path);
+  const index =
+    !raw || !Array.isArray(raw.entries)
+      ? emptyIndex()
+      : { dim: raw.dim ?? EMBEDDING_DIM, entries: raw.entries };
+  cache = { path, index };
+  return index;
 }
 
 async function saveVectorIndex(index: VectorIndex): Promise<void> {
-  await writeJson(getVectorIndexPath(), index);
+  const path = getVectorIndexPath();
+  await writeJson(path, index);
+  cache = { path, index }; // 自分の書込でキャッシュを最新へ(単一書込者ゆえ整合が閉じる)
 }
 
 /**

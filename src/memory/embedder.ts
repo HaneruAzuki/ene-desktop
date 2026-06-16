@@ -75,7 +75,7 @@ async function runEmbed(texts: string[], kind: EmbeddingKind): Promise<number[][
   return output.tolist();
 }
 
-/** 既定の埋め込み実装(遅延ロード・シングルトン・クエリは LRU 風キャッシュ)。 */
+/** 既定の埋め込み実装(遅延ロード・シングルトン・クエリは LRU キャッシュ=ヒットで末尾へ昇格)。 */
 export function getDefaultEmbedder(): Embedder {
   return {
     async embed(texts, kind) {
@@ -84,7 +84,12 @@ export function getDefaultEmbedder(): Embedder {
       if (kind === 'query' && texts.length === 1) {
         const key = texts[0] ?? '';
         const hit = queryCache.get(key);
-        if (hit) return [hit];
+        if (hit) {
+          // LRU: ヒット=最近使用 → 末尾へ移動(Map は挿入順保持・eviction は先頭=最古を削除)。
+          queryCache.delete(key);
+          queryCache.set(key, hit);
+          return [hit];
+        }
         const [vec] = await runEmbed([key], 'query');
         if (!vec) return [];
         queryCache.set(key, vec);
