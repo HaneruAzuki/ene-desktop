@@ -1,5 +1,5 @@
-/* eslint-disable max-lines -- 音声/IPC 状態機械の分解は実機(renderer smoke)検証が要る既知負債のため保留中。
-   設定群は use-ene-settings.ts へ分離済(825→747行)。残りの分解は別途の実機セッションで行う(§8.5)。 */
+/* eslint-disable max-lines -- 音声入力ステートマシンは use-voice-input.ts、設定群は use-ene-settings.ts へ分離済。
+   残るは IPC 購読群(useEneEvents 候補)・起動ゲート・会話フロー。さらなる分解は実機 smoke 検証つきで段階的に行う(§8.5)。 */
 import React, { useEffect, useRef, useState } from 'react';
 import { CharacterDisplay } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';
@@ -9,7 +9,6 @@ import { ControlBar } from './components/ControlBar';
 import { playClick } from './sound';
 import {
   enqueueAudio,
-  stopPlayback,
   setPlaybackHandlers,
   setSentenceHandler,
   getVoiceAmplitude,
@@ -17,10 +16,9 @@ import {
 } from './audio-player';
 import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { setEqBands } from './voice-eq';
-import { VoiceMic } from './voice-conversation';
-import { startRecording, type Recorder } from './mic-capture';
 import { useInteractionRouting } from './use-interaction-routing';
 import { useEneSettings } from './use-ene-settings';
+import { useVoiceInput } from './use-voice-input';
 import {
   SOFA_AFTER_IDLE_MS,
   MOUTH_FLAP_MS,
@@ -29,7 +27,7 @@ import {
   IDLE_TURN_BACK_MS,
   THINKING_WATCHDOG_MS,
 } from './constants';
-import { STT_SAMPLE_RATE, BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
+import { BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { CharacterState } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
@@ -39,12 +37,6 @@ import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
 // キャラ表示・吹き出し・ホバーで現れる操作バー(マイク/音量/離席/設定/じゃあね)＋入力ピルを束ねる。
 // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
 //   ボタンは ON(リッスン中)/OFF だけ示す。状態テキストは出さない(聞き取り中はキャラは neutral)。
-
-/** これ未満の長さ(秒)の push-to-talk 録音は誤タップ扱いで無視する。 */
-const MIN_RECORDING_SEC = 0.3;
-
-/** マイク単一ハイブリッドの判別: 押下がこの ms 未満=タップ(ハンズフリーのトグル)、以上=PTT(押している間録音)。 */
-const TAP_MAX_MS = 250;
 
 /** 「じゃあね」ポップの表示時間(ms)。これだけ見せてからトレイにしまう(UI改修 段階4)。 */
 const GOODBYE_POP_MS = 600;
@@ -65,8 +57,6 @@ export function App(): React.ReactElement | null {
   const [inputFocused, setInputFocused] = useState(false);
   const [goodbyePop, setGoodbyePop] = useState(false); // 「じゃあね」ポップ表示中(段階4)
   const [away, setAway] = useState(false); // 離席中(段階5)
-  const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
-  const [recording, setRecording] = useState(false); // push-to-talk で録音中(押下中)
   const [nodKey, setNodKey] = useState(0); // うなずき(増えるたびに1回うなずく・task_18)
   const [nodStrength, setNodStrength] = useState(1); // うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け)
   const [yawnKey, setYawnKey] = useState(0); // あくび(増えるたびに1回・長時間傾聴・listening-mode)
@@ -95,11 +85,6 @@ export function App(): React.ReactElement | null {
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTurnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 後ろ向きまでのアイドル計時
   const goodbyeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 「じゃあね」ポップ→最小化の遅延
-  const micRef = useRef<VoiceMic | null>(null); // ハンズフリーのマイク
-  const recorderRef = useRef<Recorder | null>(null); // push-to-talk の録音
-  const pressHeldRef = useRef(false); // マイク押下が長押し(PTT)に確定したか
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // タップ/長押し判別タイマー
-  const voiceModeRef = useRef(false); // 非同期コールバックから handsFreeOn を読む
   // ストリーミング音声で「再生開始済み=聞かせた文」を貯める(Phase A: 再生同期の吹き出し)。
   // 先頭文(index=0)でリセットし、文が再生されるたび追記する。
   const spokenRef = useRef<string[]>([]);
@@ -107,8 +92,9 @@ export function App(): React.ReactElement | null {
   const interactedRef = useRef(false); // 既にユーザーが会話を始めたか(準備完了後の挨拶差し替え判定)
   const preparingRef = useRef(true); // 準備中フラグ(コールバックから読む・preparing state と同期)
 
-  // ON(リッスン中)かどうか: ハンズフリー起動中 or PTT 録音中。
-  const micActive = handsFreeOn || recording;
+  // 音声入力ステートマシン(マイク/PTT/ハンズフリー/barge-in)は専用フックへ集約(会話/アイドル計時とは deps で疎結合)。
+  // respond/noteActivity は関数宣言ゆえ巻き上げられ、ここで参照しても定義順の問題は無い。
+  const voice = useVoiceInput({ noteActivity, respond, setBubble, setCharState, spokenRef, talkingTimerRef });
 
   // 起動時に CharacterInfo を取得 ＋ 起動準備の状態を反映。
   // 準備が整うまでは挨拶を出さず「ちょっと待って、」を表示する(整い次第・挨拶へ差し替え)。
@@ -240,10 +226,10 @@ export function App(): React.ReactElement | null {
       () => {
         // 応答が鳴り始めた瞬間=鳴り残った相槌をダッキング(停止)して声の重なりを防ぐ。
         stopBackchannel();
-        if (voiceModeRef.current) window.ene.setVadSpeaking(true);
+        if (voice.isHandsFree()) window.ene.setVadSpeaking(true);
       },
       () => {
-        if (voiceModeRef.current) window.ene.setVadSpeaking(false);
+        if (voice.isHandsFree()) window.ene.setVadSpeaking(false);
       },
     );
   }, []);
@@ -266,7 +252,7 @@ export function App(): React.ReactElement | null {
     window.ene.onVoiceResponse((response) => applyResponseUI(response, false));
     // 自発発話(P7): main がアイドル判定で生成した一言を吹き出し/表情へ反映する(音声なし v1=全文表示)。
     window.ene.onProactiveMessage((response) => applyResponseUI(response, true));
-    window.ene.onVoiceBargeIn(() => handleBargeIn());
+    window.ene.onVoiceBargeIn(() => voice.handleBargeIn());
   }, []);
 
   // アンマウント時に走らせっぱなしのタイマーを止める(口パク終了の talkingTimer・VRM 保存デバウンスの
@@ -275,7 +261,6 @@ export function App(): React.ReactElement | null {
     return () => {
       if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
       if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
-      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
       if (goodbyeTimerRef.current) clearTimeout(goodbyeTimerRef.current);
     };
   }, []);
@@ -461,125 +446,8 @@ export function App(): React.ReactElement | null {
     playClick();
     setForceOpen(false);
     // 喋っている最中の送信=割り込み(現在の発話を止め、進行中の生成を畳んでから新ターンへ・#8 統一 barge-in)。
-    if (isPlaying()) handleBargeIn();
+    if (isPlaying()) voice.handleBargeIn();
     await respond(text);
-  }
-
-  /** barge-in: ENE 発話中にユーザーが話しかけたら、ENE の声を即停止して聞く体勢へ。 */
-  function handleBargeIn(): void {
-    stopPlayback();
-    stopBackchannel(); // 鳴り残った相槌もダッキング(割り込み時に黙らせる)
-    // Phase B: 実際に聞かせた発言(再生開始済みの文を連結)を main へ報告し、記憶を切り詰めさせる。
-    window.ene.notifyBargeInHeard(spokenRef.current.join(''));
-    if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
-    setCharState((s) =>
-      s.activity === 'talking' ? { ...s, activity: 'idle', emotion: 'neutral' } : s,
-    );
-    window.ene.setVadSpeaking(false);
-  }
-
-  // --- ハンズフリー(VAD)の ON/OFF ---
-  async function startHandsFree(): Promise<void> {
-    noteActivity(); // マイクを点ける=こちらへ向き直る
-    const ok = await window.ene.startVad();
-    if (!ok) {
-      setBubble('…ごめん、耳がまだ準備できてないみたい。');
-      return;
-    }
-    // 聞き取り開始の時点で Tier0 キャッシュを温める(ハンズフリーは入力欄を開かないため・レイテンシ施策)。
-    void window.ene.warmCache();
-    try {
-      micRef.current ??= new VoiceMic();
-      await micRef.current.start();
-      voiceModeRef.current = true;
-      setHandsFreeOn(true);
-    } catch {
-      window.ene.stopVad();
-      setBubble('…マイクが使えないみたい。マイクの接続や設定を確認してみて?');
-    }
-  }
-  function stopHandsFree(): void {
-    micRef.current?.stop();
-    window.ene.stopVad();
-    window.ene.setVadSpeaking(false);
-    voiceModeRef.current = false;
-    setHandsFreeOn(false);
-  }
-
-  // --- push-to-talk(押している間だけ録音) ---
-  async function startPtt(): Promise<void> {
-    if (recording) return;
-    noteActivity(); // 話し始める=こちらへ向き直る
-    // 録音開始の時点で Tier0 キャッシュを温める(録音→認識の間に書き込まれる・レイテンシ施策)。
-    void window.ene.warmCache();
-    try {
-      recorderRef.current = await startRecording();
-      setRecording(true);
-    } catch {
-      recorderRef.current = null;
-      setBubble('…マイクが使えないみたい。マイクの接続や設定を確認してみて?');
-    }
-  }
-  async function stopPtt(): Promise<void> {
-    const rec = recorderRef.current;
-    if (!rec || !recording) return;
-    recorderRef.current = null;
-    setRecording(false);
-    try {
-      const samples = await rec.stop();
-      if (samples.length < STT_SAMPLE_RATE * MIN_RECORDING_SEC) return; // 短すぎ=無視
-      setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' })); // 認識中は「…」
-      const result = await window.ene.transcribeAudio(samples);
-      if (result.ok) {
-        await respond(result.text);
-      } else {
-        setBubble(result.message);
-        setCharState((s) => (s.activity === 'thinking' ? { ...s, activity: 'idle' } : s));
-      }
-    } catch {
-      setBubble('…うまく聞き取れなかった。もう一回試してみて?');
-      setCharState((s) => (s.activity === 'thinking' ? { ...s, activity: 'idle' } : s));
-    }
-  }
-
-  // --- マイク単一ハイブリッド(短タップ=ハンズフリーON/OFF・長押し=押している間 PTT) ---
-  // 押下時点ではタップか長押しか不明。TAP_MAX_MS 押し続けたら長押し=PTT を開始、
-  // それ未満で離せばタップ=ハンズフリーをトグルする。ハンズフリーON中はタップで OFF。
-  function micDown(): void {
-    pressHeldRef.current = false;
-    if (handsFreeOn) return; // ON 中は離した時に OFF にするだけ(長押しでも PTT に入らない)
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = setTimeout(() => {
-      pressHeldRef.current = true;
-      void startPtt();
-    }, TAP_MAX_MS);
-  }
-  function micUp(): void {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (handsFreeOn) {
-      stopHandsFree(); // ON 中のクリック=OFF
-      return;
-    }
-    if (pressHeldRef.current) {
-      pressHeldRef.current = false;
-      void stopPtt(); // 長押し=PTT を確定(録音停止→認識)
-    } else {
-      void startHandsFree(); // タップ=ハンズフリー ON
-    }
-  }
-  function micLeave(): void {
-    // 押しながら外れた時: PTT 中なら確定、判別前ならキャンセル(誤操作回避)。
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (pressHeldRef.current) {
-      pressHeldRef.current = false;
-      void stopPtt();
-    }
   }
 
   /** VRM 表示パラメータの変更(即時反映＋デバウンスして data/config へ保存)。 */
@@ -591,7 +459,7 @@ export function App(): React.ReactElement | null {
 
   /** じゃあね(段階4): ポップを一瞬見せてからタスクバーへ最小化。マイクは念のため切る。 */
   function handleGoodbye(): void {
-    if (handsFreeOn) stopHandsFree();
+    if (voice.handsFreeOn) voice.stopHandsFree();
     setGoodbyePop(true);
     // 連打でタイマーが多重化しないよう、前回分を破棄してから張り直す(ref 保持でアンマウント時も解放できる)。
     if (goodbyeTimerRef.current) clearTimeout(goodbyeTimerRef.current);
@@ -608,24 +476,11 @@ export function App(): React.ReactElement | null {
     setAway(next);
     window.ene.setAway(next);
     noteActivity(); // 手動トグル=操作=アイドル計時リセット(離席復帰時に自動後ろ向きを確実に解除)
-    if (next) {
-      // 離席に入る=マイクを確実に切る(ハンズフリー稼働中なら停止・PTT 録音中なら破棄)。
-      if (voiceModeRef.current) stopHandsFree();
-      if (recorderRef.current) {
-        recorderRef.current.cancel();
-        recorderRef.current = null;
-        setRecording(false);
-      }
-    }
+    // 離席に入る=マイクを確実に切る(ハンズフリー稼働中なら停止・PTT 録音中なら破棄)。
+    if (next) voice.stopForAway();
   }
 
   if (!characterInfo) return null;
-
-  // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
-  const micHandlers = { onMouseDown: micDown, onMouseUp: micUp, onMouseLeave: micLeave };
-  const micTitle = handsFreeOn
-    ? '聞いてるよ(クリックで切る)'
-    : 'クリックで聞く / 押している間だけ話す';
 
   // フルバーを出す条件=下部ゾーン内 or 明示展開 or 入力中(案A・段階5 修正)。離席は常にサインのみ。
   const showFull = forceOpen || inputFocused || barHovered;
@@ -666,7 +521,7 @@ export function App(): React.ReactElement | null {
           =手を伸ばす途中で消えない)。入力中/明示展開中は離れても保持する。
           マイクON 中はホバーを外すと、操作バーの代わりに最小の常駐サイン(緑「聞いてるよ」)を残す。
           段階2: マイクは単一ハイブリッド配線。音量/離席/じゃあねは段階3/5/4 で実装。 */}
-        {!preparing && (showFull || micActive || away) && (
+        {!preparing && (showFull || voice.micActive || away) && (
           <div className="control-overlay" data-interactive data-hitbox>
             {away ? (
               // 離席中はホバーでも操作バーを出さず、戻る用の最小サインのみ(クリックで戻る)。
@@ -682,9 +537,9 @@ export function App(): React.ReactElement | null {
             ) : showFull ? (
               <>
                 <ControlBar
-                  micActive={micActive}
-                  micHandlers={micHandlers}
-                  micTitle={micTitle}
+                  micActive={voice.micActive}
+                  micHandlers={voice.micHandlers}
+                  micTitle={voice.micTitle}
                   volume={settings.volume}
                   muted={settings.muted}
                   onToggleMute={settings.toggleMute}
@@ -703,11 +558,11 @@ export function App(): React.ReactElement | null {
                   onFocusChange={setInputFocused}
                 />
               </>
-            ) : micActive ? (
+            ) : voice.micActive ? (
               // マイクON だがホバー外: 最小の常駐サイン(クリックで切る)。
               <button
                 className="mic-indicator"
-                onClick={() => void stopHandsFree()}
+                onClick={() => void voice.stopHandsFree()}
                 title="聞いてるよ(クリックで切る)"
                 aria-label="音声入力をオフ"
               >

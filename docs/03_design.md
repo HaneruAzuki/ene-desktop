@@ -257,6 +257,7 @@ ene-desktop/
 │   │       ├── use-window-drag.ts     ← キャラのドラッグ移動フック(mouse-gesture を配線・N-ARCH-3)
 │   │       ├── use-interaction-routing.ts ← クリックスルー/ホバー操作バー領域の当たり判定フック(rAF 間引き・UI改修2026-06)
 │   │       ├── use-ene-settings.ts    ← ユーザー設定(音量/話しかけ頻度/自動起動/呼び方)を App から分離したフック
+│   │       ├── use-voice-input.ts     ← 音声入力ステートマシン(マイク/PTT/ハンズフリー/barge-in)を App から分離したフック
 │   │       ├── sound.ts               ← UI 効果音(Web Audio 合成・task_13)
 │   │       ├── audio-player.ts        ← 音声チャンク(WAV)の逐次再生・barge-in 即停止(task_17)
 │   │       ├── backchannel-player.ts  ← 相槌の即時再生(応答キューと別系統・task_18)
