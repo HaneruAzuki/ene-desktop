@@ -6,8 +6,8 @@ import {
   DAILY_LIFE_IMPORTANCE,
   EPISODIC_SUMMARY_MAX_CHARS,
 } from '../shared/constants';
-import { loadAllEpisodicFiles } from '../memory/episodic';
-import { selectOpenLoops, loadOpenLoopState, saveOpenLoopState } from '../memory/open-loops';
+import { loadOpenLoopState, saveOpenLoopState } from '../memory/open-loops';
+import { readPresenceMemory } from '../memory/presence-reads';
 import { saveAndIndexEpisodic } from '../memory/episodic-write';
 import type { LlmComplete } from '../memory/extractor';
 import type { ActiveCharacter, CharacterContext } from '../shared/types/character';
@@ -119,17 +119,14 @@ export async function generateOffscreenLife(
   if (!active.firstLaunchCompleted) return null;
 
   try {
-    const all = await loadAllEpisodicFiles();
+    // 最近の暮らし＋気にかけを memory の読み取り窓口から1回で得る(ストレージ実装に直接依存しない)。
+    // 気にかけは会話・自発発話と同じ選択を通す(上限・休眠を共有)。挨拶が実際に作れたら下で履歴を保存する。
+    const loopState = await loadOpenLoopState();
+    const { dailyLife, openLoops: loopSel } = await readPresenceMemory(loopState, Date.now(), nowLocalIso());
     const todayYmd = nowLocalIso().slice(0, 10);
-    const dailyLife = all
-      .filter((r) => r.memory.category === DAILY_LIFE_CATEGORY)
-      .sort((a, b) => b.memory.date.localeCompare(a.memory.date));
     // 同日2回目以降は断片を増やさない(1日1個)。挨拶だけ作る。
     const makeFragment = !dailyLife.some((r) => r.memory.date.slice(0, 10) === todayYmd);
     const recentLife = dailyLife.slice(0, 3).map((r) => r.memory.summary);
-    // 気にかけは会話・自発発話と同じ選択を通す(上限・休眠を共有)。挨拶が実際に作れたら下で履歴を保存する。
-    const loopState = await loadOpenLoopState();
-    const loopSel = selectOpenLoops(all, loopState, Date.now(), nowLocalIso());
     const openLoops = loopSel.notes;
 
     const prompt = buildOffscreenLifePrompt({

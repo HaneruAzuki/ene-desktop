@@ -39,6 +39,16 @@ module.exports = {
       to: { path: '^src/memory/index-(inverted|vector)' },
     },
     {
+      name: 'no-episodic-store-outside-memory',
+      comment:
+        'memory の中期記憶ストア(episodic.ts)は読み書きのプリミティブ。memory 層の外は公開 facade' +
+        '(context-builder / presence-reads / episodic-write 等)経由で使い、ストア実装(全件ロード等)へ' +
+        '直接依存しない。書き込み側 no-index-impl-outside-memory と対称に、読み取り側も §4.4 を担保する。',
+      severity: 'error',
+      from: { pathNot: '^src/memory/' },
+      to: { path: '^src/memory/episodic\\.ts$' },
+    },
+    {
       name: 'no-circular',
       comment: '循環依存を禁止(疎結合・CLAUDE.md §4.4)。',
       severity: 'error',

@@ -298,6 +298,7 @@ ene-desktop/
 │   │   ├── short-term.ts
 │   │   ├── episodic.ts
 │   │   ├── episodic-write.ts      ← 中期記憶の書き込み窓口(保存＋逆引き索引付けを束ねる facade・§4.4)
+│   │   ├── presence-reads.ts      ← 存在感(挨拶/自発発話)向け読み取り窓口(最近の暮らし＋気にかけ・§4.4 読み取り側 facade)
 │   │   ├── semantic.ts
 │   │   ├── retriever.ts           ← 想起(語彙+entity+ベクトルRRF・task_15)
 │   │   ├── update.ts              ← 非破壊更新 supersede/refine/reattribute(task_15)

@@ -3,11 +3,7 @@ import { log } from '../../shared/logger';
 import { nowLocalIso } from '../../shared/datetime';
 import { timeOfDayLabel } from '../../shared/moment';
 import { normalizeEmotion } from '../../shared/llm-parse';
-import {
-  IDLE_TALK_CHECK_INTERVAL_MS,
-  IDLE_TALK_ENABLED_ENV,
-  DAILY_LIFE_CATEGORY,
-} from '../../shared/constants';
+import { IDLE_TALK_CHECK_INTERVAL_MS, IDLE_TALK_ENABLED_ENV } from '../../shared/constants';
 import {
   shouldSpeakIdle,
   buildIdleTalkPrompt,
@@ -16,13 +12,8 @@ import {
 } from '../../conversation/idle-talk';
 import { makeLlmComplete } from '../../conversation/client';
 import { speakResponse } from './voice-runtime';
-import { loadAllEpisodicFiles } from '../../memory/episodic';
-import {
-  selectOpenLoops,
-  loadOpenLoopState,
-  saveOpenLoopState,
-  type OpenLoopSurface,
-} from '../../memory/open-loops';
+import { loadOpenLoopState, saveOpenLoopState, type OpenLoopSurface } from '../../memory/open-loops';
+import { readPresenceMemory } from '../../memory/presence-reads';
 import { appendShortTerm } from '../../memory/short-term';
 import { loadAppSettings } from '../../shared/node/app-settings';
 import type { EmotionLabel } from '../../shared/types/animation';
@@ -194,16 +185,11 @@ export class IdleTalkManager {
     const d = new Date();
     const timeOfDay = timeOfDayLabel(d.getHours());
     try {
-      const all = await loadAllEpisodicFiles();
-      // 会話経路と同じ気にかけ選択を使う(上限・クールダウン・休眠を共有)。
-      // ここでは選択だけ行い、実際に発話できたら emit で state を保存する(黙ったまま上限を消費しない)。
+      // 会話経路と同じ気にかけ選択を使う(上限・クールダウン・休眠を共有)。memory の読み取り窓口から
+      // 最近の暮らし＋気にかけを1回で得る。選択だけ行い、発話できたら emit で state を保存する(黙ったまま上限を消費しない)。
       const state = await loadOpenLoopState();
-      const sel = selectOpenLoops(all, state, d.getTime(), nowLocalIso());
-      const recentLife = all
-        .filter((r) => r.memory.category === DAILY_LIFE_CATEGORY)
-        .sort((a, b) => b.memory.date.localeCompare(a.memory.date))
-        .slice(0, 2)
-        .map((r) => r.memory.summary);
+      const { dailyLife, openLoops: sel } = await readPresenceMemory(state, d.getTime(), nowLocalIso());
+      const recentLife = dailyLife.slice(0, 2).map((r) => r.memory.summary);
       return {
         hasMaterial: sel.notes.length > 0 || recentLife.length > 0,
         openLoops: sel.notes,
