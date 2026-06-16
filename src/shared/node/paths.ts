@@ -215,7 +215,12 @@ export function getTrayIconPath(): string {
 
 /** Silero VAD モデル(resources/silero_vad.onnx・配布物に同梱・task_17 Phase C)。 */
 export function getVadModelPath(): string {
-  return path.join(getResourcesDir(), VAD_MODEL_FILE);
+  // silero_vad.onnx は asarUnpack 済み(electron-builder.yml)。ネイティブ onnxruntime は asar 内を
+  // 直接開けないため、packaged では app.asar ではなく app.asar.unpacked 側の実ファイルを指す
+  // (app.getAppPath() は packaged で …/resources/app.asar を返す)。dev はその名を含まないので no-op。
+  return path
+    .join(getResourcesDir(), VAD_MODEL_FILE)
+    .replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
 }
 
 // --- Electron userData(暗号化 API キーの保存先) ---

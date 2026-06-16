@@ -2,17 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import path from 'node:path';
 import os from 'node:os';
 
-// electron をモック(app.isPackaged / getPath)
+// json-store/appPath をモックして refreshActiveCharacterId / getAppPath を制御
+const h = vi.hoisted(() => ({ readJson: vi.fn(), appPath: process.cwd() }));
+
+// electron をモック(app.isPackaged / getPath / getAppPath)
 vi.mock('electron', () => ({
   app: {
     isPackaged: false,
     getPath: (name: string): string =>
       name === 'userData' ? path.join(os.tmpdir(), 'ene-ud') : os.tmpdir(),
+    getAppPath: (): string => h.appPath,
   },
 }));
 
-// json-store をモックして refreshActiveCharacterId を制御
-const h = vi.hoisted(() => ({ readJson: vi.fn() }));
 vi.mock('../../src/shared/node/json-store', () => ({ readJson: h.readJson }));
 
 import { app } from 'electron';
@@ -25,6 +27,7 @@ import {
   getActiveCharacterPath,
   getApiKeyPath,
   getMachineDataDir,
+  getVadModelPath,
   setActiveCharacterId,
   refreshActiveCharacterId,
 } from '../../src/shared/node/paths';
@@ -35,6 +38,7 @@ function setPackaged(v: boolean): void {
 
 beforeEach(() => {
   h.readJson.mockReset();
+  h.appPath = process.cwd();
   setActiveCharacterId('ene');
   setPackaged(false);
 });
@@ -84,5 +88,18 @@ describe('paths (設計書 §3.6 / §5.5)', () => {
   it('マシン固定データと API キーパスは userData 配下', () => {
     expect(getMachineDataDir()).toBe(path.join(os.tmpdir(), 'ene-ud'));
     expect(getApiKeyPath()).toBe(path.join(os.tmpdir(), 'ene-ud', 'api-key.enc'));
+  });
+
+  it('getVadModelPath は packaged(app.asar)では asar.unpacked 側の実ファイルを指す', () => {
+    // ネイティブ onnxruntime は asar 内を開けないため、asarUnpack された実体側へ向ける必要がある。
+    h.appPath = path.join(os.tmpdir(), 'win-unpacked', 'resources', 'app.asar');
+    expect(getVadModelPath()).toBe(
+      path.join(os.tmpdir(), 'win-unpacked', 'resources', 'app.asar.unpacked', 'resources', 'silero_vad.onnx'),
+    );
+  });
+
+  it('getVadModelPath は dev(app.asar を含まない)では置換しない', () => {
+    h.appPath = path.join(os.tmpdir(), 'proj');
+    expect(getVadModelPath()).toBe(path.join(os.tmpdir(), 'proj', 'resources', 'silero_vad.onnx'));
   });
 });

@@ -10,9 +10,9 @@
     "embarrassed": "relaxed"
   },
   "display": {
-    "height": 0,
-    "distance": 0.55,
-    "yawDeg": 18,
-    "armDownDeg": 62
+    "height": 0.17,
+    "distance": 1.5,
+    "yawDeg": -13,
+    "armDownDeg": -70
   }
 }
