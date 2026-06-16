@@ -103,6 +103,21 @@ export class VadRuntime {
       : new VadSegmenter();
   }
 
+  /**
+   * 起動ゲート用: VAD モデル(silero)を事前ロードする(best-effort・非破壊)。
+   * 「ちょっと待って」完了時点で**耳まで準備済み**にし、初回マイク押下にロード遅延・失敗を出さないため
+   * (= ready 後にシステム感を漏らさない・哲学整合)。失敗してもキャッシュを戻すだけで start で再試行できる。
+   */
+  async warm(): Promise<void> {
+    try {
+      if (!this.loading) this.loading = this.vad.load();
+      await this.loading;
+    } catch (e) {
+      this.loading = null; // 次回 start/warm で再試行
+      log.warn(`VAD warm failed: ${(e as Error).name}`);
+    }
+  }
+
   /** VAD セッション開始。モデル未配置なら false(呼び出し側は push-to-talk のまま)。 */
   async start(): Promise<boolean> {
     // listenOnly(相槌テスト)は Whisper を使わないので STT モデル無しでも開始できる。

@@ -200,12 +200,15 @@ export async function runStartupSequence(
       Promise.all([
         warmStt().catch(() => undefined),
         warmLocalRouter(charContext.knowledgeDomains).catch(() => undefined),
+        // 耳(VAD)も事前ロード=「ちょっと待って」完了＝口/耳/記憶/判別器の全部 ready(哲学整合)。
+        // registerIpcHandlers が runtime.warmVad を注入済み(VadRuntime.warm・best-effort)。
+        runtime.warmVad?.() ?? Promise.resolve(),
       ]),
     )
     .then(() => {
       runtime.ready = true;
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.APP_READY);
-      log.info('app fully ready (voice engine + embedder + STT + local router warmed)');
+      log.info('app fully ready (voice engine + embedder + STT + VAD + local router warmed)');
     });
 
   // Step 10.5: 音声を best-effort 初期化(エンジンは Step 4.5 で背景起動済み・task_17 Phase A)。

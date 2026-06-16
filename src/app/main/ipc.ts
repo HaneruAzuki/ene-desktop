@@ -141,6 +141,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   const vad = new VadRuntime(mainWindow, backchannel, listenOnly, coalesce);
   // barge-in 判定窓を main の応答ターンで駆動する(構造的修正)。第一声(コミット)で true、barge-in/次ターンで false。
   runtime.setResponseActive = (active: boolean): void => vad.setResponseActive(active);
+  // 起動ゲートで耳(VAD)も事前ロードさせる=「ちょっと待って」完了時点で耳まで ready(初回マイクに遅延を出さない)。
+  runtime.warmVad = (): Promise<void> => vad.warm();
   // 適応(段階②): coordinator が算出した無音窓を segmenter へ反映(§6.2: ms のみ・本文なし)。
   if (coalesceOn) {
     applySilenceWindow = (ms: number): void => {

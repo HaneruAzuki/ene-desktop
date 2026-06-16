@@ -52,6 +52,11 @@ export interface AppRuntime {
    * VadRuntime.setResponseActive を ipc 配線時に注入する。renderer の再生明滅から分離=確実に被せ割り込みを拾う。
    */
   setResponseActive?: (active: boolean) => void;
+  /**
+   * 起動ゲート用: VAD(耳)モデルを事前ロードする(VadRuntime が注入)。lifecycle の二段ゲートが
+   * STT/埋め込み/判別器と一緒に await し、「ちょっと待って」完了＝耳も含め全部 ready を保証する。
+   */
+  warmVad?: () => Promise<void>;
 }
 
 /**
