@@ -273,7 +273,6 @@ ene-desktop/
 │   │       │   ├── SpeechBubble.tsx
 │   │       │   ├── InputArea.tsx
 │   │       │   ├── ControlBar.tsx       ← ホバー操作バー(マイク/音量/離席/設定/じゃあね・UI改修2026-06)
-│   │       │   ├── ConversationLog.tsx  ← VTuber風 会話ログ(">>"で右拡張・UI改修2026-06)
 │   │       │   ├── VolumeControl.tsx    ← 音量スライダー(操作バー内・UI改修2026-06)
 │   │       │   └── SettingsPanel.tsx    ← 設定パネル(⚙統合・話しかけ頻度/見た目/自動起動/記憶/APIキー・UI改修2026-06)
 │   │       ├── api-key-dialog/        ← APIキーダイアログ専用ページ(2nd renderer エントリ・N-09-2)

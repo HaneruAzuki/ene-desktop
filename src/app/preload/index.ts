@@ -27,8 +27,6 @@ const eneAPI: EneAPI = {
   setAutoLaunch: (on) => ipcRenderer.invoke(IPC.SET_AUTO_LAUNCH, on),
   getOwnerName: () => ipcRenderer.invoke(IPC.GET_OWNER_NAME),
   setOwnerName: (name, reading) => ipcRenderer.invoke(IPC.SET_OWNER_NAME, name, reading),
-  setLogExpanded: (expanded, panelWidth) =>
-    ipcRenderer.send(IPC.SET_LOG_EXPANDED, expanded, panelWidth),
   onUserSaid: (cb) => {
     ipcRenderer.removeAllListeners(IPC.USER_SAID);
     ipcRenderer.on(IPC.USER_SAID, (_event, text: string) => cb(text));

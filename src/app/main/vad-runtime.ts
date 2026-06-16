@@ -264,8 +264,8 @@ export class VadRuntime {
           `vad transcript (${text.length} chars, stt=${Math.round(performance.now() - t)}ms; ` +
             `+silence ${silenceMs}ms before)`,
         );
-        // 会話ログ(UI改修・VTuber風)表示用: 確定したユーザー発話を renderer へ(コアレッシング有無に関わらず)。
-        // 表示専用=生成経路には影響しない(逐語ログは保存しない=セッション内メモリのみ・§6.3)。
+        // 確定したユーザー発話を renderer へ(コアレッシング有無に関わらず)。renderer はこれを
+        // アイドル計時のリセット(話しかけられた=前を向く)に使う。生成経路には影響しない。
         this.send(IPC.USER_SAID, text);
         // コアレッシング: 確定でなく**暫定**ターン終了として coordinator へ(投機生成＋連結)。
         // 既定(非コアレッシング)は従来どおり renderer へ送り、renderer が sendMessage に流す。

@@ -34,7 +34,6 @@ export const IPC = {
   SET_AUTO_LAUNCH: 'ene:set-auto-launch',
   SET_AWAY: 'ene:set-away',
   SET_IGNORE_MOUSE_EVENTS: 'ene:set-ignore-mouse-events',
-  SET_LOG_EXPANDED: 'ene:set-log-expanded',
   SET_OWNER_NAME: 'ene:set-owner-name',
   SET_VRM_DISPLAY: 'ene:set-vrm-display',
   SHOW_ABOUT: 'ene:show-about',

@@ -3,7 +3,6 @@ import { CharacterDisplay } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';
 import { InputArea, type InputAreaHandle } from './components/InputArea';
 import { SettingsPanel } from './components/SettingsPanel';
-import { ConversationLog, type LogEntry } from './components/ConversationLog';
 import { ControlBar } from './components/ControlBar';
 import { playClick } from './sound';
 import {
@@ -26,8 +25,6 @@ import {
   MOUTH_FLAP_MS,
   TALKING_MIN_MS,
   TALKING_MAX_MS,
-  LOG_PANEL_WIDTH,
-  LOG_MAX_ENTRIES,
   IDLE_TURN_BACK_MS,
   THINKING_WATCHDOG_MS,
 } from './constants';
@@ -91,8 +88,6 @@ export function App(): React.ReactElement | null {
   const [autoLaunch, setAutoLaunch] = useState(false); // PC起動時に自動起動(段階6)
   const [ownerName, setOwnerName] = useState(''); // 主人の呼び方(設定で登録/変更)
   const [ownerReading, setOwnerReading] = useState(''); // 呼び方の読み(かな・音声用)
-  const [logOpen, setLogOpen] = useState(false); // 会話ログ(ウィンドウ横拡張・VTuber風)
-  const [logEntries, setLogEntries] = useState<LogEntry[]>([]); // 直近のやりとり(セッション内のみ)
   const [idleBack, setIdleBack] = useState(false); // 会話が途切れて退屈→後ろ向き(話しかけで前へ・見た目だけ)
 
   const vrmPanelRef = useRef<HTMLDivElement>(null); // 設定パネル(パネル外クリック判定で使用)
@@ -178,12 +173,11 @@ export function App(): React.ReactElement | null {
     });
   }, []);
 
-  // ユーザー発話(ハンズフリー音声・コアレッシング含む)を会話ログへ＋アイドル計時リセット(表示専用イベント)。
+  // ユーザー発話(ハンズフリー音声・コアレッシング含む)でアイドル計時をリセットする
+  //   (話しかけられた=前を向く)。コアレッシング音声経路では応答時に noteActivity を通らないため、
+  //   ユーザー発話を拾うこのイベントが「前を向く」唯一のトリガーになる。
   useEffect(() => {
-    window.ene.onUserSaid((text) => {
-      pushLog('user', text);
-      noteActivity();
-    });
+    window.ene.onUserSaid(() => noteActivity());
   }, []);
 
   // 会話が途切れて IDLE_TURN_BACK_MS 経つとトリミは後ろを向く(話しかけ/クリックで前へ・見た目だけ)。起動時から計時。
@@ -443,10 +437,7 @@ export function App(): React.ReactElement | null {
   /** 起動挨拶を1回取得して吹き出しに出す(pull・取得後 main 側でクリア)。 */
   async function showGreeting(): Promise<void> {
     const greeting = await window.ene.getInitialGreeting();
-    if (greeting) {
-      setBubble(greeting);
-      pushLog('torimi', greeting); // 起動挨拶も会話ログへ(他の発話経路と揃える=ログが空のまま残らない)
-    }
+    if (greeting) setBubble(greeting);
   }
 
   /** 起動準備が整った時の処理(pull/push どちらから来ても冪等)。 */
@@ -481,7 +472,6 @@ export function App(): React.ReactElement | null {
    */
   function applyResponseUI(response: ConversationResponse, setBubbleToo = true): void {
     interactedRef.current = true;
-    pushLog('torimi', response.message);
     const emotion = response.type === 'chat' ? (response.emotion ?? 'neutral') : 'neutral';
     if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
     setCharState((s) => ({ ...s, activity: 'talking', emotion, pose: 'stand' }));
@@ -504,7 +494,6 @@ export function App(): React.ReactElement | null {
   async function handleSubmit(text: string): Promise<void> {
     playClick();
     setForceOpen(false);
-    pushLog('user', text);
     // 喋っている最中の送信=割り込み(現在の発話を止め、進行中の生成を畳んでから新ターンへ・#8 統一 barge-in)。
     if (isPlaying()) handleBargeIn();
     await respond(text);
@@ -576,7 +565,6 @@ export function App(): React.ReactElement | null {
       setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' })); // 認識中は「…」
       const result = await window.ene.transcribeAudio(samples);
       if (result.ok) {
-        pushLog('user', result.text);
         await respond(result.text);
       } else {
         setBubble(result.message);
@@ -654,20 +642,6 @@ export function App(): React.ReactElement | null {
     void window.ene.setOwnerName(name, reading);
   }
 
-  /** 会話ログへ1件追記(直近 LOG_MAX_ENTRIES 件だけ保持・セッション内のみ)。 */
-  function pushLog(role: 'user' | 'torimi', text: string): void {
-    const t = text.trim();
-    if (!t) return;
-    setLogEntries((prev) => [...prev, { role, text: t }].slice(-LOG_MAX_ENTRIES));
-  }
-
-  /** 会話ログの開閉(ウィンドウ横拡張・VTuber風)。main にウィンドウ幅の伸縮を依頼。 */
-  function toggleLog(): void {
-    const next = !logOpen;
-    setLogOpen(next);
-    window.ene.setLogExpanded(next, LOG_PANEL_WIDTH);
-  }
-
   /** 音量・ミュートの保存(デバウンス・段階3)。 */
   function persistAudio(v: number, m: boolean): void {
     if (audioSaveTimerRef.current) clearTimeout(audioSaveTimerRef.current);
@@ -733,8 +707,8 @@ export function App(): React.ReactElement | null {
   const showFull = forceOpen || inputFocused || barHovered;
 
   return (
-    <div className={`app${logOpen ? ' app--log-open' : ''}`}>
-      {/* トリミ本体＋彼女のUIは常に左260pxの「ステージ」に閉じ込める(会話ログ展開時も隠さない・VTuber風)。 */}
+    <div className="app">
+      {/* トリミ本体＋彼女のUIを載せる「ステージ」(ウィンドウ幅 260px)。 */}
       <div className="stage">
         {/* 考える間(thinking)の演出。専用スプライトが無いので「…」で示す(F-ANIM-04)。 */}
         {charState.activity === 'thinking' && <div className="bubble bubble--thinking">…</div>}
@@ -845,23 +819,7 @@ export function App(): React.ReactElement | null {
             />
           </div>
         )}
-        {/* 会話ログのトグル(»/«)。ステージ右端の中央に常駐(透明・ホバーで濃く)。 */}
-        <button
-          className="log-toggle"
-          data-interactive
-          onClick={toggleLog}
-          title={logOpen ? '会話ログを閉じる' : '会話ログを開く'}
-          aria-label="会話ログ"
-        >
-          {logOpen ? '«' : '»'}
-        </button>
       </div>
-      {/* 会話ログ(VTuber風・ウィンドウを右に広げた時のみ表示)。 */}
-      {logOpen && (
-        <div data-interactive style={{ display: 'contents' }}>
-          <ConversationLog entries={logEntries} />
-        </div>
-      )}
     </div>
   );
 }

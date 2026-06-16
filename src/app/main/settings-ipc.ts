@@ -1,7 +1,6 @@
 import { ipcMain, dialog, shell, app, type BrowserWindow } from 'electron';
 import { loadAppSettings, saveIdleTalk, saveAutoLaunch } from '../../shared/node/app-settings';
 import { openApiKeyDialog } from './api-key-dialog';
-import { setLogExpanded } from './window-position';
 import { getPortableDataDir } from '../../shared/node/paths';
 import { getSemantic, updateSemantic } from '../../memory/semantic';
 import type { IdleTalkMode } from '../../shared/types/settings';
@@ -53,11 +52,6 @@ export function registerSettingsIpc(mainWindow: BrowserWindow, runtime: AppRunti
   // API利用状況・残高(残高は API では取得不可=コンソールでのみ確認)。ブラウザで課金ページを開く。
   ipcMain.handle(IPC.OPEN_CONSOLE, async (): Promise<void> => {
     await shell.openExternal('https://console.anthropic.com/settings/billing');
-  });
-
-  // 会話ログ(UI改修・VTuber風): 「>>」でウィンドウ幅を伸縮(トリミは左に固定、右にログ領域)。一方向。
-  ipcMain.on(IPC.SET_LOG_EXPANDED, (_event, expanded: boolean, panelWidth: number) => {
-    setLogExpanded(mainWindow, expanded, panelWidth);
   });
 
   // PC起動時に自動起動。本番は OS のスタートアップが真実、開発は app-settings の値を表示に使う

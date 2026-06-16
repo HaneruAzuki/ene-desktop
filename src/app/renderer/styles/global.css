@@ -23,104 +23,13 @@ body,
   height: 100%;
 }
 
-/* 会話ログ展開時もトリミを隠さない左固定ステージ(幅=キャラ部分のウィンドウ幅 260px=WINDOW_WIDTH)。
-   通常時はウィンドウ全体と同じ幅。展開時はウィンドウだけ右に伸び、ステージ(=トリミと操作UI)は左に残る。 */
+/* トリミと操作UIを載せるステージ(幅=ウィンドウ幅 260px=WINDOW_WIDTH)。 */
 .stage {
   position: absolute;
   left: 0;
   top: 0;
   width: 260px;
   height: 100%;
-}
-
-/* 会話ログの開閉トグル(»/«)。ステージ右端の中央に常駐。透明で控えめ、ホバーで濃く(VTuber風)。 */
-.log-toggle {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 22px;
-  height: 48px;
-  border: none;
-  border-radius: 8px 0 0 8px;
-  background: rgba(28, 32, 39, 0.18);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  z-index: 50;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.log-toggle:hover {
-  background: rgba(28, 32, 39, 0.55);
-  color: #fff;
-}
-
-/* 会話ログ(VTuber風・ウィンドウ右拡張領域)。トリミの右に最新のやりとりを並べる。 */
-.log-panel {
-  position: absolute;
-  left: 260px; /* = WINDOW_WIDTH。ステージの右隣〜画面端 */
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  background: rgba(249, 250, 252, 0.95);
-  border-left: 1px solid rgba(20, 24, 31, 0.12);
-  backdrop-filter: blur(12px);
-  box-shadow: -8px 0 24px rgba(17, 22, 31, 0.18);
-}
-.log-panel__head {
-  flex: none;
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #1c2026;
-  border-bottom: 1px solid rgba(20, 24, 31, 0.08);
-}
-.log-panel__list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.log-empty {
-  color: #9aa0aa;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 20px;
-}
-.log-msg {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
-  line-height: 1.4;
-}
-.log-msg--user {
-  align-items: flex-end;
-}
-.log-msg--torimi {
-  align-items: flex-start;
-}
-.log-msg__who {
-  font-size: 10px;
-  color: #8a909a;
-}
-.log-msg__text {
-  color: #2b2f36;
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding: 6px 9px;
-  border-radius: 9px;
-  background: #eef1f6;
-}
-.log-msg--user .log-msg__text {
-  background: #e3ecff;
 }
 
 /* キャラ表示(VRM キャンバス・F・3D化)。3D カメラがバストアップをフレーミングするのでウィンドウ全面に置く。

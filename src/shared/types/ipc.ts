@@ -71,10 +71,8 @@ export interface EneAPI {
   getOwnerName(): Promise<OwnerName>;
   setOwnerName(name: string, reading: string): Promise<void>;
 
-  // --- 会話ログ(UI改修・VTuber風) ---
-  // 「>>」でウィンドウ幅を伸縮(トリミ部分は固定、右にログ領域を足す)。renderer→main 一方向。
-  setLogExpanded(expanded: boolean, panelWidth: number): void;
-  // ユーザー発話の確定テキスト(ログ表示専用・main→renderer)。ハンズフリー音声(コアレッシング含む)で発火。
+  // ユーザー発話の確定テキスト(main→renderer)。ハンズフリー音声(コアレッシング含む)で発火し、
+  // renderer はこれをアイドル計時のリセット(話しかけられた=前を向く)に使う。
   onUserSaid(callback: (text: string) => void): void;
   // ウィンドウ可視性の通知(main → renderer)。false=非表示/最小化→描画停止。
   onWindowVisibility(callback: (visible: boolean) => void): void;
