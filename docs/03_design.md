@@ -224,12 +224,12 @@ ene-desktop/
 │   │   │   ├── index.ts               ← エントリポイント
 │   │   │   ├── window.ts              ← BrowserWindow設定(透過)
 │   │   │   ├── window-position.ts     ← ウィンドウ位置の読込/デバウンス保存
-│   │   │   ├── tray.ts                ← タスクトレイ
-│   │   │   ├── character-context-menu.ts ← キャラ右クリックメニュー
+│   │   │   ├── character-context-menu.ts ← キャラのコンテキストメニュー(クレジット表示等)
 │   │   │   ├── single-instance.ts     ← 多重起動防止
 │   │   │   ├── init-directories.ts    ← data/ 配下の初期化
 │   │   │   ├── app-runtime.ts         ← AppRuntime 型(起動時状態・main 各所で共有・ipc 逆依存回避 N-ARCH-2)
 │   │   │   ├── ipc.ts                 ← IPCハンドラ集約・配線(ターン司令塔は turn-engine へ分離・N-ARCH-3)
+│   │   │   ├── settings-ipc.ts        ← 設定系IPCの分離(各種 get/set・ipc.ts の entanglement 回避・UI改修2026-06)
 │   │   │   ├── turn-engine.ts         ← 1ターンの司令塔 generateResponse/commitTurn/handleSendMessage(N-ARCH-3)
 │   │   │   ├── lifecycle.ts           ← 起動シーケンス(runStartupSequence)
 │   │   │   ├── shutdown.ts            ← 終了シーケンス(runShutdownSequence)
@@ -241,6 +241,7 @@ ene-desktop/
 │   │   │   ├── vad-runtime.ts          ← ハンズフリーVADランタイム(フレーム受信→区間検出→STT・task_17)
 │   │   │   ├── voice-turn-coordinator.ts ← 音声ターン調停(発話コアレッシング・無音窓の自動調整・2026-06)
 │   │   │   ├── backchannel-controller.ts ← 相槌コントローラ(聞くターンの配線・task_18)
+│   │   │   ├── idle-talk-manager.ts   ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
 │   │   │   └── os/                    ← OS Integration(ホワイトリスト実行・§3.5)
 │   │   │       ├── executor.ts        ← コマンド実行(shell API)
 │   │   │       ├── validators.ts      ← ホワイトリスト・パス/URL 検証
@@ -257,13 +258,13 @@ ene-desktop/
 │   │       ├── constants.ts           ← Renderer 用定数
 │   │       ├── mouse-gesture.ts       ← クリック/ドラッグ/長押し判別(純粋ロジック・単体テスト対象)
 │   │       ├── use-window-drag.ts     ← キャラのドラッグ移動フック(mouse-gesture を配線・N-ARCH-3)
-│   │       ├── use-click-through.ts   ← クリックスルー当たり判定フック(rAF 間引き・§8.6・N-ARCH-3)
-│   │       ├── resolve-frame.ts       ← 状態→フレーム名の解決(task_13・純粋関数)
+│   │       ├── use-interaction-routing.ts ← クリックスルー/ホバー操作バー領域の当たり判定フック(rAF 間引き・UI改修2026-06)
 │   │       ├── sound.ts               ← UI 効果音(Web Audio 合成・task_13)
 │   │       ├── audio-player.ts        ← 音声チャンク(WAV)の逐次再生・barge-in 即停止(task_17)
 │   │       ├── backchannel-player.ts  ← 相槌の即時再生(応答キューと別系統・task_18)
 │   │       ├── mic-capture.ts         ← マイク取得 push-to-talk(task_17)
 │   │       ├── voice-conversation.ts  ← ハンズフリー音声会話のマイク入力(task_17)
+│   │       ├── voice-eq.ts            ← 再生音声へのイコライザ適用(voice.json の eq・UI改修2026-06)
 │   │       ├── vrm-renderer.ts        ← three-vrm 描画エンジン(30fps上限・非表示時停止・F)
 │   │       ├── vrm/
 │   │       │   └── expression-resolver.ts ← emotion→VRM表情プリセットの重み解決(純粋関数・F)
@@ -271,7 +272,10 @@ ene-desktop/
 │   │       │   ├── CharacterDisplay.tsx
 │   │       │   ├── SpeechBubble.tsx
 │   │       │   ├── InputArea.tsx
-│   │       │   └── VrmSettingsPanel.tsx ← VRM 表示パラメータの調整パネル(F)
+│   │       │   ├── ControlBar.tsx       ← ホバー操作バー(マイク/音量/離席/設定/じゃあね・UI改修2026-06)
+│   │       │   ├── ConversationLog.tsx  ← VTuber風 会話ログ(">>"で右拡張・UI改修2026-06)
+│   │       │   ├── VolumeControl.tsx    ← 音量スライダー(操作バー内・UI改修2026-06)
+│   │       │   └── SettingsPanel.tsx    ← 設定パネル(⚙統合・話しかけ頻度/見た目/自動起動/記憶/APIキー・UI改修2026-06)
 │   │       ├── api-key-dialog/        ← APIキーダイアログ専用ページ(2nd renderer エントリ・N-09-2)
 │   │       │   ├── index.html
 │   │       │   ├── main.tsx
@@ -287,7 +291,6 @@ ene-desktop/
 │   │   ├── system-prompt-builder.ts ← 人格システムプロンプト構築(N-02-2)
 │   │   ├── birthday-checker.ts    ← 誕生日判定
 │   │   ├── active-character.ts    ← active-character.json の読書(最小状態)
-│   │   ├── animation-loader.ts    ← animation.json ロード(task_13)
 │   │   └── vrm-loader.ts          ← vrm.json ロード(F)
 │   │
 │   ├── knowledge/                 ← あり方②:限られた知識(Knowledge Router)
@@ -298,6 +301,7 @@ ene-desktop/
 │   ├── memory/                    ← あり方③:人間のような記憶(Memory Layer・忘却・心)
 │   │   ├── short-term.ts
 │   │   ├── episodic.ts
+│   │   ├── episodic-write.ts      ← 中期記憶の書き込み窓口(保存＋逆引き索引付けを束ねる facade・§4.4)
 │   │   ├── semantic.ts
 │   │   ├── retriever.ts           ← 想起(語彙+entity+ベクトルRRF・task_15)
 │   │   ├── update.ts              ← 非破壊更新 supersede/refine/reattribute(task_15)
@@ -316,7 +320,10 @@ ene-desktop/
 │   │   ├── consolidation-policy.ts ← 忘却の計画(純粋ロジック・段階的記憶縮退・§11.6)
 │   │   ├── consolidation-state.ts ← 忘却機構の実行記録(最終実行時刻・§11.6)
 │   │   ├── summarizer.ts          ← 期間サマリ生成(月次/年次の再要約・§11.6)
-│   │   └── schema-validation.ts   ← Semantic のスキーマ検証
+│   │   ├── schema-validation.ts   ← Semantic のスキーマ検証
+│   │   ├── open-loops.ts          ← 「気にかけ」(open loop)の選択・状態(存在感P・引き際の上限管理)
+│   │   ├── knowledge-gaps.ts      ← 知識ギャップ(名前など未取得情報)の判定(尋ねて埋める)
+│   │   └── user-birthday.ts       ← ユーザー誕生日の判定・記録(誕生日反応)
 │   │
 │   ├── conversation/              ← あり方④:語り口=言葉(Conversation Layer)
 │   │   ├── client.ts              ← Claude APIクライアント(chat / makeLlmComplete)
@@ -326,6 +333,8 @@ ene-desktop/
 │   │   ├── ai-self-check.ts       ← AI自称検知(第2層)
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
 │   │   ├── greeting.ts            ← 起動挨拶生成(firstLaunch/forgotten/normal)
+│   │   ├── offscreen-life.ts      ← オフスクリーンライフ生成(会っていない間の暮らし＋挨拶・存在感P3)
+│   │   ├── idle-talk.ts           ← 自発発話の文面生成(話しかけ・存在感P)
 │   │   ├── model-selector.ts      ← 二段生成のモデル選択(雑談=Haiku/難題=Sonnet・B-15b・既定オフ)
 │   │   └── token-counter.ts       ← 入力トークンのローカル見積もり(N-05-3)
 │   │
@@ -337,7 +346,6 @@ ene-desktop/
 │   │   ├── json-stream-parser.ts  ← JSON応答のストリーミング解釈(C1・B-06)
 │   │   ├── sentence-splitter.ts   ← 日本語の文単位分割(純粋ロジック・task_17)
 │   │   ├── ruby.ts                ← 青空文庫式ルビの解決(Claude振り仮名方式・B-06)
-│   │   ├── name-correction.ts     ← STT 固有名詞(呼びかけ)の誤認補正(B-10)
 │   │   ├── stt-transcriber.ts     ← Whisper STT(transformers.js・ローカル・task_17)
 │   │   ├── silero-vad.ts          ← Silero VAD v4 ランナー(onnxruntime-node・task_17)
 │   │   ├── vad-segmenter.ts       ← 発話区間セグメンタ(無音でターン終了・barge-in判定・task_17)
@@ -364,8 +372,11 @@ ene-desktop/
 │       │   └── settings.ts         ← AppSettings/VoiceInputMode(task_17)
 │       ├── constants.ts
 │       ├── datetime.ts            ← ローカルTZ込み ISO ユーティリティ(§5.6)
+│       ├── moment.ts              ← 「今」の導出(時間帯ラベル等・存在感)
+│       ├── ipc-channels.ts        ← IPC チャネル名の SSOT(main/preload が同じ定数を参照・綴りズレをコンパイル検出)
 │       ├── logger.ts              ← electron-logラッパー
 │       ├── llm-parse.ts           ← LLM応答パースの共有ヘルパ(JSON抽出・emotion正規化等の集約)
+│       ├── vector-math.ts         ← コサイン類似度等のベクトル計算(router/ベクトル想起の共有)
 │       ├── api-key-error-messages.ts ← エラー種別→ユーザ表示文言(§3.7)
 │       └── node/                  ← Node(main プロセス)専用の基盤
 │           ├── paths.ts           ← パス管理(characterId キャッシュ)

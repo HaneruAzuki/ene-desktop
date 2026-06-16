@@ -66,7 +66,7 @@
 - 1つでも満たされなかったら、該当箇所を修正してから再判定
 - 修正は (1) `ene/identity.json` の personality 強化、
   (2) `ene/fewshot.json` の例追加、
-  (3) AI自称防止の検知パターン強化(`src/conversation/ai-self-reference.ts` 等)のいずれかで対応する
+  (3) AI自称防止の検知パターン強化(`src/conversation/ai-self-check.ts` 等)のいずれかで対応する
 
 ---
 
