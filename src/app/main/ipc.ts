@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- IPC ハンドラ登録・配線の集約点(ターン司令塔は turn-engine、設定系は
+   settings-ipc へ分離済)。残りは宣言的な配線の列挙でまとまりを保つ例外(§8.5)。 */
 import { ipcMain, type BrowserWindow } from 'electron';
 import { log } from '../../shared/logger';
 import {

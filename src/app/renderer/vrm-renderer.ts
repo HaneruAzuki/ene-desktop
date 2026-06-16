@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- three-vrm の毎フレーム描画(表情/口パク/うなずき/物理/当たり判定)を担う
+   単一ホットパスクラス。分割は実機計測(常駐CPU 3%・柱4)が要るため保留する例外(§8.5)。 */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {

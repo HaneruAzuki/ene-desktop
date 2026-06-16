@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- 音声/IPC 状態機械の分解は実機(renderer smoke)検証が要る既知負債のため保留中。
+   設定群は use-ene-settings.ts へ分離済(825→747行)。残りの分解は別途の実機セッションで行う(§8.5)。 */
 import React, { useEffect, useRef, useState } from 'react';
 import { CharacterDisplay } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';

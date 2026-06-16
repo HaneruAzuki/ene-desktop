@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- 音声ターン調停(投機生成コアレッシング/barge-in/無音窓適応)の単一状態機械。
+   DI 化済でユニットテストあり(voice-turn-coordinator.test.ts)。凝集を優先する例外(§8.5)。 */
 import { log } from '../../shared/logger';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import {

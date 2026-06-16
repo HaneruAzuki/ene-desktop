@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- 大半がプロンプト文字列定数(出力形式・ルビ規則・存在文脈の整形)。
+   意味のまとまりを保つため一体に置く例外(§8.5)。 */
 import type { CharacterContext } from '../shared/types/character';
 import type { MemoryContext, SemanticMemory, EpisodicMemory, ConversationMoment } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';

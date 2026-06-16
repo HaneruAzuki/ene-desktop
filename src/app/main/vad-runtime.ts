@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- ハンズフリー VAD の単一状態機械(録音/区間検出/barge-in/フレームキュー)。
+   DI 化済でユニットテストあり(vad-runtime.test.ts)。凝集を優先する例外(§8.5)。 */
 import type { BrowserWindow } from 'electron';
 import { performance } from 'node:perf_hooks';
 import { log } from '../../shared/logger';
