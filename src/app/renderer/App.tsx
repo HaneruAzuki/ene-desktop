@@ -12,14 +12,13 @@ import {
   setSentenceHandler,
   getVoiceAmplitude,
   isPlaying,
-  setOutputVolume as audioSetVolume,
-  setMuted as audioSetMuted,
 } from './audio-player';
 import { playBackchannel, stopBackchannel } from './backchannel-player';
 import { setEqBands } from './voice-eq';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { useInteractionRouting } from './use-interaction-routing';
+import { useEneSettings } from './use-ene-settings';
 import {
   SOFA_AFTER_IDLE_MS,
   MOUTH_FLAP_MS,
@@ -33,7 +32,6 @@ import type { CharacterInfo } from '../../shared/types/ipc';
 import type { CharacterState } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
-import type { IdleTalkMode } from '../../shared/types/settings';
 
 // トップコンポーネント(設計書 §8 / task_13 / UI改修 2026-06)。
 // キャラ表示・吹き出し・ホバーで現れる操作バー(マイク/音量/離席/設定/じゃあね)＋入力ピルを束ねる。
@@ -63,8 +61,6 @@ export function App(): React.ReactElement | null {
   const [barHovered, setBarHovered] = useState(false); // トリミ(ヒットボックス)/操作バー上にマウスがあるか(イベント駆動)
   const [forceOpen, setForceOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
-  const [volume, setVolume] = useState(1); // トリミの声(出力)の音量 0〜1(段階3)
-  const [muted, setMuted] = useState(false);
   const [goodbyePop, setGoodbyePop] = useState(false); // 「じゃあね」ポップ表示中(段階4)
   const [away, setAway] = useState(false); // 離席中(段階5)
   const [handsFreeOn, setHandsFreeOn] = useState(false); // ハンズフリーで VAD 起動中
@@ -84,11 +80,9 @@ export function App(): React.ReactElement | null {
   const [vrmDisplay, setVrmDisplay] = useState<VrmDisplayParams | null>(null);
   const [visible, setVisible] = useState(true); // ウィンドウ可視性(非表示で VRM 描画停止)
   const [showSettings, setShowSettings] = useState(false); // 統合設定パネル(段階6)
-  const [idleTalk, setIdleTalk] = useState<IdleTalkMode>('on'); // 自分から話しかける する/しない(段階6)
-  const [autoLaunch, setAutoLaunch] = useState(false); // PC起動時に自動起動(段階6)
-  const [ownerName, setOwnerName] = useState(''); // 主人の呼び方(設定で登録/変更)
-  const [ownerReading, setOwnerReading] = useState(''); // 呼び方の読み(かな・音声用)
   const [idleBack, setIdleBack] = useState(false); // 会話が途切れて退屈→後ろ向き(話しかけで前へ・見た目だけ)
+  // ユーザー設定(音量/ミュート・話しかけ頻度・自動起動・主人の呼び方)は専用フックへ集約(会話/マイクと疎結合)。
+  const settings = useEneSettings();
 
   const vrmPanelRef = useRef<HTMLDivElement>(null); // 設定パネル(パネル外クリック判定で使用)
   // トリミ本体のクリックスルー判定(シルエット)。CharacterDisplay がレンダラの isOpaqueAt を差し込む。
@@ -96,7 +90,6 @@ export function App(): React.ReactElement | null {
   const inputApiRef = useRef<InputAreaHandle>(null); // 入力欄の blur / 空判定(アイドル退避で使用)
   const warmedRef = useRef(false); // 入力フォーカス時のキャッシュウォームを一度だけ発火
   const vrmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const audioSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTurnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 後ろ向きまでのアイドル計時
   const goodbyeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 「じゃあね」ポップ→最小化の遅延
@@ -139,38 +132,10 @@ export function App(): React.ReactElement | null {
     void window.ene.getCharacterModel().then(setVrmModel);
   }, []);
 
-  // 音量・ミュート設定を読み込み、audio-player へ適用(段階3)。
-  useEffect(() => {
-    void window.ene.getAudioPrefs().then(({ volume: v, muted: m }) => {
-      setVolume(v);
-      setMuted(m);
-      audioSetVolume(v);
-      audioSetMuted(m);
-    });
-  }, []);
-
   // 声色補正 EQ(voice.json 由来)を再生グラフへ適用する。再生グラフは初回再生時に遅延構築されるため、
   // ユーザー操作より前のマウント時に設定しておけば確実に間に合う(以後は変更しない)。
   useEffect(() => {
     void window.ene.getVoiceEq().then(setEqBands);
-  }, []);
-
-  // 話しかけてくる頻度を読み込み(段階6・設定パネルの初期表示用)。
-  useEffect(() => {
-    void window.ene.getIdleTalk().then(setIdleTalk);
-  }, []);
-
-  // 自動起動の状態を読み込み(段階6・設定パネルの初期表示用)。
-  useEffect(() => {
-    void window.ene.getAutoLaunch().then(setAutoLaunch);
-  }, []);
-
-  // 主人の呼び方＋読みを読み込み(設定パネルの初期表示用)。
-  useEffect(() => {
-    void window.ene.getOwnerName().then(({ name, reading }) => {
-      setOwnerName(name);
-      setOwnerReading(reading);
-    });
   }, []);
 
   // ユーザー発話(ハンズフリー音声・コアレッシング含む)でアイドル計時をリセットする
@@ -309,7 +274,6 @@ export function App(): React.ReactElement | null {
       if (talkingTimerRef.current) clearTimeout(talkingTimerRef.current);
       if (vrmSaveTimerRef.current) clearTimeout(vrmSaveTimerRef.current);
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-      if (audioSaveTimerRef.current) clearTimeout(audioSaveTimerRef.current);
       if (goodbyeTimerRef.current) clearTimeout(goodbyeTimerRef.current);
     };
   }, []);
@@ -623,48 +587,6 @@ export function App(): React.ReactElement | null {
     vrmSaveTimerRef.current = setTimeout(() => void window.ene.setVrmDisplay(d), 400);
   }
 
-  /** 話しかけてくる頻度の変更(段階6)。即時反映＋保存。 */
-  function handleIdleTalkChange(mode: IdleTalkMode): void {
-    setIdleTalk(mode);
-    void window.ene.saveIdleTalk(mode);
-  }
-
-  /** 自動起動の切替(段階6)。即時反映＋保存(本番は OS のスタートアップにも反映)。 */
-  function handleAutoLaunchChange(on: boolean): void {
-    setAutoLaunch(on);
-    void window.ene.setAutoLaunch(on);
-  }
-
-  /** 主人の呼び方＋読みの保存(設定パネル・意図的変更=会話ロックを通る)。 */
-  function handleOwnerNameSave(name: string, reading: string): void {
-    setOwnerName(name);
-    setOwnerReading(reading);
-    void window.ene.setOwnerName(name, reading);
-  }
-
-  /** 音量・ミュートの保存(デバウンス・段階3)。 */
-  function persistAudio(v: number, m: boolean): void {
-    if (audioSaveTimerRef.current) clearTimeout(audioSaveTimerRef.current);
-    audioSaveTimerRef.current = setTimeout(() => void window.ene.saveAudioPrefs(v, m), 400);
-  }
-  /** ミュート切替(段階3)。即時に audio-player へ反映＋デバウンス保存。 */
-  function handleToggleMute(): void {
-    const m = !muted;
-    setMuted(m);
-    audioSetMuted(m);
-    persistAudio(volume, m);
-  }
-  /** 音量変更(段階3・スライダー)。動かしたらミュート解除。即時反映＋デバウンス保存。 */
-  function handleVolume(v: number): void {
-    setVolume(v);
-    audioSetVolume(v);
-    if (muted) {
-      setMuted(false);
-      audioSetMuted(false);
-    }
-    persistAudio(v, false);
-  }
-
   /** じゃあね(段階4): ポップを一瞬見せてからタスクバーへ最小化。マイクは念のため切る。 */
   function handleGoodbye(): void {
     if (handsFreeOn) stopHandsFree();
@@ -761,10 +683,10 @@ export function App(): React.ReactElement | null {
                   micActive={micActive}
                   micHandlers={micHandlers}
                   micTitle={micTitle}
-                  volume={volume}
-                  muted={muted}
-                  onToggleMute={handleToggleMute}
-                  onVolume={handleVolume}
+                  volume={settings.volume}
+                  muted={settings.muted}
+                  onToggleMute={settings.toggleMute}
+                  onVolume={settings.setVolumeValue}
                   away={away}
                   onAway={handleAway}
                   onSettings={() => setShowSettings((v) => !v)}
@@ -802,13 +724,13 @@ export function App(): React.ReactElement | null {
           <div data-interactive style={{ display: 'contents' }}>
             <SettingsPanel
               ref={vrmPanelRef}
-              ownerName={ownerName}
-              ownerReading={ownerReading}
-              onOwnerNameSave={handleOwnerNameSave}
-              idleTalk={idleTalk}
-              onIdleTalkChange={handleIdleTalkChange}
-              autoLaunch={autoLaunch}
-              onAutoLaunchChange={handleAutoLaunchChange}
+              ownerName={settings.ownerName}
+              ownerReading={settings.ownerReading}
+              onOwnerNameSave={settings.saveOwnerName}
+              idleTalk={settings.idleTalk}
+              onIdleTalkChange={settings.setIdleTalkMode}
+              autoLaunch={settings.autoLaunch}
+              onAutoLaunchChange={settings.setAutoLaunchOn}
               vrmDisplay={vrmConfig && vrmDisplay ? vrmDisplay : undefined}
               onVrmChange={handleVrmDisplayChange}
               onApiKey={() => void window.ene.openApiKeyDialog()}
