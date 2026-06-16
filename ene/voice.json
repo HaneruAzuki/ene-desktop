@@ -7,14 +7,21 @@
     "neutral": {
       "styleId": 1736267264,
       "speedScale": 1.0,
-      "pitchScale": -0.06,
+      "pitchScale": 0,
       "intonationScale": 1.0,
       "tempoDynamicsScale": 1.0,
       "volumeScale": 1.0
     }
   },
   "eq": [
-    { "type": "highshelf", "frequency": 3500, "gain": -4 },
-    { "type": "lowshelf", "frequency": 220, "gain": 2.5 }
+    { "type": "peaking", "frequency": 32, "gain": 2, "q": 1.4 },
+    { "type": "peaking", "frequency": 64, "gain": 2, "q": 1.4 },
+    { "type": "peaking", "frequency": 125, "gain": 2, "q": 1.4 },
+    { "type": "peaking", "frequency": 250, "gain": 2, "q": 1.4 },
+    { "type": "peaking", "frequency": 500, "gain": 2, "q": 1.4 },
+    { "type": "peaking", "frequency": 1000, "gain": -1, "q": 1.4 },
+    { "type": "peaking", "frequency": 2000, "gain": -2, "q": 1.4 },
+    { "type": "peaking", "frequency": 4000, "gain": -2, "q": 1.4 },
+    { "type": "peaking", "frequency": 8000, "gain": -2, "q": 1.4 }
   ]
 }
