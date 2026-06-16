@@ -50,8 +50,24 @@ const PREROLL_FRAMES = Math.ceil((VAD_SPEECH_PAD_MS / 1000) * STT_SAMPLE_RATE / 
 /** 録音の上限(暴走防止・約30秒)。 */
 const MAX_RECORD_FRAMES = Math.ceil((30 * STT_SAMPLE_RATE) / VAD_FRAME_SIZE);
 
+/** VadRuntime が使う VAD モデルの最小インターフェース(SileroVad が満たす・テスト差し替え用)。 */
+export interface VadModel {
+  load(): Promise<void>;
+  reset(): void;
+  process(frame: Float32Array): Promise<number>;
+}
+
+/** VadRuntime の外部依存(既定は実装・テストでフェイク注入)。フレーム調停の状態機械を単体検証するための seam。 */
+export interface VadRuntimeDeps {
+  createVad: () => VadModel;
+  transcribe: (samples: Float32Array) => Promise<string>;
+  isSttModelAvailable: () => Promise<boolean>;
+}
+
+const defaultVadDeps: VadRuntimeDeps = { createVad: () => new SileroVad(), transcribe, isSttModelAvailable };
+
 export class VadRuntime {
-  private vad = new SileroVad();
+  private vad: VadModel;
   private seg: VadSegmenter;
   private active = false;
   private loading: Promise<void> | null = null;
@@ -75,7 +91,10 @@ export class VadRuntime {
     private readonly listenOnly = false,
     // コアレッシング(段階①・ENE_COALESCE)。指定時は話終わりを暫定扱いにして coordinator を駆動する。
     private readonly coalesce?: CoalesceHooks,
+    // 外部依存(既定は実装・テストで差し替え)。
+    private readonly deps: VadRuntimeDeps = defaultVadDeps,
   ) {
+    this.vad = deps.createVad();
     // コアレッシング時は暫定ターン終了を短く(投機生成を早く始める)。未指定なら既定(VAD_MIN_SILENCE_MS)。
     this.seg = coalesce
       ? new VadSegmenter({ ...DEFAULT_VAD_CONFIG, minSilenceMs: coalesce.minSilenceMs })
@@ -85,7 +104,7 @@ export class VadRuntime {
   /** VAD セッション開始。モデル未配置なら false(呼び出し側は push-to-talk のまま)。 */
   async start(): Promise<boolean> {
     // listenOnly(相槌テスト)は Whisper を使わないので STT モデル無しでも開始できる。
-    if (!this.listenOnly && !(await isSttModelAvailable())) return false;
+    if (!this.listenOnly && !(await this.deps.isSttModelAvailable())) return false;
     if (this.listenOnly) log.warn('VAD listen-only mode: responses disabled (backchannel test)');
     this.seg.reset();
     this.vad.reset();
@@ -256,7 +275,7 @@ export class VadRuntime {
     //   この前に必ず VAD_MIN_SILENCE_MS の無音待ちが入る(喋り終わってから死に時間=無音 + stt)。
     const t = performance.now();
     try {
-      const text = await transcribe(audio);
+      const text = await this.deps.transcribe(audio);
       if (text && this.active) {
         // §6.2: 本文は出さない(文字数と ms のみ)。
         const silenceMs = this.coalesce?.minSilenceMs ?? VAD_MIN_SILENCE_MS;
