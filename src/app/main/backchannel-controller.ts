@@ -8,6 +8,7 @@ import { BackchannelEngine } from '../../voice/backchannel-engine';
 import { selectBackchannel } from '../../voice/backchannel-pool';
 import { loadBackchannelPool } from '../../voice/backchannel-loader';
 import { resolveStyle } from '../../voice/voice-loader';
+import { resolveVoice } from './app-runtime';
 import type { BackchannelPoolData } from '../../shared/types/backchannel';
 import type { TtsEngine, VoiceConfig } from '../../shared/types/voice';
 
@@ -72,10 +73,9 @@ export class BackchannelController {
     try {
       this.pool ??= await loadBackchannelPool(this.deps.characterId);
       if (!this.pool) return; // backchannels.json なし → 相槌なし
-      const tts = this.deps.getTts();
-      const voiceConfig = this.deps.getVoiceConfig();
-      if (tts && voiceConfig) {
-        const synth = await prewarm(this.pool, tts, voiceConfig);
+      const voice = resolveVoice(this.deps.getTts(), this.deps.getVoiceConfig());
+      if (voice) {
+        const synth = await prewarm(this.pool, voice.tts, voice.voiceConfig);
         if (synth.size > 0) this.synth = synth; // 失敗(0件)なら次回また試す
       }
       log.info(`backchannel ready (timing on; audio: ${this.synth?.size ?? 0} phrases)`);

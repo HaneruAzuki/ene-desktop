@@ -1015,6 +1015,13 @@
 - **検証**: typecheck / lint / lint:deps(違反0・142 modules）/ build / 426 テスト 全グリーン。
   ⚠️ renderer 2フックは「同一コードの移設」で構造的に不変だが、**ドラッグ移動・クリックスルー・音声入出力の実機 smoke を一度推奨**(本環境では Electron 実行不可のため未実施)。
 
+### N-ARCH-4 🟢 SSOT 違反の解消(横断監査 C3/C2・2026-06-16)
+- **狙い**: 「同じ状態を複数箇所で別々に保持し手動同期(単一の真実点が無い)」を畳む。横断監査が本丸と指摘した C 群の残り2件。
+- **C3 ウィンドウ可視性(`App.tsx`)**: `visible` を2経路(main の hide/minimize/show/restore IPC ＋ renderer の `visibilitychange`)が **last-write-wins で奪い合っていた**(VRM 描画の start/stop を駆動する重要フラグ)。両信号をクロージャ変数に持ち、**両者の AND を単一の recompute で導出**する形へ(`visible = windowVisible && docVisible`)。どちらかが「隠れ」と言えば描画停止=取りこぼし無し・競合無し・occlusion 停止も維持。真実点=導出結果ひとつ。
+- **C2 音声可否(`tts && voiceConfig`)**: 同一述語が4+箇所(backchannel-controller / turn-engine×2 / idle-talk-manager / ipc 起動挨拶)に手コピーされていた。`app-runtime.ts` に **`resolveVoice(tts, voiceConfig)`**(揃えば narrowing 済みの組、欠ければ null)を新設し全箇所を集約。将来「ミュート中は不可」等の条件追加もこの1箇所で済む。backbone(DI getter の backchannel)も runtime 直参照も同じ呼び口。
+- **残(意図的に据置)**: C1 は barge-in 判定を `responseActive`(main駆動)で単一化済みだが `speaking` は今も renderer→main IPC ミラー(役割分離は明文化済み=エコーガード/strict VAD 用)。C5 は逆引き索引の増分/全再生成/ベクトルの3経路が「派生キャッシュ・真実の源=episodic本体」として明文化済みの割り切り(性能の作り直し=D1 とともに別タスク)。
+- **検証**: typecheck / eslint / lint:deps(違反0・150 modules)/ **506 テスト** 全グリーン。⚠️ C3 のウィンドウ可視性は **実機 smoke 推奨**(最小化/復帰/隠蔽での VRM 描画 start/stop・本環境では Electron 実行不可)。
+
 ---
 
 ### N-PRES-* 🟢 存在感の改修(「人間との会話の違和感」解消パック・2026-06-13)

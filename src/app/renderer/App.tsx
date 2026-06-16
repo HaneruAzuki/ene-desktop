@@ -195,10 +195,24 @@ export function App(): React.ReactElement | null {
   }, []);
 
   // ウィンドウ可視性 → VRM 描画の停止/再開(§3.6・軽量原則 柱4)。
+  // 2つの独立信号——main の hide/minimize/show/restore(意図的な表示操作)と renderer の
+  // visibilitychange(最小化/隠蔽=Chromium の可視性)——を **last-write-wins で奪い合わせず**、
+  // 両者の AND から visible を一意に導出する(C3・SSOT)。どちらかが「隠れている」と言えば描画を止める
+  // =取りこぼし無し・競合無し・occlusion 停止も維持。クロージャを単一の recompute で畳む(真実点=導出結果ひとつ)。
   useEffect(() => {
-    window.ene.onWindowVisibility(setVisible);
-    const onVis = (): void => setVisible(!document.hidden);
+    let windowVisible = true; // main 駆動(hide/minimize=false / show/restore=true)
+    let docVisible = !document.hidden; // renderer 駆動(最小化/隠蔽で hidden=true)
+    const recompute = (): void => setVisible(windowVisible && docVisible);
+    window.ene.onWindowVisibility((v) => {
+      windowVisible = v;
+      recompute();
+    });
+    const onVis = (): void => {
+      docVisible = !document.hidden;
+      recompute();
+    };
     document.addEventListener('visibilitychange', onVis);
+    recompute(); // 初期状態を一度同期
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 

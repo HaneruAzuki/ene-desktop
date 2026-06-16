@@ -27,7 +27,7 @@ import { appendShortTerm } from '../../memory/short-term';
 import { loadAppSettings } from '../../shared/node/app-settings';
 import type { EmotionLabel } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
-import type { AppRuntime } from './app-runtime';
+import { resolveVoice, type AppRuntime } from './app-runtime';
 
 // 自発発話マネージャ(P7・N-PRES-7)。タイマーで定期的に「いま自分から一言かけてよいか」を判定し、
 // 良ければ材料(気にかけ/今日の暮らし/時間帯)から短い一言を生成して吹き出し＋音声で出す。
@@ -177,12 +177,13 @@ export class IdleTalkManager {
     // 音声があれば喋る(通常応答と同じ speakResponse→voice-chunk 経路=エコーガードは相槌で実証済みの経路を継承)。
     // push-to-talk(既定)はマイクが押下中のみ=自声を拾わない。ハンズフリーは相槌と同じ再生ガードで保護される。
     // 自発発話も barge-in で止められるよう、中断ハンドルを張り替えて signal を渡す(穴A)。
-    if (tts && voiceConfig) {
+    const voice = resolveVoice(tts, voiceConfig);
+    if (voice) {
       this.runtime.selfSpeech?.abort();
       const ctrl = new AbortController();
       this.runtime.selfSpeech = ctrl;
       this.runtime.setResponseActive?.(true); // 自発発話中も barge-in で止められるよう窓を開く
-      void speakResponse(msg.message, emotion, tts, voiceConfig, this.mainWindow, ctrl.signal);
+      void speakResponse(msg.message, emotion, voice.tts, voice.voiceConfig, this.mainWindow, ctrl.signal);
     }
     log.info('idle talk emitted');
   }

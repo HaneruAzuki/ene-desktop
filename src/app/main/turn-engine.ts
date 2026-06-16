@@ -24,7 +24,7 @@ import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse, streamVoiceChat } from './voice-runtime';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { EmotionLabel } from '../../shared/types/animation';
-import type { AppRuntime } from './app-runtime';
+import { resolveVoice, type AppRuntime } from './app-runtime';
 
 // ターンエンジン(1ターンの司令塔)。send-message オーケストレーションの中核を ipc 配線から分離する。
 //   generateResponse(副作用なし=投機可)→ commitTurn(副作用)→ handleSendMessage(直列の統合フロー)。
@@ -79,15 +79,14 @@ export async function generateResponse(
 
   // 本会話。音声があれば**既定でストリーミング**(文単位で第一声を早める・B-06)。ENE_VOICE_STREAMING=0 で無効化。
   // 失敗時は非ストリーミングへフォールバック。既定ON はユーザ試聴判定の結果(2026-06-13)。
-  const { tts, voiceConfig } = runtime;
-  const streamingOn =
-    Boolean(tts && voiceConfig) && process.env[VOICE_STREAMING_ENABLED_ENV] !== '0';
+  const voice = resolveVoice(runtime.tts, runtime.voiceConfig);
+  const streamingOn = Boolean(voice) && process.env[VOICE_STREAMING_ENABLED_ENV] !== '0';
   let response: ConversationResponse;
   let audioStreamed = false;
-  if (streamingOn && tts && voiceConfig) {
+  if (streamingOn && voice) {
     try {
       response = await streamVoiceChat(
-        text, charContext, memoryContext, routerResult, apiKey, model, tts, voiceConfig, mainWindow,
+        text, charContext, memoryContext, routerResult, apiKey, model, voice.tts, voice.voiceConfig, mainWindow,
         signal, onFirstAudio,
       );
       audioStreamed = true; // ストリーミング中に音声は送出済み
@@ -123,8 +122,8 @@ export async function commitTurn(
   signal?: AbortSignal, // ターンの中断(barge-in / supersede)。非ストリーミングの確定発話を打ち切れるよう渡す。
 ): Promise<ConversationResponse> {
   const speakOut = (spokenText: string, emo: EmotionLabel): void => {
-    const { tts, voiceConfig } = runtime;
-    if (tts && voiceConfig) void speakResponse(spokenText, emo, tts, voiceConfig, mainWindow, signal);
+    const voice = resolveVoice(runtime.tts, runtime.voiceConfig);
+    if (voice) void speakResponse(spokenText, emo, voice.tts, voice.voiceConfig, mainWindow, signal);
   };
 
   // 1. user を短期記憶へ ＋ 関係の事実を記録(ターンが確定したら=コミット時・task_16)。

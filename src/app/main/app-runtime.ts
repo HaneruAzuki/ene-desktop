@@ -53,3 +53,16 @@ export interface AppRuntime {
    */
   setResponseActive?: (active: boolean) => void;
 }
+
+/**
+ * 「音声が使えるか(tts と voiceConfig が揃っているか)」の単一判定(C2・SSOT)。
+ * 揃っていれば **narrowing 済みの組**を返し、欠けていれば null。各所に散っていた `tts && voiceConfig` の
+ * コピー判定をここへ集約する=将来「ミュート中は不可」等の条件追加もこの1箇所で済む。
+ * backbone(DI getter 経由の backchannel)も runtime 直参照(turn-engine/idle-talk/ipc)も同じ呼び口で使える。
+ */
+export function resolveVoice(
+  tts: TtsEngine | null | undefined,
+  voiceConfig: VoiceConfig | null | undefined,
+): { tts: TtsEngine; voiceConfig: VoiceConfig } | null {
+  return tts && voiceConfig ? { tts, voiceConfig } : null;
+}

@@ -28,7 +28,7 @@ import type { CharacterInfo } from '../../shared/types/ipc';
 import type { TranscribeResult } from '../../shared/types/stt';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
 import type { EqBand } from '../../shared/types/voice';
-import type { AppRuntime } from './app-runtime';
+import { resolveVoice, type AppRuntime } from './app-runtime';
 
 // IPC ハンドラ集約(設計書 §4)。ターンの司令塔(generateResponse/commitTurn/handleSendMessage)は
 // turn-engine.ts に分離し、本ファイルは IPC 登録と各種ハンドラの配線に専念する。
@@ -306,13 +306,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       // 起動挨拶も声に出す(通常応答・自発発話と同じ speakResponse 経路)。これまで挨拶だけ
       // 吹き出し表示のみで無音だったため配線する。fire-and-forget=テキスト返却(吹き出し)を待たせない。
       // tts/voiceConfig が揃っている時だけ(オフライン/エンジン未配置なら従来どおり無音テキスト)。emotion は neutral。
-      if (runtime.tts && runtime.voiceConfig) {
+      const voice = resolveVoice(runtime.tts, runtime.voiceConfig);
+      if (voice) {
         // 起動挨拶も barge-in で止められるよう中断ハンドルを張り替えて signal を渡し、barge-in 窓を開く(穴A)。
         runtime.selfSpeech?.abort();
         const ctrl = new AbortController();
         runtime.selfSpeech = ctrl;
         runtime.setResponseActive?.(true);
-        void speakResponse(greeting, 'neutral', runtime.tts, runtime.voiceConfig, mainWindow, ctrl.signal);
+        void speakResponse(greeting, 'neutral', voice.tts, voice.voiceConfig, mainWindow, ctrl.signal);
       }
     }
     return greeting;
