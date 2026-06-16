@@ -151,9 +151,9 @@ export async function runStartupSequence(
   // (ローカル判別器 B-15 と STT のウォームは、下の二段ゲートでこの完了後に実行する。)
   const embedderReady = warmEmbedder().catch(() => undefined);
 
-  // Step 8.5: 忘却機構(B-13 / §11.6)。**既定オフ**(ENE_FORGETTING=1 のときのみ)。
-  // 起動時に未処理の月次/年次サマリを背景で実行する(await しない=起動/会話を妨げない)。
-  // 破壊的(物理削除)のため、実データでの有効化はレビュー後。
+  // Step 8.5: 忘却機構(B-13 / §11.6)。**既定オン**(2026-06-13 ユーザ決定・実機検証済 N-FORGET-1。
+  // `ENE_FORGETTING=0` で無効化できる安全弁)。起動時に未処理の月次/年次サマリ(低重要度の物理削除を含む)を
+  // 背景で実行する(await しない=起動/会話を妨げない)。「人間らしい忘却」=製品の柱(§11.6)。
   if (isForgettingEnabled()) {
     log.info('forgetting mechanism enabled; running consolidation in background');
     void requestForgetting(withNameMishearHint(makeLlmComplete(apiKey), nameHint));
