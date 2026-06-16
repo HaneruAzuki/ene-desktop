@@ -1,5 +1,6 @@
-/* eslint-disable max-lines -- 音声入力ステートマシンは use-voice-input.ts、設定群は use-ene-settings.ts へ分離済。
-   残るは IPC 購読群(useEneEvents 候補)・起動ゲート・会話フロー。さらなる分解は実機 smoke 検証つきで段階的に行う(§8.5)。 */
+/* eslint-disable max-lines -- 音声入力(use-voice-input)・IPC購読(use-ene-events)・設定(use-ene-settings)・
+   当たり判定(use-interaction-routing)へ分離済。残るは会話フロー(respond/applyResponseUI)・起動ゲート・
+   音声再生の配線と UI ツリー(=コンポジションルート)。これ以上の分解は実機 smoke 検証つきで段階的に行う(§8.5)。 */
 import React, { useEffect, useRef, useState } from 'react';
 import { CharacterDisplay } from './components/CharacterDisplay';
 import { SpeechBubble } from './components/SpeechBubble';
@@ -8,17 +9,17 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { ControlBar } from './components/ControlBar';
 import { playClick } from './sound';
 import {
-  enqueueAudio,
   setPlaybackHandlers,
   setSentenceHandler,
   getVoiceAmplitude,
   isPlaying,
 } from './audio-player';
-import { playBackchannel, stopBackchannel } from './backchannel-player';
+import { stopBackchannel } from './backchannel-player';
 import { setEqBands } from './voice-eq';
 import { useInteractionRouting } from './use-interaction-routing';
 import { useEneSettings } from './use-ene-settings';
 import { useVoiceInput } from './use-voice-input';
+import { useEneEvents } from './use-ene-events';
 import {
   SOFA_AFTER_IDLE_MS,
   MOUTH_FLAP_MS,
@@ -27,7 +28,6 @@ import {
   IDLE_TURN_BACK_MS,
   THINKING_WATCHDOG_MS,
 } from './constants';
-import { BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
 import type { CharacterState } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
@@ -93,8 +93,25 @@ export function App(): React.ReactElement | null {
   const preparingRef = useRef(true); // 準備中フラグ(コールバックから読む・preparing state と同期)
 
   // 音声入力ステートマシン(マイク/PTT/ハンズフリー/barge-in)は専用フックへ集約(会話/アイドル計時とは deps で疎結合)。
-  // respond/noteActivity は関数宣言ゆえ巻き上げられ、ここで参照しても定義順の問題は無い。
+  // respond/noteActivity 等は関数宣言ゆえ巻き上げられ、ここで参照しても定義順の問題は無い。
   const voice = useVoiceInput({ noteActivity, respond, setBubble, setCharState, spokenRef, talkingTimerRef });
+
+  // main(ene)→ renderer のイベント購読を一手に引き受ける(購読配線と状態保持の分離・疎結合)。
+  useEneEvents({
+    markReady,
+    noteActivity,
+    openInput,
+    setVisible,
+    setNodKey,
+    setNodStrength,
+    setYawnKey,
+    setIsListening,
+    setBubble,
+    setCharState,
+    respond,
+    applyResponseUI,
+    handleBargeIn: voice.handleBargeIn,
+  });
 
   // 起動時に CharacterInfo を取得 ＋ 起動準備の状態を反映。
   // 準備が整うまでは挨拶を出さず「ちょっと待って、」を表示する(整い次第・挨拶へ差し替え)。
@@ -104,11 +121,6 @@ export function App(): React.ReactElement | null {
       if (r) markReady();
       // 未完了なら preparing(初期 true)のまま=頭だけ覗く＋「ちょっと待って...」で待つ。
     });
-  }, []);
-
-  // 準備完了の通知(push)。pull(isReady)との競合は readyRef で冪等化する。
-  useEffect(() => {
-    window.ene.onAppReady(() => markReady());
   }, []);
 
   // VRM 表示(F): 設定とモデルを取得(両方揃えば VRM 描画。欠け/失敗時は一言メッセージのみ=立ち絵フォールバック廃止)。
@@ -126,51 +138,12 @@ export function App(): React.ReactElement | null {
     void window.ene.getVoiceEq().then(setEqBands);
   }, []);
 
-  // ユーザー発話(ハンズフリー音声・コアレッシング含む)でアイドル計時をリセットする
-  //   (話しかけられた=前を向く)。コアレッシング音声経路では応答時に noteActivity を通らないため、
-  //   ユーザー発話を拾うこのイベントが「前を向く」唯一のトリガーになる。
-  useEffect(() => {
-    window.ene.onUserSaid(() => noteActivity());
-  }, []);
-
   // 会話が途切れて IDLE_TURN_BACK_MS 経つとトリミは後ろを向く(話しかけ/クリックで前へ・見た目だけ)。起動時から計時。
   useEffect(() => {
     noteActivity();
     return () => {
       if (idleTurnTimerRef.current) clearTimeout(idleTurnTimerRef.current);
     };
-  }, []);
-
-  // ウィンドウ可視性 → VRM 描画の停止/再開(§3.6・軽量原則 柱4)。
-  // 2つの独立信号——main の hide/minimize/show/restore(意図的な表示操作)と renderer の
-  // visibilitychange(最小化/隠蔽=Chromium の可視性)——を **last-write-wins で奪い合わせず**、
-  // 両者の AND から visible を一意に導出する(C3・SSOT)。どちらかが「隠れている」と言えば描画を止める
-  // =取りこぼし無し・競合無し・occlusion 停止も維持。クロージャを単一の recompute で畳む(真実点=導出結果ひとつ)。
-  useEffect(() => {
-    let windowVisible = true; // main 駆動(hide/minimize=false / show/restore=true)
-    let docVisible = !document.hidden; // renderer 駆動(最小化/隠蔽で hidden=true)
-    const recompute = (): void => setVisible(windowVisible && docVisible);
-    window.ene.onWindowVisibility((v) => {
-      windowVisible = v;
-      recompute();
-    });
-    const onVis = (): void => {
-      docVisible = !document.hidden;
-      recompute();
-    };
-    document.addEventListener('visibilitychange', onVis);
-    recompute(); // 初期状態を一度同期
-    return () => document.removeEventListener('visibilitychange', onVis);
-  }, []);
-
-  // トレイ / コンテキストメニューからのイベント(入力欄を開く)。
-  useEffect(() => {
-    window.ene.onOpenInputArea(() => openInput());
-  }, []);
-
-  // 音声応答チャンク(WAV＋任意で文テキスト/通し番号)を逐次再生(task_17 Phase A)。
-  useEffect(() => {
-    window.ene.onVoiceChunk((chunk) => void enqueueAudio(chunk.wav, chunk.text, chunk.index));
   }, []);
 
   // 文の再生開始に同期して吹き出しを1文ずつ伸ばす(Phase A・ストリーミング音声のみ)。
@@ -186,40 +159,6 @@ export function App(): React.ReactElement | null {
     });
   }, []);
 
-  // 相槌(聞くターン・task_18 Phase B): WAV があれば即時再生＋必ずうなずく(音声未準備でもうなずきは出す)。
-  useEffect(() => {
-    window.ene.onBackchannel((wav) => {
-      if (wav) void playBackchannel(wav);
-      setNodStrength(BACKCHANNEL_NOD_STRENGTH); // 相槌のうなずきは控えめ(ターン終端の浅い側と同程度)
-      setNodKey((k) => k + 1);
-    });
-  }, []);
-
-  // ターン終端うなずき(2026-06-12): 無音窓終端で1回うなずき、ターン受け取りを視覚で示す(音は鳴らさない)。
-  //   深さ(strength)は発話の長さで出し分け(main 側で算出)=短い発話は軽く・長い発話は重め。
-  useEffect(() => {
-    window.ene.onTurnNod((strength) => {
-      setNodStrength(strength);
-      setNodKey((k) => k + 1);
-    });
-  }, []);
-
-  // あくび(長時間傾聴の情緒ビート・listening-mode): main が ene:yawn を送ったら1回あくび。
-  useEffect(() => {
-    window.ene.onYawn(() => setYawnKey((k) => k + 1));
-  }, []);
-
-  // 傾聴モードの出入り(listening-mode): 入室で少し首をかしげ、退室で戻す。
-  useEffect(() => {
-    window.ene.onListening((on) => setIsListening(on));
-  }, []);
-
-  // 思考フィラー(熟考の入り・Phase C): 吹き出しに「考えている」文字列を一時表示。
-  // 応答が来たら setBubble(response.message) で上書きされる(=一瞬の"間"の見える化)。
-  useEffect(() => {
-    window.ene.onThinkingFiller((text) => setBubble(text));
-  }, []);
-
   // 実際の再生開始/終了に「ENE 発話中」フラグを連動(task_17 Phase C・barge-in)。
   useEffect(() => {
     setPlaybackHandlers(
@@ -232,27 +171,6 @@ export function App(): React.ReactElement | null {
         if (voice.isHandsFree()) window.ene.setVadSpeaking(false);
       },
     );
-  }, []);
-
-  // ハンズフリー: main からの状態/確定テキスト/割り込み。
-  // 状態テキストは出さず、考え中(transcribing)だけ吹き出し「…」で示す(聞き取り中は neutral)。
-  useEffect(() => {
-    window.ene.onVoiceState((state) => {
-      if (state === 'transcribing') {
-        setCharState((s) => ({ ...s, activity: 'thinking', pose: 'stand' }));
-      } else if (state === 'listening') {
-        // 空認識などで聞き取りに戻った時、考え中を解除して neutral へ。
-        setCharState((s) => (s.activity === 'thinking' ? { ...s, activity: 'idle' } : s));
-      }
-      // 'recording'(ユーザー発話中)は何もしない=キャラは neutral のまま。
-    });
-    window.ene.onVoiceTranscript((text) => void respond(text));
-    // コアレッシング(ENE_COALESCE)時は main で生成が完結し、確定応答だけが届く(投機キャンセルは届かない)。
-    // 吹き出しは文の再生に同期して伸ばす(setSentenceHandler)ので、ここでは**全文をセットしない**(表情/口パクのみ)。
-    window.ene.onVoiceResponse((response) => applyResponseUI(response, false));
-    // 自発発話(P7): main がアイドル判定で生成した一言を吹き出し/表情へ反映する(音声なし v1=全文表示)。
-    window.ene.onProactiveMessage((response) => applyResponseUI(response, true));
-    window.ene.onVoiceBargeIn(() => voice.handleBargeIn());
   }, []);
 
   // アンマウント時に走らせっぱなしのタイマーを止める(口パク終了の talkingTimer・VRM 保存デバウンスの
