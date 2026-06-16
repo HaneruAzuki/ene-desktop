@@ -6,16 +6,19 @@ directories:
   output: dist
   buildResources: resources
 # 配布物に含めるファイル。main/preload/renderer は out/ に自己完結バンドル済み。
-# 例外: 埋め込みランタイム(@huggingface/transformers + onnxruntime-node)は ESM＋ネイティブ依存のため
-# バンドルせず external 化(electron.vite.config.ts)し、ここで node_modules から必要分だけ同梱する。
-# ※ Phase B(task_15)。配布サイズ §4.3 を守るため CPU 限定(GPU用DLL除外)・win-x64 のみ・onnxruntime-web 除外。
-# ※ この同梱範囲は実機 `npm run package:portable` での起動確認が未了(手動テスト後に検証)。
+# 例外: external 化した実行時依存(electron.vite.config.ts の external＋動的 require)は out/ にバンドルされず、
+# 実行時に node_modules から require される。それらをここで明示同梱する(欠けると packaged で機能が無言で死ぬ)。
+# ※ 配布サイズ §4.3 を守るため onnxruntime-node の native は CPU・win-x64 のみ(GPU用 DirectML/他OSは除外)。
 files:
   - 'out/**/*'
-  - 'ene/**/*' # 初期キャラ(JSON + portrait)を同梱
-  - 'resources/**/*' # トレイアイコン等(実行時に nativeImage が読む・N-07-6)＋ Silero VAD モデル(task_17 Phase C)
+  - 'ene/**/*' # 初期キャラ(JSON + portrait + VRM)を同梱
+  - 'resources/**/*' # アイコン等＋ Silero VAD モデル(task_17 Phase C)
   - '!node_modules/**/*'
-  # 埋め込みランタイム(text 用途に必要な分のみ)
+  # ロガー(logger.ts が動的 require=バンドルされない。欠けるとログが書けず診断不能になる・2026-06)
+  - 'node_modules/electron-log/**/*'
+  # 埋め込み/STT ランタイム(transformers.js とその実行時依存)。
+  # ※ transformers.js の Node ビルド(transformers.node.cjs)は onnxruntime-node＋onnxruntime-common のみを
+  #   require する(onnxruntime-web は使わない=同梱不要・確認済み 2026-06)。
   - 'node_modules/@huggingface/transformers/**/*'
   - 'node_modules/@huggingface/jinja/**/*'
   - 'node_modules/@huggingface/tokenizers/**/*'

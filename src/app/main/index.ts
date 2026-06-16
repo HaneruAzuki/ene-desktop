@@ -42,12 +42,14 @@ const runtime: AppRuntime = {
   ready: false, // 音声エンジン＋ウォーム完了で true（lifecycle が背景で確定し ene:app-ready を送る）
 };
 let mainWindow: BrowserWindow | null = null;
+let mainWindowCreated = false; // メインウィンドウが一度でも作られたか(起動時 APIキーダイアログの開閉で誤終了しないため)
 let shuttingDown = false;
 
 async function start(): Promise<void> {
   try {
     const result = await runStartupSequence(runtime);
     mainWindow = result.mainWindow;
+    mainWindowCreated = true;
   } catch (e) {
     // 起動シーケンス内で app.quit() 済み。ここではログのみ。
     log.error('startup failed', { name: (e as Error).name });
@@ -68,7 +70,10 @@ if (!acquireSingleInstanceLock()) {
   });
 
   app.on('window-all-closed', () => {
-    app.quit();
+    // 起動シーケンス中(APIキー入力ダイアログの開閉等)はメインウィンドウ未確立=ここで終了しない。
+    // メインウィンドウが一度でも作られた後の「全ウィンドウ閉じ」だけ終了する(ユーザーが本体を閉じた時)。
+    // これが無いと初回起動でキー入力→ダイアログが閉じた瞬間に quit し、再起動が必要になっていた。
+    if (mainWindowCreated) app.quit();
   });
 
   // 終了前に記憶抽出 + 短期記憶クリア(設計書 §7.2)。
