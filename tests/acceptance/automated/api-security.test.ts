@@ -37,9 +37,9 @@ describe('受入: API キーの暗号化(成功基準6)', () => {
     expect(await loadAndDecryptApiKey()).toBe('sk-ant-roundtrip-99');
   });
 
-  it('保存先はマシン固定領域(userData)であり data/ 配下ではない', () => {
-    // 別PCで復号できないため API キーだけは data/ ではなく %APPDATA% 配下に置く(CLAUDE §6.3)
+  it('保存先は Electron の userData 配下(ポータブル運用では app フォルダ内へリダイレクト)', () => {
+    // ポータブル: packaged 時に index.ts が userData を exe 隣の data/app へ向け直す。
+    // api-key.enc はそこに置かれ、DPAPI 暗号で機械固定=別PCにフォルダごとコピーしても復号不可→再入力(§6.3)。
     expect(getApiKeyPath()).toBe(path.join(h.dir, 'api-key.enc'));
-    expect(getApiKeyPath()).not.toContain(`${path.sep}data${path.sep}`);
   });
 });

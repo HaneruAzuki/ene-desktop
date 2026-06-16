@@ -6,11 +6,13 @@ import { getApiKeyPath } from './paths';
 // API キーの暗号化保存・復号(設計書 §3.6 / §6.3)。
 //
 // 暗号化対象は API キーのみ(記憶・設定ファイルは平文 JSON)。
-// Electron safeStorage(OS 標準の暗号化機構)を使用。鍵は OS/ユーザー/マシンに
-// 紐づくため、保存先は data/ ではなく %APPDATA%/ene-desktop/ とする(§6.3)。
+// Electron safeStorage(OS 標準の暗号化機構=Windows は DPAPI)を使用。
+// 保存先はポータブル運用ではアプリフォルダ内の data/app/api-key.enc(userData リダイレクト先・
+// index.ts)。鍵は OS/ユーザー/マシンに紐づくため、フォルダごと別PCへコピーしても復号できず再入力になる
+// (=ポータブルとして正直な挙動)。暗号化済みなのでファイルが読まれても平文キーは漏れない(§6.3)。
 
 /**
- * API キーを暗号化して %APPDATA%/ene-desktop/api-key.enc に保存する。
+ * API キーを暗号化して api-key.enc(ポータブル運用では data/app/ 配下)に保存する。
  * 暗号化が利用できない環境では throw する(呼出側でダイアログ表示等を行う)。
  */
 export async function encryptAndSaveApiKey(plaintext: string): Promise<void> {

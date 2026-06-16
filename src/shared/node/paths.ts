@@ -11,7 +11,8 @@ import {
 // ファイルパスの統一管理(設計書 §3.6 / §5.5)。
 //
 // - ポータブルデータ: exe と同じディレクトリ(本番)/ プロジェクトルート(開発)の data/
-// - マシン固定データ: %APPDATA%/ene-desktop/(app.getPath('userData'))
+// - Electron userData(Local Storage・api-key.enc 等)も index.ts で data/app/ へ向け直す
+//   (ポータブル運用=%APPDATA% に痕跡を残さない・フォルダ削除で完全に消える・§6.3)。
 //
 // 記憶系パスは「現在使用中キャラの characterId」に依存して動的に変わる。
 // characterId の読込(active-character.json)は非同期 I/O のため、起動時に
@@ -217,14 +218,18 @@ export function getVadModelPath(): string {
   return path.join(getResourcesDir(), VAD_MODEL_FILE);
 }
 
-// --- マシン固定データ(暗号化 API キーの保存先) ---
+// --- Electron userData(暗号化 API キーの保存先) ---
 
-/** %APPDATA%/ene-desktop/(環境問わず app.getPath('userData'))。 */
+/**
+ * Electron の userData ディレクトリ(app.getPath('userData'))。
+ * ポータブル運用では index.ts が起動時に data/app/ へ向け直すため、ここもフォルダ内を指す
+ * (リダイレクト前の既定は %APPDATA%/ene-desktop)。
+ */
 export function getMachineDataDir(): string {
   return app.getPath('userData');
 }
 
-/** %APPDATA%/ene-desktop/api-key.enc */
+/** api-key.enc(ポータブル運用では data/app/api-key.enc・DPAPI 暗号・別PCでは再入力)。 */
 export function getApiKeyPath(): string {
   return path.join(getMachineDataDir(), 'api-key.enc');
 }

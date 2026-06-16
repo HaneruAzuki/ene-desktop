@@ -1,19 +1,37 @@
 import { app, type BrowserWindow } from 'electron';
+import path from 'node:path';
 import { log } from '../../shared/logger';
 import { acquireSingleInstanceLock } from './single-instance';
 import { runStartupSequence } from './lifecycle';
 import { runShutdownSequence } from './shutdown';
 import { stopVoiceEngine } from './voice-engine';
+import { getPortableDataDir } from '../../shared/node/paths';
 import type { AppRuntime } from './app-runtime';
 
 // Electron main エントリポイント(設計書 §7)。
 // 多重起動防止 → 起動シーケンス(lifecycle)→ 終了時に記憶抽出(shutdown)。
 
-// userData(%APPDATA%/<app名>)を安定した ASCII 識別子に固定する(§6.3)。
+// userData(既定は %APPDATA%/<app名>)を安定した ASCII 識別子に固定する(§6.3)。
 // app.getName() は packaged 版で productName(=「魚川トリミ」)を使うため、固定しないと
-// userData が日本語パスへ動き、API キー(api-key.enc)の保存先が変わってしまう。
-// productName(表示名)と userData(保存先識別子)を分離するための明示設定。
+// 既定の userData が日本語パスへ動く。表示名と保存先識別子を分離するための明示設定。
 app.setName('ene-desktop');
+
+// ポータブル運用(§3.6/§6.3): Electron の状態(userData=Local Storage/Network/api-key.enc・
+// キャッシュ・ログ・クラッシュダンプ)を、exe の隣(dev はプロジェクトルート)の data/ 配下へ向け直す。
+// これで %APPDATA% に痕跡を残さず「フォルダ削除＝完全アンインストール」が成立する。
+//   - api-key.enc は data/app/ へ移る(getApiKeyPath は userData 基準ゆえ自動追従)。DPAPI 暗号は不変=
+//     別PCにフォルダごとコピーしても復号不可で再入力(=ポータブルとして正直な挙動・§6.3)。
+//   - getPortableDataDir() は process.execPath/cwd 由来で app.ready 前でも安全に解決できる。
+//   - app.ready より前に呼ぶ必要があるため、ここ(モジュール先頭)で設定する。
+{
+  const dataDir = getPortableDataDir();
+  const appStateDir = path.join(dataDir, 'app');
+  app.setPath('userData', appStateDir);
+  app.setPath('sessionData', appStateDir);
+  app.setPath('cache', path.join(appStateDir, 'cache'));
+  app.setPath('logs', path.join(dataDir, 'logs'));
+  app.setPath('crashDumps', path.join(appStateDir, 'crashes'));
+}
 
 const runtime: AppRuntime = {
   charContext: null,

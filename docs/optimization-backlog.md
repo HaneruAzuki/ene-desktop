@@ -117,9 +117,10 @@ Router は**ローカル判別器へ置換済**(B-15 ✅・ネットワーク0�
 - **現状**: STT は main・onnxruntime-node・**CPU**(`stt-transcriber.ts`・dtype 自動判定)。kotoba q8 ~1.8s は当面許容。起動時ウォーム(`warmStt`)で初回発話の読込待ちは前倒し済(2026-06-12)。
 - **着手条件**: STT がレイテンシのボトルネックと判断したら。**WebGPU(最も可搬)を第一候補**に。CPU フォールバックは必須(弱い iGPU/ドライバ問題への保険)。
 
-### B-07 パッケージ時のログ保存先が %APPDATA%(data/logs ではない)
+### B-07 パッケージ時のログ保存先が %APPDATA%(data/logs ではない)【✅解消・2026-06】
 - **由来**: N-11-4。
 - **内容**: パッケージ版で `main.log` が `data/logs` ではなく `%APPDATA%/ene-desktop/logs` に出力(記憶・設定の永続化は正常)。electron-log 設定を見直す。
+- **解消**: ポータブル運用で `index.ts` が起動時に `app.setPath('logs', data/logs)` を含む全 Electron パスを `data/` 配下へリダイレクト。早期ログ含め `data/logs` に出力されるようになった。
 
 ### B-08 winCodeSign 展開の手動回避が必要
 - **由来**: N-11-1。

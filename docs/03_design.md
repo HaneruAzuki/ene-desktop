@@ -1746,16 +1746,17 @@ export function getPortableDataDir(): string {
 | 本番(その他・`app.isPackaged`) | `path.dirname(process.execPath)/data` | exe の隣に作成 |
 | 開発(`app.isPackaged === false`) | `process.cwd()/data` | リポジトリルートに作成 |
 
-> ⚠️ **N-11-4(MVP後ブラッシュアップ)**:パッケージ版では `electron-log` のログが
-> `data/logs/` ではなく `%APPDATA%/ene-desktop/logs/` に出力される(dev は `data/logs/`)。
-> 記憶・設定の永続化は正常。ログ保存先を `data/logs/` に揃えるのは MVP 後に対応。
+> ✅ **N-11-4 解消(ポータブル運用・2026-06)**:`index.ts` で起動時に `app.setPath('logs', …)` を
+> `data/logs/` へ向け直すため、早期ログ含めパッケージ版でも `data/logs/` に出力される
+> (旧 B-07 の `%APPDATA%` 流出を解消)。
 
 開発時に作られる `data/` は `.gitignore` に含まれるため、リポジトリには
 コミットされない(設計書 §2 のディレクトリ構成を参照)。
 
-なお、マシン固定データ用の `getMachineDataDir()` は環境を問わず
-`app.getPath('userData')` を使う。Electronが自動的に開発時と本番時で
-適切な場所(`%APPDATA%/ene-desktop/`)を返す。
+なお `getMachineDataDir()` は `app.getPath('userData')` を返すが、ポータブル運用では
+`index.ts` が起動時に userData を **exe 隣の `data/app/`** へ向け直す(Local Storage・
+`api-key.enc`・キャッシュ・クラッシュダンプも含めて `data/` 配下へ集約)。これにより
+`%APPDATA%` に痕跡を残さず、フォルダ削除だけで完全に消える。
 
 ### 3.7 APIキー管理ダイアログ(API Key Management)
 
