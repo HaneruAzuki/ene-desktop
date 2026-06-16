@@ -483,7 +483,6 @@ Character Layer    Memory Layer    (両者を統合)
 Conversation Layer(Claude API)
    ↓ JSON応答
    ├─ Memory Layer(記憶の保存・更新)
-   └─ OS Integration Layer(コマンド実行)
 ```
 
 ### 4.2 各レイヤーの役割

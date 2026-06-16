@@ -1,14 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createJsonStreamParser } from '../../src/voice/json-stream-parser';
 import type { EmotionLabel } from '../../src/shared/types/animation';
-import type { OsCommand } from '../../src/shared/types/os';
 
 // JSON応答のストリーミング解釈(C1・B-06)。
 
 interface RunResult {
   sentences: string[];
   emotion?: EmotionLabel;
-  command?: OsCommand;
   enterListening?: boolean;
 }
 function run(deltas: string[]): RunResult {
@@ -22,7 +20,7 @@ function run(deltas: string[]): RunResult {
   }
   const f = parser.flush();
   sentences.push(...f.sentences);
-  return { sentences, emotion, command: f.command, enterListening: f.enterListening };
+  return { sentences, emotion, enterListening: f.enterListening };
 }
 
 describe('json-stream-parser (C1)', () => {
@@ -30,7 +28,6 @@ describe('json-stream-parser (C1)', () => {
     const r = run(['{"type":"chat","emotion":"joy","message":"やあ。元気?"}']);
     expect(r.emotion).toBe('joy');
     expect(r.sentences).toEqual(['やあ。', '元気?']);
-    expect(r.command).toBeUndefined();
   });
 
   it('デルタ分割でも再構成し、ルビは保持したまま文を割る(施策A:最初は読点で早期発話)', () => {

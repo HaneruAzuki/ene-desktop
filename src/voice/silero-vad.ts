@@ -20,8 +20,16 @@ type OrtSession = import('onnxruntime-node').InferenceSession;
 let ortPromise: Promise<OrtModule> | null = null;
 async function getOrt(): Promise<OrtModule> {
   // 遅延 import(VAD 未使用時にロードしない・起動を重くしない)。
+  // ロード失敗時はキャッシュを null に戻し、次回 load() で再試行できるようにする。
+  // rejected Promise を握り続けると一過性の失敗が再起動まで治らない恒久故障になる
+  // (stt-transcriber / embedder の自己回復と同方針=これで3経路すべて統一)。
   if (!ortPromise) ortPromise = import('onnxruntime-node');
-  return ortPromise;
+  try {
+    return await ortPromise;
+  } catch (e) {
+    ortPromise = null;
+    throw e;
+  }
 }
 
 const STATE_LEN = 2 * 1 * 64;

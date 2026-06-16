@@ -2,7 +2,7 @@ import { EMOTION_LABELS, type EmotionLabel } from './types/animation';
 
 // LLM 応答パースの共有ヘルパ(設計書 §3.4)。
 // Conversation / Memory / Router の各所で重複していた「JSON 抽出・emotion 正規化・
-// OS コマンド検証・文字列配列化」を1か所に集約する(振る舞いは従来の各コピーと同一)。
+// 文字列配列化」を1か所に集約する(振る舞いは従来の各コピーと同一)。
 
 /**
  * コードフェンス・前後テキストを除去して最初の JSON オブジェクトを抽出・パースする。

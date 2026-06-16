@@ -562,7 +562,7 @@ export interface CharacterContext {
   fewshot: CharacterFewshot;
   portraitPath: string;
   // N-02-2/N-05-5: systemPrompt は人格・背景・知識境界・AI自称防止まで。
-  // JSON 応答形式(chat/os_command)は Conversation Layer(prompt-builder)が付与する。
+  // JSON 応答形式(chat)は Conversation Layer(prompt-builder)が付与する。
   systemPrompt: string;
   birthdayHint?: 'today' | 'forgotten' | null;
 }
@@ -1079,28 +1079,15 @@ function isExtraValue(v: unknown): v is ExtraValue {
 ```typescript
 // src/shared/types/conversation.ts
 
-export type ResponseType = "chat" | "os_command";
-
-export interface ChatResponse {
+// 応答型は chat のみ(OS操作=os_command は廃止・2026-06・§3.5)。
+export type ConversationResponse = {
   type: "chat";
   message: string;
   reading?: string;         // task_17: 音声読み上げ用ひらがな(任意・欠落時は message を読む=漢字誤読対策)
   emotion?: EmotionLabel;   // task_13: 表情アニメ用(任意・1ターン揮発)。許可外/欠落は neutral。
-}
-
-export interface OsCommandResponse {
-  type: "os_command";
-  message: string;            // キャラとしての応答も付随
-  reading?: string;           // task_17: 音声読み上げ用ひらがな(任意)
-  command: OsCommand;         // src/shared/types/os.ts で定義(action は固定リテラル型)
-}
-
-export type ConversationResponse = ChatResponse | OsCommandResponse;
+  enterListening?: boolean; // listening-mode: 傾聴入室(明示宣言時のみ true)
+};
 ```
-
-> 📌 `OsCommand` の action は `"open_notepad" | "open_browser" | "open_folder"` の
-> リテラル型に固定されている(§3.5 参照)。これにより、Claude APIが想定外の
-> action 文字列を返しても、応答パース時の型ガードで即座に検出・拒否できる。
 
 > 📌 **応答の音声化(task_17・既定=非ストリーミング)**:音声有効時は、`chat()` が返した
 > **確定応答**を文単位で合成し、文ごとに WAV を renderer へ送って逐次再生する
@@ -1263,19 +1250,8 @@ messages:
 通常の会話:
 {"type": "chat", "message": "..."}
 
-OS操作(以下の3種類のみ。それ以外の action は使えない):
-
-メモ帳を開く:
-{"type": "os_command", "message": "...", "command": {"action": "open_notepad"}}
-
-ブラウザでURLを開く(http/https のみ):
-{"type": "os_command", "message": "...", "command": {"action": "open_browser", "target": "https://..."}}
-
-フォルダをエクスプローラで開く(ユーザホーム配下のみ、絶対パス):
-{"type": "os_command", "message": "...", "command": {"action": "open_folder", "target": "C:\\Users\\..."}}
-
-ユーザが上記以外の操作を求めた場合は、chat 型で「それはできない」と
-キャラ口調で説明してください。
+PC を操作する手段は持たない(OS操作は廃止・2026-06)。アプリ・ブラウザ・フォルダを開く等を
+頼まれても、chat 型で「それはできない」とキャラ口調で説明してください。
 ```
 
 #### 応答パースの堅牢化
@@ -1320,9 +1296,7 @@ function fallbackResponse(): ConversationResponse {
 
 function isValidResponse(obj: unknown): obj is ConversationResponse {
   // 手書きの型ガード(zod等は使わない)
-  // type が "chat" / "os_command" のいずれか
-  // os_command の場合は command.action が許可リテラルか
-  // ... (省略)
+  // type が "chat" で message が文字列であること
 }
 ```
 
@@ -1631,7 +1605,7 @@ export async function execute(cmd: OsCommand): Promise<OsCommandResult> {
 | `notepad.exe` 偽装 | 引数なし固定のため、コマンドラインからファイルを開かれない |
 
 > **音声エンジンの spawn は別枠の承認済み例外(N-17-6 / N-17-12)**
-> 上の OS 操作ホワイトリスト(キャラの `os_command` 機能)とは独立に、`src/app/main/voice-engine.ts` が
+> かつての OS 操作機能(廃止・2026-06)とは無関係に、`src/app/main/voice-engine.ts` が
 > 起動時に AivisSpeech サイドカー(`data/voice/engine/run.exe`)を `child_process.spawn` で起動する。
 > これは**キャラ駆動ではなくアプリ内部のライフサイクル**であり、安全性は OS 操作と同じ原則で担保する:
 > **固定パスの既知バイナリ + 引数配列(`--host 127.0.0.1 --port 10101`)+ `shell:false` + `windowsHide:true`**。
@@ -2279,7 +2253,6 @@ export function todayLocalYmd(): { year: number; month: number; day: number } {
 | Knowledge Router失敗 | fallbackドメインを使用 | 透過(ユーザに見せない) |
 | Memory読み込み失敗 | 空の記憶として続行 | 透過(ログのみ) |
 | Memory書き込み失敗 | リトライせず警告ログ | 透過(次回会話で再試行) |
-| OS操作失敗 | コマンド実行結果をキャラ応答に反映 | キャラ口調で報告 |
 | JSON不正 | パース堅牢化(§3.4)で救済、失敗ならフォールバック | 透過(成功時) / キャラ口調(失敗時) |
 | APIキー未設定 | 起動時にAPIキー管理ダイアログ表示(§3.7) | 初回セットアップを促す |
 
