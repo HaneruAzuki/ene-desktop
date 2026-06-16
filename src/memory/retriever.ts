@@ -152,7 +152,12 @@ export async function retrieveRecords(
   for (const r of all) {
     if (r.memory.supersededBy) continue;
     if (!passesCategory(r.memory, query.category)) continue;
-    if ((r.memory.disclosureLevel ?? 1) > stage) continue; // 開示ゲーティング(task_16)
+    // 開示ゲーティング(task_16)。これは **canon(トリミ自身の人生・provenance:'self')** を
+    // 「親密度が上がるほど深い level まで打ち明ける」ための機構。user 記憶(相手が話したこと)は
+    // 抽出器が level を付けず既定 1=**常に開示=意図的**(相手が話したことは親密度に関係なく覚えている。
+    // そこにゲートをかけると"覚えていない"ように見える逆効果)。よって実質 canon にのみ効く=設計判断であって
+    // 配線漏れではない(横断監査 disclosureLevel・2026-06-16 ユーザー確認)。
+    if ((r.memory.disclosureLevel ?? 1) > stage) continue;
     byId.set(r.id, r);
   }
   const current = [...byId.values()];

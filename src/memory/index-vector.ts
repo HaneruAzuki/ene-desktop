@@ -1,6 +1,7 @@
 import { getVectorIndexPath } from '../shared/node/paths';
 import { readJson, writeJson } from '../shared/node/json-store';
 import { EMBEDDING_DIM } from '../shared/constants';
+import { cosineSimilarity } from '../shared/vector-math';
 import type { Embedder } from './embedder';
 import type { EpisodicRecord } from '../shared/types/memory';
 
@@ -89,22 +90,9 @@ export async function pruneVectorIndex(validIds: Set<string>): Promise<void> {
   }
 }
 
-/** コサイン類似度(正規化済みでも安全に計算)。 */
-export function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  const len = Math.min(a.length, b.length);
-  for (let i = 0; i < len; i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    dot += x * y;
-    na += x * x;
-    nb += y * y;
-  }
-  if (na === 0 || nb === 0) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
-}
+// コサイン類似度は共有実装(shared/vector-math)へ集約(E2③・二重定義の解消)。
+// 後方互換のため index-vector からも再エクスポート(searchVectors の内部利用＋テストが import)。
+export { cosineSimilarity };
 
 /** クエリベクトルに近い順に上位 topK の ID を返す。 */
 export function searchVectors(

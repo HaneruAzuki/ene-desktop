@@ -2,6 +2,7 @@ import { resolveDomain } from './domain-resolver';
 import { buildFallbackResult } from './fallback';
 import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../memory/embedder';
 import { log } from '../shared/logger';
+import { cosineSimilarity } from '../shared/vector-math';
 import {
   ROUTER_KEYWORD_MIN_LEN,
   ROUTER_EMBED_MIN_CHARS,
@@ -53,14 +54,6 @@ interface TopicVec {
 }
 const topicVecCache = new Map<string, TopicVec[]>(); // key = characterId
 
-/** 正規化ベクトル同士のコサイン類似(=内積)。embedder は normalize 済みを返す。 */
-function cosine(a: number[], b: number[]): number {
-  let s = 0;
-  const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i += 1) s += (a[i] ?? 0) * (b[i] ?? 0);
-  return s;
-}
-
 /** 全 topics を document 埋め込みして domain 付きでキャッシュする(初回のみ・冪等)。 */
 async function getTopicVectors(
   knowledgeDomains: CharacterKnowledgeDomains,
@@ -100,7 +93,7 @@ export async function classifyByEmbedding(
   let best: (LocalMatch & { score: number }) | null = null;
   for (const t of topics) {
     if (t.vec.length === 0) continue;
-    const score = cosine(qv, t.vec);
+    const score = cosineSimilarity(qv, t.vec);
     if (!best || score > best.score) best = { domain: t.domain, matchedTopic: t.topic, score };
   }
   return best && best.score >= threshold ? best : null;

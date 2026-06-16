@@ -1022,6 +1022,14 @@
 - **残(意図的に据置)**: C1 は barge-in 判定を `responseActive`(main駆動)で単一化済みだが `speaking` は今も renderer→main IPC ミラー(役割分離は明文化済み=エコーガード/strict VAD 用)。C5 は逆引き索引の増分/全再生成/ベクトルの3経路が「派生キャッシュ・真実の源=episodic本体」として明文化済みの割り切り(性能の作り直し=D1 とともに別タスク)。
 - **検証**: typecheck / eslint / lint:deps(違反0・150 modules)/ **506 テスト** 全グリーン。⚠️ C3 のウィンドウ可視性は **実機 smoke 推奨**(最小化/復帰/隠蔽での VRM 描画 start/stop・本環境では Electron 実行不可)。
 
+### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
+- **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。
+- **E2②(非原子的 save)**: `app-settings.ts` の4 save が read-modify-write で、設定パネルの素早い複数トグルで後勝ち取りこぼしの縁。`updateSettings` で promise チェーン直列化(短期記憶 withWriteLock と同方針)。
+- **E2③(cosine 二重実装)**: `local-classifier`(内積版)と `index-vector`(フル版)の cosine を `shared/vector-math.ts` の `cosineSimilarity` に集約(index-vector は後方互換で再エクスポート)。正規化済みでは同値=挙動不変・ドリフト解消。
+- **disclosureLevel(設計判断・ユーザー確認)**: user 記憶が常に level 1=開示ゲートが canon にのみ効く件は **配線漏れではなく意図的**と確定。ゲートは「トリミが自分のことをどれだけ打ち明けるか(canon の段階的自己開示)」の機構で、user が話したことに親密度ゲートをかけるのは無意味(覚えていないように見える逆効果)。`retriever.ts` の該当行にコメント明文化=再検出防止。**コード変更なし**。
+- **横断監査の到達点**: 実バグ(A群=A5 まで)・死蔵(B/E1)・SSOT 本丸(C2/C3)・軽微(E2)・設計確認(disclosureLevel)=**クローズ**。**残=性能(D1 索引の線形走査 / D2 想起毎の全ベクトルロード / D3 抽出経路の二重フルスキャン)と C5/C1(明文化済みの割り切り)=設計を練ってからの別タスク**。
+- **検証**: typecheck / eslint / lint:deps(違反0・151 modules)/ **506 テスト** 緑。
+
 ---
 
 ### N-PRES-* 🟢 存在感の改修(「人間との会話の違和感」解消パック・2026-06-13)

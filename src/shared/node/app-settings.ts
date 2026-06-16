@@ -11,26 +11,39 @@ export async function loadAppSettings(): Promise<AppSettings> {
   return { ...DEFAULT_APP_SETTINGS, ...(data ?? {}) };
 }
 
+// 設定書き込みの直列化(E2②・read-modify-write の競合防止)。各 save は「読み→patch適用→書き戻し」だが、
+// 設定パネルで複数項目を素早くトグルすると read 同士が交差して**後勝ちで他項目の変更を取りこぼす**。
+// 直前の書き込みの完了を待ってから次を実行する promise チェーンで直列化する(短期記憶の withWriteLock と同方針)。
+let writeChain: Promise<void> = Promise.resolve();
+async function updateSettings(patch: Partial<AppSettings>): Promise<void> {
+  const run = writeChain.then(async () => {
+    const current = await loadAppSettings();
+    await writeJson(getAppSettingsPath(), { ...current, ...patch });
+  });
+  // 直前の成功/失敗に関わらず次へ進めるよう、チェーンは結果を握り潰して保持する(失敗で全保存が止まらない)。
+  writeChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run; // 呼び出し側へは従来どおり完了/失敗を伝える。
+}
+
 /** VRM 表示パラメータのユーザー上書きを保存する(GUI スライダーの調整結果・F)。 */
 export async function saveVrmDisplay(vrmDisplay: Partial<VrmDisplayParams>): Promise<void> {
-  const current = await loadAppSettings();
-  await writeJson(getAppSettingsPath(), { ...current, vrmDisplay });
+  return updateSettings({ vrmDisplay });
 }
 
 /** トリミの声(出力)の音量・ミュートを保存する(UI改修 段階3)。 */
 export async function saveAudioPrefs(outputVolume: number, muted: boolean): Promise<void> {
-  const current = await loadAppSettings();
-  await writeJson(getAppSettingsPath(), { ...current, outputVolume, muted });
+  return updateSettings({ outputVolume, muted });
 }
 
 /** 話しかけてくる頻度(自発発話・P7)を保存する(UI改修 段階6・設定パネル)。 */
 export async function saveIdleTalk(idleTalk: IdleTalkMode): Promise<void> {
-  const current = await loadAppSettings();
-  await writeJson(getAppSettingsPath(), { ...current, idleTalk });
+  return updateSettings({ idleTalk });
 }
 
 /** PC起動時の自動起動の希望値を保存する(UI改修 段階6)。本番は OS と併用、開発は表示用。 */
 export async function saveAutoLaunch(autoLaunch: boolean): Promise<void> {
-  const current = await loadAppSettings();
-  await writeJson(getAppSettingsPath(), { ...current, autoLaunch });
+  return updateSettings({ autoLaunch });
 }
