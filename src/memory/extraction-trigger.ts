@@ -1,9 +1,8 @@
 import { log } from '../shared/logger';
 import { nowLocalIso } from '../shared/datetime';
 import { getUnextractedEntries, markAsExtracted } from './short-term';
-import { saveEpisodic } from './episodic';
 import { loadRecallPool } from './recall-pool';
-import { indexEpisodic } from './index-inverted';
+import { saveAndIndexEpisodic } from './episodic-write';
 import { retrieveRecords } from './retriever';
 import { applyCorrections } from './update';
 import { resolveOpenLoop } from './open-loops';
@@ -55,8 +54,7 @@ export async function extractFromShortTerm(
   // 先に新記録を保存して ID を得る(supersede の置換先に使う)。
   let newRecordId: string | undefined;
   if (episodic) {
-    newRecordId = await saveEpisodic(episodic);
-    await indexEpisodic(newRecordId, episodic);
+    newRecordId = await saveAndIndexEpisodic(episodic);
   }
   if (corrections && corrections.length > 0) {
     await applyCorrections(corrections, newRecordId);

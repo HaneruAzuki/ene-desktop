@@ -38,6 +38,7 @@ import {
   saveWindowPosition,
 } from './window-position';
 import type { CharacterContext, ActiveCharacter } from '../../shared/types/character';
+import { IPC } from '../../shared/ipc-channels';
 
 // 起動シーケンス(設計書 §7.1 の11ステップ)。
 // runtime(実行時状態)を埋め、メインウィンドウを返す。
@@ -203,7 +204,7 @@ export async function runStartupSequence(
     )
     .then(() => {
       runtime.ready = true;
-      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:app-ready');
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.APP_READY);
       log.info('app fully ready (voice engine + embedder + STT + local router warmed)');
     });
 

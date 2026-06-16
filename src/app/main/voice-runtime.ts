@@ -15,6 +15,7 @@ import type { CharacterContext } from '../../shared/types/character';
 import type { MemoryContext } from '../../shared/types/memory';
 import type { RouterResult } from '../../shared/types/router';
 import type { ConversationResponse } from '../../shared/types/conversation';
+import { IPC } from '../../shared/ipc-channels';
 
 // 音声ランタイム(main 側・task_17 Phase A / design-revision-voice §4)。
 // 起動時に best-effort で TTS を用意し、応答メッセージを文単位で合成 → renderer へ音声チャンクを送る。
@@ -90,7 +91,7 @@ export async function streamVoiceChat(
       }
       // 各文の WAV にテキストと通し番号を同梱(再生開始に同期して吹き出しを1文ずつ伸ばす・Phase A)。
       if (!mainWindow.isDestroyed())
-        mainWindow.webContents.send('ene:voice-chunk', { wav, text, index: sentenceIndex++ });
+        mainWindow.webContents.send(IPC.VOICE_CHUNK, { wav, text, index: sentenceIndex++ });
     },
   });
 
@@ -129,7 +130,7 @@ export async function speakResponse(
       neverCallsSelf: [],
       // 非ストリーミングは文テキストを同梱しない(text/index 無し=吹き出しは別途・全文表示のまま)。
       onAudio: (wav) => {
-        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:voice-chunk', { wav });
+        if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.VOICE_CHUNK, { wav });
       },
       signal,
     });

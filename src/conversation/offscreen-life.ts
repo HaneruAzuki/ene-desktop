@@ -6,9 +6,9 @@ import {
   DAILY_LIFE_IMPORTANCE,
   EPISODIC_SUMMARY_MAX_CHARS,
 } from '../shared/constants';
-import { loadAllEpisodicFiles, saveEpisodic } from '../memory/episodic';
+import { loadAllEpisodicFiles } from '../memory/episodic';
 import { selectOpenLoops, loadOpenLoopState, saveOpenLoopState } from '../memory/open-loops';
-import { indexEpisodic } from '../memory/index-inverted';
+import { saveAndIndexEpisodic } from '../memory/episodic-write';
 import type { LlmComplete } from '../memory/extractor';
 import type { ActiveCharacter, CharacterContext } from '../shared/types/character';
 import type { EpisodicMemory } from '../shared/types/memory';
@@ -101,8 +101,7 @@ async function saveLifeFragment(life: string): Promise<void> {
     valence: 0, // 平凡な日常は心情を揺らさない
     disclosureLevel: 1,
   };
-  const id = await saveEpisodic(memory);
-  await indexEpisodic(id, memory);
+  await saveAndIndexEpisodic(memory);
 }
 
 /**

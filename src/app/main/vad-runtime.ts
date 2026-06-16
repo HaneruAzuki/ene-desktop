@@ -13,6 +13,7 @@ import {
   STT_SAMPLE_RATE,
   COALESCE_WINDOW_MAX_MS,
 } from '../../shared/constants';
+import { IPC } from '../../shared/ipc-channels';
 
 /**
  * コアレッシング(投機生成＋連結・段階①)の配線。ON のとき、話終わりを**暫定**扱いにし、
@@ -168,7 +169,7 @@ export class VadRuntime {
   private onSpeechStart(): void {
     if (this.responseActive) {
       // 応答ターンの進行中に発話開始 = 割り込み(明滅しない responseActive で確実に拾う)。
-      this.send('ene:voice-barge-in');
+      this.send(IPC.VOICE_BARGE_IN);
       // 案①: barge-in の早い/遅いを分類して窓を伸縮(早い=無音開始=直近 speech-end から MAX窓以内)。
       if (this.coalesce && this.lastSpeechEndAt) {
         const sinceSilence = performance.now() - this.lastSpeechEndAt;
@@ -202,7 +203,7 @@ export class VadRuntime {
     const speechMs = (this.recorded.length * VAD_FRAME_SIZE * 1000) / STT_SAMPLE_RATE;
     const nodStrength = turnNodStrength(speechMs);
     log.info(`turn nod (speech=${Math.round(speechMs)}ms strength=${nodStrength})`);
-    this.send('ene:turn-nod', nodStrength);
+    this.send(IPC.TURN_NOD, nodStrength);
     this.backchannel?.reset(); // ターン終了=次の発話は相槌カウンタを 0 から
     if (this.listenOnly) {
       // 相槌テスト: 文字起こし・応答(Claude/記憶=レイテンシ源)をスキップし聞き取りに戻る。
@@ -231,11 +232,11 @@ export class VadRuntime {
         );
         // 会話ログ(UI改修・VTuber風)表示用: 確定したユーザー発話を renderer へ(コアレッシング有無に関わらず)。
         // 表示専用=生成経路には影響しない(逐語ログは保存しない=セッション内メモリのみ・§6.3)。
-        this.send('ene:user-said', text);
+        this.send(IPC.USER_SAID, text);
         // コアレッシング: 確定でなく**暫定**ターン終了として coordinator へ(投機生成＋連結)。
         // 既定(非コアレッシング)は従来どおり renderer へ送り、renderer が sendMessage に流す。
         if (this.coalesce) this.coalesce.onProvisionalEnd(text);
-        else this.send('ene:voice-transcript', text);
+        else this.send(IPC.VOICE_TRANSCRIPT, text);
       } else {
         this.sendState('listening'); // 空認識 → 聞き取りに戻る
       }
@@ -246,7 +247,7 @@ export class VadRuntime {
   }
 
   private sendState(state: 'listening' | 'recording' | 'transcribing'): void {
-    this.send('ene:voice-state', state);
+    this.send(IPC.VOICE_STATE, state);
   }
 
   private send(channel: string, payload?: unknown): void {

@@ -28,6 +28,17 @@ module.exports = {
       to: { path: '^src/(app|character|knowledge|memory|conversation|voice)/' },
     },
     {
+      name: 'no-index-impl-outside-memory',
+      comment:
+        'memory の索引実装(index-inverted / index-vector)は episodic 本体から再生成できる' +
+        '派生キャッシュ=内部実装。memory 層の外は公開窓口(retriever / episodic-write)経由で使い、' +
+        '索引実装へ直接依存しない。これが §4.4 の旗艦例「検索方式を変えても上位は無変更」を' +
+        '機械的に担保する(宣言だけの疎結合を実体にする)。',
+      severity: 'error',
+      from: { pathNot: '^src/memory/' },
+      to: { path: '^src/memory/index-(inverted|vector)' },
+    },
+    {
       name: 'no-circular',
       comment: '循環依存を禁止(疎結合・CLAUDE.md §4.4)。',
       severity: 'error',

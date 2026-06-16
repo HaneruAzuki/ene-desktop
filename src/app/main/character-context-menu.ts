@@ -2,13 +2,14 @@ import { Menu, app, dialog, type BrowserWindow } from 'electron';
 import { resetToDefaultPosition } from './window-position';
 import { openApiKeyDialog } from './api-key-dialog';
 import type { AppRuntime } from './app-runtime';
+import { IPC } from '../../shared/ipc-channels';
 
 // キャラ右クリックメニュー(設計書 §8.8)。
 // 終了文言などキャラ依存の文字列は MVP ではコード内。将来 identity.json へ移行余地あり。
 
 export function showCharacterContextMenu(window: BrowserWindow, runtime: AppRuntime): void {
   const menu = Menu.buildFromTemplate([
-    { label: '話す', click: () => window.webContents.send('ene:open-input-area') },
+    { label: '話す', click: () => window.webContents.send(IPC.OPEN_INPUT_AREA) },
     { type: 'separator' },
     { label: '位置をリセット', click: () => resetToDefaultPosition(window) },
     {

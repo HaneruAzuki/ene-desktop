@@ -29,6 +29,7 @@ import type { TranscribeResult } from '../../shared/types/stt';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
 import type { EqBand } from '../../shared/types/voice';
 import { resolveVoice, type AppRuntime } from './app-runtime';
+import { IPC } from '../../shared/ipc-channels';
 
 // IPC ハンドラ集約(設計書 §4)。ターンの司令塔(generateResponse/commitTurn/handleSendMessage)は
 // turn-engine.ts に分離し、本ファイルは IPC 登録と各種ハンドラの配線に専念する。
@@ -57,10 +58,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     getTts: () => runtime.tts,
     getVoiceConfig: () => runtime.voiceConfig,
     send: (wav) => {
-      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:backchannel', wav);
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.BACKCHANNEL, wav);
     },
     sendFillerText: (text) => {
-      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:thinking-filler', text);
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.THINKING_FILLER, text);
     },
     rng: Math.random,
   });
@@ -107,7 +108,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
         },
         emitResponse: (response) => {
           if (!mainWindow.isDestroyed())
-            mainWindow.webContents.send('ene:voice-response', response);
+            mainWindow.webContents.send(IPC.VOICE_RESPONSE, response);
         },
         setSilenceWindow: (ms) => applySilenceWindow(ms),
         // barge-in(生成完了後)時に、最新 assistant 記憶を「聞かせた分」へ切り詰める(Phase B)。
@@ -116,10 +117,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
         listeningEnabled: process.env[LISTENING_ENABLED_ENV] !== '0',
         // 頬杖姿勢の出し入れ/あくびを renderer へ(VRM 視覚は Phase 4 で受信側を配線)。
         onListeningChange: (on) => {
-          if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:listening', on);
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.LISTENING, on);
         },
         onYawn: () => {
-          if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:yawn');
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.YAWN);
         },
       })
     : null;
@@ -145,12 +146,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       log.info(`coalesce window → ${ms}ms (adaptive)`);
     };
   }
-  ipcMain.handle('ene:vad-start', async (): Promise<boolean> => vad.start());
-  ipcMain.on('ene:vad-frame', (_event, frame: Float32Array) => {
+  ipcMain.handle(IPC.VAD_START, async (): Promise<boolean> => vad.start());
+  ipcMain.on(IPC.VAD_FRAME, (_event, frame: Float32Array) => {
     void vad.pushFrame(frame instanceof Float32Array ? frame : new Float32Array(frame));
   });
-  ipcMain.on('ene:vad-stop', () => vad.stop());
-  ipcMain.on('ene:vad-speaking', (_event, speaking: boolean) => vad.setSpeaking(speaking));
+  ipcMain.on(IPC.VAD_STOP, () => vad.stop());
+  ipcMain.on(IPC.VAD_SPEAKING, (_event, speaking: boolean) => vad.setSpeaking(speaking));
   // 現在ターンの単一管理(#8/#9): テキスト/音声の発話を1つの「現在ターン」に保つ。新ターンは前ターンを
   // supersede(中断)し、barge-in も同じ機構で止める。中断は Claude ストリーム＋TTS合成を signal で打ち切る
   // ので、捨てた生成が API/エンジンに残って次を詰まらせない(遅延して返った応答は無視する)。
@@ -165,7 +166,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   // barge-in: renderer が「実際に聞かせた発言(再生済みの文を連結)」を報告する(Phase B)。テキスト発話中なら
   // 中断＋「ユーザ＋聞かせた分」をコミット(全文は記憶しない)、音声/生成完了後は coordinator に委ねる(切り詰め)。
-  ipcMain.on('ene:voice-heard', (_event, heardText: string) => {
+  ipcMain.on(IPC.VOICE_HEARD, (_event, heardText: string) => {
     runtime.setResponseActive?.(false); // barge-in=この応答の窓を閉じる
     // 自発発話/挨拶(ターン機構の外)も止める(穴A)。
     runtime.selfSpeech?.abort();
@@ -183,7 +184,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
 
   ipcMain.handle(
-    'ene:send-message',
+    IPC.SEND_MESSAGE,
     async (_event, text: string): Promise<ConversationResponse | null> => {
       const ctrl = beginTextTurn(text);
       const timer = setTimeout(() => ctrl.abort(), TURN_TIMEOUT_MS); // ハング自動復帰(穴C)
@@ -201,7 +202,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     },
   );
 
-  ipcMain.handle('ene:get-character-info', async (): Promise<CharacterInfo> => {
+  ipcMain.handle(IPC.GET_CHARACTER_INFO, async (): Promise<CharacterInfo> => {
     if (runtime.charContext) {
       return { name: runtime.charContext.identity.name };
     }
@@ -210,7 +211,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   // --- VRM 表示(F・3D化)。vrm.json が無ければ null=renderer は PNG 立ち絵へフォールバック ---
   // 表情マップ＋初期パラメータ(ユーザー上書きをマージ済み)。モデル本体は別 IPC で取得する。
-  ipcMain.handle('ene:get-vrm-config', async (): Promise<VrmRenderConfig | null> => {
+  ipcMain.handle(IPC.GET_VRM_CONFIG, async (): Promise<VrmRenderConfig | null> => {
     const characterId = runtime.charContext?.identity.characterId;
     if (!characterId) return null;
     const config = await loadVrmConfig(characterId);
@@ -220,7 +221,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
 
   // VRM モデル本体(ArrayBuffer)。10MB を base64 化せず生バイトで渡す(§3.8)。読めなければ null。
-  ipcMain.handle('ene:get-character-model', async (): Promise<ArrayBuffer | null> => {
+  ipcMain.handle(IPC.GET_CHARACTER_MODEL, async (): Promise<ArrayBuffer | null> => {
     const characterId = runtime.charContext?.identity.characterId;
     if (!characterId) return null;
     const config = await loadVrmConfig(characterId);
@@ -230,41 +231,41 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   // GUI スライダーの調整結果を保存(renderer は即時ローカル反映済み・ここは永続化のみ)。
   ipcMain.handle(
-    'ene:set-vrm-display',
+    IPC.SET_VRM_DISPLAY,
     async (_event, display: Partial<VrmDisplayParams>): Promise<void> => {
       await saveVrmDisplay(display);
     },
   );
 
   // 音量・ミュート(トリミの声=出力・UI改修 段階3)。renderer は即時ローカル反映済み・ここは永続化のみ。
-  ipcMain.handle('ene:get-audio-prefs', async (): Promise<{ volume: number; muted: boolean }> => {
+  ipcMain.handle(IPC.GET_AUDIO_PREFS, async (): Promise<{ volume: number; muted: boolean }> => {
     const s = await loadAppSettings();
     return { volume: s.outputVolume ?? 1, muted: s.muted ?? false };
   });
   ipcMain.handle(
-    'ene:save-audio-prefs',
+    IPC.SAVE_AUDIO_PREFS,
     async (_event, volume: number, muted: boolean): Promise<void> => {
       await saveAudioPrefs(volume, muted);
     },
   );
 
   // 声色補正 EQ(voice.json 由来・§4.5)。renderer が起動時に取得し再生グラフへ挟む。音声無効なら空配列。
-  ipcMain.handle('ene:get-voice-eq', async (): Promise<EqBand[]> => runtime.voiceConfig?.eq ?? []);
+  ipcMain.handle(IPC.GET_VOICE_EQ, async (): Promise<EqBand[]> => runtime.voiceConfig?.eq ?? []);
 
   // じゃあね(UI改修 段階4): タスクバーへ最小化する(クリックで戻る)。常時タスクバー表示なのでボタンは常にある。
   // 完全終了はキャラ右クリック「アプリを終了」or タスクバー右クリック「閉じる」(window-all-closed→quit)。
-  ipcMain.handle('ene:goodbye', (): void => {
+  ipcMain.handle(IPC.GOODBYE, (): void => {
     if (!mainWindow.isDestroyed()) mainWindow.minimize();
   });
 
   // 離席(UI改修 段階5): 離席中フラグを保持(自発発話の停止に使う・idle-talk-manager が参照)。
-  ipcMain.on('ene:set-away', (_event, away: boolean) => {
+  ipcMain.on(IPC.SET_AWAY, (_event, away: boolean) => {
     runtime.away = away;
   });
 
   // ウィンドウの可視性を renderer へ通知(非表示中は VRM 描画を止める=軽量原則 柱4・§3.6)。
   const notifyVisibility = (visible: boolean): void => {
-    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('ene:window-visibility', visible);
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.WINDOW_VISIBILITY, visible);
   };
   mainWindow.on('hide', () => notifyVisibility(false));
   mainWindow.on('minimize', () => notifyVisibility(false));
@@ -274,7 +275,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   // 起動挨拶を1回だけ返す(pull 方式。取得後はクリアして再表示しない)。
   // P3: オフスクリーンライフ(LLM)生成を最大 GREETING_GENERATION_TIMEOUT_MS 待ち、間に合えば差し替える。
   // 超過/失敗/初回は定型文フォールバック(initialGreeting)。オフラインでも壊れない。
-  ipcMain.handle('ene:get-initial-greeting', async (): Promise<string | null> => {
+  ipcMain.handle(IPC.GET_INITIAL_GREETING, async (): Promise<string | null> => {
     const promise = runtime.greetingPromise;
     if (promise) {
       runtime.greetingPromise = null;
@@ -320,26 +321,26 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   });
 
   // 起動準備の完了状態(renderer の初期表示用・pull)。完了通知は ene:app-ready(push)で送る。
-  ipcMain.handle('ene:is-ready', async (): Promise<boolean> => runtime.ready);
+  ipcMain.handle(IPC.IS_READY, async (): Promise<boolean> => runtime.ready);
 
-  ipcMain.handle('ene:move-window', async (_event, x: number, y: number): Promise<void> => {
+  ipcMain.handle(IPC.MOVE_WINDOW, async (_event, x: number, y: number): Promise<void> => {
     mainWindow.setBounds({ x, y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
     // ドラッグ中の連続呼び出しに備え、保存はデバウンスする。
     debouncedSavePosition(x, y);
   });
 
-  ipcMain.handle('ene:set-ignore-mouse-events', async (_event, ignore: boolean): Promise<void> => {
+  ipcMain.handle(IPC.SET_IGNORE_MOUSE_EVENTS, async (_event, ignore: boolean): Promise<void> => {
     mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
   });
 
-  ipcMain.handle('ene:show-character-context-menu', async (): Promise<void> => {
+  ipcMain.handle(IPC.SHOW_CHARACTER_CONTEXT_MENU, async (): Promise<void> => {
     showCharacterContextMenu(mainWindow, runtime);
   });
 
   // マイク音声の文字起こし(task_17 Phase B)。renderer の push-to-talk から呼ばれる。
   // §6.2 厳守: 認識テキスト本文はログに出さない(文字数のみ)。
   ipcMain.handle(
-    'ene:transcribe-audio',
+    IPC.TRANSCRIBE_AUDIO,
     async (_event, samples: Float32Array): Promise<TranscribeResult> => {
       try {
         if (!(await isSttModelAvailable())) {
@@ -361,7 +362,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   );
 
   // 入力欄オープン時のキャッシュウォーム(task_14 Phase 3・レイテンシ施策)。fire-and-forget。
-  ipcMain.handle('ene:warm-cache', async (): Promise<void> => {
+  ipcMain.handle(IPC.WARM_CACHE, async (): Promise<void> => {
     const { charContext, apiKey } = runtime;
     if (charContext && apiKey) {
       const semantic = await getSemantic();
