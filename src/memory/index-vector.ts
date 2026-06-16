@@ -1,5 +1,6 @@
 import { getVectorIndexPath } from '../shared/node/paths';
 import { readJson, writeJson } from '../shared/node/json-store';
+import { log } from '../shared/logger';
 import { EMBEDDING_DIM } from '../shared/constants';
 import { cosineSimilarity } from '../shared/vector-math';
 import type { Embedder } from './embedder';
@@ -41,10 +42,22 @@ export async function loadVectorIndex(): Promise<VectorIndex> {
   const path = getVectorIndexPath();
   if (cache && cache.path === path) return cache.index; // 常駐ヒット=毎ターンの parse を回避
   const raw = await readJson<VectorIndex>(path);
-  const index =
-    !raw || !Array.isArray(raw.entries)
-      ? emptyIndex()
-      : { dim: raw.dim ?? EMBEDDING_DIM, entries: raw.entries };
+  let index: VectorIndex;
+  if (!raw || !Array.isArray(raw.entries)) {
+    index = emptyIndex();
+  } else {
+    // 索引自身の dim を基準に、次元の合わないエントリ(空ベクトル []・破損・旧次元)を捨てる。
+    // 捨てた分は次回 syncVectorIndex で埋め直される(自己修復)。定数ではなく索引の dim で
+    // 判定するのは、テスト等で次元が異なっても正しく動くため(モデル差し替えは sync 側で検出)。
+    const dim = raw.dim ?? EMBEDDING_DIM;
+    const valid = raw.entries.filter((e) => Array.isArray(e.vector) && e.vector.length === dim);
+    if (valid.length !== raw.entries.length) {
+      log.warn(
+        `vector index: dropped ${raw.entries.length - valid.length} entries with wrong/empty dim (expected ${dim})`,
+      );
+    }
+    index = { dim, entries: valid };
+  }
   cache = { path, index };
   return index;
 }
@@ -65,20 +78,44 @@ export async function syncVectorIndex(
   embedder: Embedder,
 ): Promise<VectorIndex> {
   const index = await loadVectorIndex();
-  const byId = new Map(index.entries.map((e) => [e.id, e]));
+  let byId = new Map(index.entries.map((e) => [e.id, e]));
 
-  const need = records.filter((r) => {
+  let need = records.filter((r) => {
     const e = byId.get(r.id);
     return !e || e.summary !== r.memory.summary; // 未登録 or summary 変化
   });
   if (need.length === 0) return index;
 
-  const vectors = await embedder.embed(
+  let vectors = await embedder.embed(
     need.map((r) => r.memory.summary),
     'document',
   );
+  // 実際に得たベクトルの次元(モデルが返す次元・差し替えで変わりうる)。
+  const embedDim = vectors.find((v) => v.length > 0)?.length;
+
+  if (embedDim !== undefined && index.entries.length > 0 && embedDim !== index.dim) {
+    // モデルの次元が索引と食い違う(別モデルへ差し替え等)=既存ベクトルは現クエリと幾何的に
+    // 比較不能。索引を新次元で作り直し、全記録を埋め直す(rare path・自己修復)。
+    log.warn(`embedding dim changed (index=${index.dim}, model=${embedDim}); rebuilding vector index`);
+    index.entries.length = 0;
+    byId = new Map();
+    index.dim = embedDim;
+    need = records;
+    vectors = await embedder.embed(
+      need.map((r) => r.memory.summary),
+      'document',
+    );
+  } else if (index.entries.length === 0 && embedDim !== undefined) {
+    // 空の索引は最初に格納するベクトルの実次元を採用する(定数 768 とモデル実次元のズレを吸収)。
+    index.dim = embedDim;
+  }
+
+  let changed = false;
   need.forEach((r, i) => {
-    const vector = vectors[i] ?? [];
+    const vector = vectors[i];
+    // 埋め込み失敗/次元不一致は索引へ焼き込まない(空ベクトルを保存すると検索から永久に外れる)。
+    // 未登録のまま残し、次回 sync(埋め込み成功時)に再挑戦させる。
+    if (!vector || vector.length !== index.dim) return;
     const existing = byId.get(r.id);
     if (existing) {
       existing.summary = r.memory.summary;
@@ -88,8 +125,9 @@ export async function syncVectorIndex(
       index.entries.push(entry);
       byId.set(r.id, entry);
     }
+    changed = true;
   });
-  await saveVectorIndex(index);
+  if (changed) await saveVectorIndex(index);
   return index;
 }
 

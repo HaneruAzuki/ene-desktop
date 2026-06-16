@@ -88,4 +88,41 @@ describe('index-vector — sync(増分)', () => {
     expect(entry?.summary).toBe('ラーメンの話');
     expect(entry?.vector).toEqual([0, 1, 0]); // 食べ物軸
   });
+
+  it('埋め込み失敗(空ベクトル)は索引へ焼き込まない(横断監査⑤)', async () => {
+    // summary に「失敗」を含む行は空ベクトルを返すモック(埋め込み失敗の模擬)。
+    const embedder: Embedder = {
+      embed: vi.fn(async (texts: string[]) => texts.map((t) => (t.includes('失敗') ? [] : toVec(t)))),
+    };
+    const records: EpisodicRecord[] = [
+      { id: 'ok.json', memory: mem({ date: '2026-01-01T00:00:00+09:00', summary: 'ラーメンの話' }) },
+      { id: 'bad.json', memory: mem({ date: '2026-01-02T00:00:00+09:00', summary: '失敗する話' }) },
+    ];
+    await syncVectorIndex(records, embedder);
+    const idx = await loadVectorIndex();
+    expect(idx.entries.map((e) => e.id)).toEqual(['ok.json']); // bad は空ベクトルゆえ未登録のまま
+  });
+
+  it('モデル次元が変わったら索引を作り直し全件埋め直す(横断監査⑤)', async () => {
+    const e3: Embedder = { embed: async (texts) => texts.map(toVec) }; // 3次元
+    await syncVectorIndex(
+      [{ id: 'a.json', memory: mem({ date: '2026-01-01T00:00:00+09:00', summary: '勉強の話' }) }],
+      e3,
+    );
+    expect((await loadVectorIndex()).dim).toBe(3);
+
+    // モデルを 4 次元へ差し替えて別レコード込みで sync → 索引は 4 次元で再構築される。
+    const e4: Embedder = { embed: async (texts) => texts.map(() => [1, 0, 0, 0]) };
+    await syncVectorIndex(
+      [
+        { id: 'a.json', memory: mem({ date: '2026-01-01T00:00:00+09:00', summary: '勉強の話' }) },
+        { id: 'b.json', memory: mem({ date: '2026-01-02T00:00:00+09:00', summary: '新しい話' }) },
+      ],
+      e4,
+    );
+    const idx = await loadVectorIndex();
+    expect(idx.dim).toBe(4);
+    expect(idx.entries.every((e) => e.vector.length === 4)).toBe(true);
+    expect(idx.entries.map((e) => e.id).sort()).toEqual(['a.json', 'b.json']);
+  });
 });

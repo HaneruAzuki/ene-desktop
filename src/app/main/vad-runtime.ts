@@ -8,6 +8,7 @@ import { turnNodStrength } from '../../voice/turn-nod';
 import type { BackchannelController } from './backchannel-controller';
 import {
   VAD_FRAME_SIZE,
+  VAD_FRAME_QUEUE_MAX,
   VAD_SPEECH_PAD_MS,
   VAD_MIN_SILENCE_MS,
   STT_SAMPLE_RATE,
@@ -54,7 +55,10 @@ export class VadRuntime {
   private seg: VadSegmenter;
   private active = false;
   private loading: Promise<void> | null = null;
-  private busy = false;
+  private draining = false; // drain ループ進行中(逐次処理の単一実行を保証)
+  private queue: Float32Array[] = []; // 取り込み待ちフレーム(バウンド付き・バースト吸収)
+  private droppedFrames = 0; // 過負荷で捨てたフレーム数(累積・観測用)
+  private lastDropLogAt = 0;
   private recording = false;
   private speaking = false; // 実再生中(エコーガード=strict VAD 用・renderer 由来で明滅しうる)
   private responseActive = false; // 応答ターンが進行中(barge-in 判定の唯一の真実・main 由来で安定=明滅しない)
@@ -88,6 +92,8 @@ export class VadRuntime {
     this.recording = false;
     this.recorded = [];
     this.ring = [];
+    this.queue = [];
+    this.droppedFrames = 0;
     this.speaking = false;
     this.responseActive = false;
     if (!this.loading) this.loading = this.vad.load();
@@ -112,6 +118,7 @@ export class VadRuntime {
     this.responseActive = false;
     this.recorded = [];
     this.ring = [];
+    this.queue = [];
     this.seg.reset();
     this.vad.reset();
     this.backchannel?.reset();
@@ -137,10 +144,39 @@ export class VadRuntime {
     this.seg.setMinSilenceMs(ms);
   }
 
-  /** 1フレーム処理。busy 中はドロップ(セッションの同時 run を避ける・実質発生しない)。 */
+  /**
+   * 1フレームを取り込む。Silero は RNN 状態を持つため**逐次**処理する必要がある。
+   * 推論が一時的にフレーム間隔(約32ms)を超えても、バウンド付きキューでバーストを吸収して
+   * 取りこぼさない(以前は busy 中のフレームを無言ドロップ=発話頭の欠落に気づけなかった)。
+   * 持続的に追いつかない場合のみ最古を捨ててバックログを有界に保ち、件数を計測ログに残す。
+   */
   async pushFrame(frame: Float32Array): Promise<void> {
-    if (!this.active || this.busy) return;
-    this.busy = true;
+    if (!this.active) return;
+    if (this.queue.length >= VAD_FRAME_QUEUE_MAX) {
+      this.queue.shift(); // 過負荷: 最古を捨てて有界に保つ(無限遅延を防ぐ)
+      this.droppedFrames++;
+      const now = performance.now();
+      if (now - this.lastDropLogAt > 5000) {
+        log.warn(`VAD overloaded: dropped ${this.droppedFrames} frames so far (inference slower than realtime)`);
+        this.lastDropLogAt = now;
+      }
+    }
+    this.queue.push(frame);
+    if (this.draining) return; // 既に drain 中=この frame はキューから順に処理される
+    this.draining = true;
+    try {
+      while (this.active) {
+        const next = this.queue.shift();
+        if (!next) break;
+        await this.processFrame(next);
+      }
+    } finally {
+      this.draining = false;
+    }
+  }
+
+  /** キューから取り出した1フレームを処理する(VAD 推論→セグメンタ→イベント)。 */
+  private async processFrame(frame: Float32Array): Promise<void> {
     try {
       // 先読みリング(発話前の数フレームを保持)。
       this.ring.push(frame);
@@ -161,8 +197,6 @@ export class VadRuntime {
       else if (ev === 'speech-end') this.onSpeechEnd();
     } catch (e) {
       log.warn(`VAD frame failed: ${(e as Error).name}`);
-    } finally {
-      this.busy = false;
     }
   }
 

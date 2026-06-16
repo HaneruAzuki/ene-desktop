@@ -2,6 +2,7 @@
 
 /** 短期記憶エントリ(セッション内の直近会話)。 */
 export interface ShortTermEntry {
+  id: string; // 一意識別子(appendShortTerm で採番)。抽出マークの照合に使う(timestamp は秒精度で同秒衝突するため識別子に使わない)
   role: 'user' | 'assistant';
   text: string;
   timestamp: string; // ローカルTZ込み ISO 8601

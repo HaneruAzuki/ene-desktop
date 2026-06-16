@@ -18,7 +18,7 @@ import {
 import { SHORT_TERM_MAX_ENTRIES } from '../../src/shared/constants';
 import type { ShortTermEntry } from '../../src/shared/types/memory';
 
-function entry(i: number): ShortTermEntry {
+function entry(i: number): Omit<ShortTermEntry, 'id'> {
   return {
     role: 'user',
     text: `m${i}`,
@@ -28,6 +28,13 @@ function entry(i: number): ShortTermEntry {
 }
 
 const ts = (i: number): string => entry(i).timestamp;
+
+/** 保存済みエントリのうち timestamp が一致するものの id を返す(id は appendShortTerm が採番)。 */
+async function storedId(timestamp: string): Promise<string> {
+  const found = (await getShortTerm()).find((e) => e.timestamp === timestamp);
+  if (!found) throw new Error(`no stored entry with timestamp ${timestamp}`);
+  return found.id;
+}
 
 beforeEach(async () => {
   h.memDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-st-'));
@@ -58,8 +65,8 @@ describe('short-term (設計書 §3.3)', () => {
     const cap = SHORT_TERM_MAX_ENTRIES;
     // まず cap+1 件入れる(全未抽出 → cap+1 件保持される)。
     for (let i = 0; i < cap + 1; i++) await appendShortTerm(entry(i));
-    // 古い10件を抽出済みにする。
-    await markAsExtracted(Array.from({ length: 10 }, (_, i) => ts(i)));
+    // 古い10件を抽出済みにする(保存済みエントリの id で指定)。
+    await markAsExtracted((await getShortTerm()).slice(0, 10).map((e) => e.id));
     // もう1件追加 → cap+2 件・上限超過2件 → 最古の抽出済み2件(0,1)を落として cap 件。
     await appendShortTerm(entry(cap + 1));
     const list = await getShortTerm();
@@ -74,18 +81,38 @@ describe('short-term (設計書 §3.3)', () => {
   it('getUnextractedEntries は extracted:false のみ返す', async () => {
     await appendShortTerm(entry(1));
     await appendShortTerm(entry(2));
-    await markAsExtracted([entry(1).timestamp]);
+    await markAsExtracted([await storedId(ts(1))]);
     const un = await getUnextractedEntries();
     expect(un.map((e) => e.timestamp)).toEqual([entry(2).timestamp]);
   });
 
-  it('markAsExtracted は指定 timestamp のみ extracted にする', async () => {
+  it('markAsExtracted は指定 id のみ extracted にする', async () => {
     await appendShortTerm(entry(1));
     await appendShortTerm(entry(2));
-    await markAsExtracted([entry(1).timestamp]);
+    await markAsExtracted([await storedId(ts(1))]);
     const list = await getShortTerm();
     expect(list.find((e) => e.timestamp === entry(1).timestamp)?.extracted).toBe(true);
     expect(list.find((e) => e.timestamp === entry(2).timestamp)?.extracted).toBe(false);
+  });
+
+  it('同一 timestamp でも id 単位でマークし、未抽出を巻き添えにしない(横断監査④)', async () => {
+    // commitTurn は user→assistant を連続 append するため、同一秒(=同 timestamp)になりうる。
+    const sameTs = '2026-06-01T10:00:00+09:00';
+    await appendShortTerm({ role: 'user', text: 'u', timestamp: sameTs, extracted: false });
+    await appendShortTerm({ role: 'assistant', text: 'a', timestamp: sameTs, extracted: false });
+    const stored = await getShortTerm();
+    expect(stored).toHaveLength(2);
+    const userEntry = stored.find((e) => e.role === 'user');
+    const assistantEntry = stored.find((e) => e.role === 'assistant');
+    expect(userEntry).toBeDefined();
+    expect(assistantEntry).toBeDefined();
+    // 一意 id ゆえ user/assistant は別物(timestamp は同じ)。
+    expect(userEntry?.id).not.toBe(assistantEntry?.id);
+    // user だけ抽出済みにする → assistant は巻き添えにならない。
+    await markAsExtracted([userEntry?.id ?? '']);
+    const after = await getShortTerm();
+    expect(after.find((e) => e.role === 'user')?.extracted).toBe(true);
+    expect(after.find((e) => e.role === 'assistant')?.extracted).toBe(false);
   });
 
   it('clearShortTerm はファイルを削除する', async () => {

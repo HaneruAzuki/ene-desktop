@@ -80,6 +80,6 @@ export async function extractFromShortTerm(
     const patch = lockOwnerName(semanticPatch, current.userName);
     if (Object.keys(patch).length > 0) await updateSemantic(patch);
   }
-  // 抽出に使ったエントリへフラグを立てる(再抽出防止)。
-  await markAsExtracted(unextracted.map((e) => e.timestamp));
+  // 抽出に使ったエントリへフラグを立てる(再抽出防止)。id 単位で確実に対象だけをマークする。
+  await markAsExtracted(unextracted.map((e) => e.id));
 }

@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { getShortTermPath } from '../shared/node/paths';
 import { readJson, writeJson } from '../shared/node/json-store';
 import { SHORT_TERM_MAX_ENTRIES } from '../shared/constants';
@@ -51,10 +52,11 @@ function trimExtractedOverflow(list: ShortTermEntry[]): void {
  * 追加後 SHORT_TERM_MAX_ENTRIES を超える場合は、抽出済みの古いエントリのみトリムする
  * (設計書 §3.3)。中期記憶への抽出は呼出側がバックグラウンドで行う(B-01・extraction-scheduler)。
  */
-export async function appendShortTerm(entry: ShortTermEntry): Promise<void> {
+export async function appendShortTerm(entry: Omit<ShortTermEntry, 'id'>): Promise<void> {
   return withWriteLock(async () => {
     const list = await getShortTerm();
-    list.push(entry);
+    // id を採番してエントリの一意識別子にする(同一秒に複数追加=同 timestamp でも一意に識別できる)。
+    list.push({ ...entry, id: randomUUID() });
     if (list.length > SHORT_TERM_MAX_ENTRIES) {
       trimExtractedOverflow(list);
     }
@@ -92,14 +94,18 @@ export async function getUnextractedEntries(): Promise<ShortTermEntry[]> {
   return (await getShortTerm()).filter((e) => !e.extracted);
 }
 
-/** 指定 timestamp のエントリの extracted を true にする(重複抽出防止)。 */
-export async function markAsExtracted(timestamps: string[]): Promise<void> {
+/**
+ * 指定 id のエントリの extracted を true にする(重複抽出防止)。
+ * id 単位で照合する(timestamp は秒精度ゆえ同一秒の user/assistant が衝突し、巻き添えで
+ * 未抽出エントリを extracted 扱いにして記憶を失う恐れがあった・横断監査④)。
+ */
+export async function markAsExtracted(ids: string[]): Promise<void> {
   return withWriteLock(async () => {
-    const targets = new Set(timestamps);
+    const targets = new Set(ids);
     const list = await getShortTerm();
     let changed = false;
     for (const e of list) {
-      if (targets.has(e.timestamp) && !e.extracted) {
+      if (targets.has(e.id) && !e.extracted) {
         e.extracted = true;
         changed = true;
       }
