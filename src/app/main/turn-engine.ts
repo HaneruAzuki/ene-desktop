@@ -11,7 +11,6 @@ import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../conversa
 import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
 import { chooseModelTier } from '../../conversation/model-selector';
 import { shouldPlayThinkingFiller } from '../../voice/thinking-filler';
-import { executeOsCommand } from './os/executor';
 import {
   recordBirthdayCelebrated,
   recordConversationTurn,
@@ -146,16 +145,7 @@ export async function commitTurn(
     requestExtraction(complete, () => Boolean(runtime.generating));
   }
 
-  // 6. OS コマンドなら実行(失敗時はキャラ口調フォールバックに差し替え＋エラー発話)。
-  if (response.type === 'os_command') {
-    const osResult = await executeOsCommand(response.command);
-    if (!osResult.ok && osResult.message) {
-      speakOut(osResult.message, 'neutral');
-      return { type: 'chat', message: osResult.message };
-    }
-  }
-
-  // 7. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)。
+  // 6. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)。
   if (runtime.charContext?.birthdayHint === 'today') {
     // 検出語は identity.json に外出し(§4.5・ハードコード禁止)。未定義なら祝い検出はしない。
     const keywords = runtime.charContext.identity.birthday?.congratsKeywords ?? [];

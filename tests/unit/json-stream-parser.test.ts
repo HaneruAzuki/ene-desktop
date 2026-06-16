@@ -64,21 +64,6 @@ describe('json-stream-parser (C1)', () => {
     expect(c1.sentences).toEqual(['えっ。']);
   });
 
-  it('os_command を flush で取り出す', () => {
-    const r = run([
-      '{"type":"os_command","message":"メモ帳を開くね。","command":{"action":"open_notepad"}}',
-    ]);
-    expect(r.sentences).toEqual(['メモ帳を開くね。']);
-    expect(r.command).toEqual({ action: 'open_notepad' });
-  });
-
-  it('open_browser の target も取り出す', () => {
-    const r = run([
-      '{"type":"os_command","message":"開くね。","command":{"action":"open_browser","target":"https://example.com"}}',
-    ]);
-    expect(r.command).toEqual({ action: 'open_browser', target: 'https://example.com' });
-  });
-
   it('message 内のエスケープされた引用符を解く(本文終端と誤判定しない)', () => {
     const r = run(['{"type":"chat","emotion":"neutral","message":"彼は\\"やあ\\"と言った。"}']);
     expect(r.sentences).toEqual(['彼は"やあ"と言った。']);

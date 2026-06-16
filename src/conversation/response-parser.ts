@@ -1,6 +1,5 @@
 import type { ConversationResponse } from '../shared/types/conversation';
-import type { OsAction } from '../shared/types/os';
-import { extractJsonObject, normalizeEmotion, VALID_OS_ACTIONS } from '../shared/llm-parse';
+import { extractJsonObject, normalizeEmotion } from '../shared/llm-parse';
 import { stripRuby, rubyToReading } from '../voice/ruby';
 
 // JSON 応答パースの三段構え(設計書 §3.4「パース成功率の三段構え」)。
@@ -9,25 +8,7 @@ import { stripRuby, rubyToReading } from '../voice/ruby';
 function isValidResponse(obj: unknown): obj is ConversationResponse {
   if (typeof obj !== 'object' || obj === null) return false;
   const o = obj as Record<string, unknown>;
-
-  if (o.type === 'chat') {
-    return typeof o.message === 'string';
-  }
-
-  if (o.type === 'os_command') {
-    if (typeof o.message !== 'string') return false;
-    if (typeof o.command !== 'object' || o.command === null) return false;
-    const cmd = o.command as Record<string, unknown>;
-    if (typeof cmd.action !== 'string') return false;
-    if (!VALID_OS_ACTIONS.includes(cmd.action as OsAction)) return false;
-    // open_browser / open_folder は target(文字列)が必須
-    if (cmd.action === 'open_browser' || cmd.action === 'open_folder') {
-      if (typeof cmd.target !== 'string') return false;
-    }
-    return true;
-  }
-
-  return false;
+  return o.type === 'chat' && typeof o.message === 'string';
 }
 
 export function parseConversationResponse(raw: string): ConversationResponse | null {
@@ -41,17 +22,14 @@ export function parseConversationResponse(raw: string): ConversationResponse | n
   const display = stripRuby(parsed.message);
   const ttsText = rubyToReading(parsed.message);
   const reading = ttsText !== display ? ttsText : undefined;
-  // chat は emotion(任意)を許可ラベルへ正規化して付与する(task_13)。
-  if (parsed.type === 'chat') {
-    const emotion = typeof o.emotion === 'string' ? normalizeEmotion(o.emotion) : undefined;
-    const enterListening = o.enterListening === true; // 傾聴入室(listening-mode・明示宣言時のみ)
-    return {
-      type: 'chat',
-      message: display,
-      ...(emotion ? { emotion } : {}),
-      ...(reading ? { reading } : {}),
-      ...(enterListening ? { enterListening: true } : {}),
-    };
-  }
-  return { ...parsed, message: display, ...(reading ? { reading } : {}) };
+  // emotion(任意)を許可ラベルへ正規化して付与する(task_13)。
+  const emotion = typeof o.emotion === 'string' ? normalizeEmotion(o.emotion) : undefined;
+  const enterListening = o.enterListening === true; // 傾聴入室(listening-mode・明示宣言時のみ)
+  return {
+    type: 'chat',
+    message: display,
+    ...(emotion ? { emotion } : {}),
+    ...(reading ? { reading } : {}),
+    ...(enterListening ? { enterListening: true } : {}),
+  };
 }

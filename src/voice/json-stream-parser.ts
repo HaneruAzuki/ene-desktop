@@ -1,14 +1,12 @@
 import { type EmotionLabel } from '../shared/types/animation';
-import type { OsCommand } from '../shared/types/os';
 import { splitSentences, splitFirstChunk } from './sentence-splitter';
 import { FIRST_CHUNK_MAX_CHARS } from '../shared/constants';
-import { normalizeEmotion, parseOsCommand } from '../shared/llm-parse';
+import { normalizeEmotion } from '../shared/llm-parse';
 
 // JSON応答のストリーミング解釈(C1・B-06)。`runVoiceChat` が使う VoiceStreamParser を満たす。
 //
 // 契約は非ストリーミングと同一の JSON 1個:
 //   {"type":"chat","emotion":"neutral","message":"…(青空文庫式ルビ込み)…"}
-//   {"type":"os_command","emotion":"...","message":"…","command":{...}}
 // emotion を message より前に置く前提(プロンプトで指示)で、最初の声までに emotion を確定できる。
 // message の文字列値を逐次取り出し、文単位に分割して TTS へ流す(JSON エスケープを解く)。
 // ルビ(漢字《よみ》)は message 本文にそのまま含まれ、文単位で TTS 側(runVoiceChat)が解決する。
@@ -21,17 +19,16 @@ export interface StreamChunk {
   sentences: string[];
 }
 
-/** flush の戻り値。残っていた最終文と、末尾トレーラの OS コマンド/傾聴入室フラグ(妥当な場合のみ)。 */
+/** flush の戻り値。残っていた最終文と、末尾トレーラの傾聴入室フラグ(妥当な場合のみ)。 */
 export interface StreamFinal {
   sentences: string[];
-  command?: OsCommand;
   enterListening?: boolean;
 }
 
 export interface VoiceStreamParser {
   /** テキストデルタを与え、確定した emotion / 発話文を得る。 */
   push(delta: string): StreamChunk;
-  /** ストリーム終端。残りの文と OS コマンドを得る。 */
+  /** ストリーム終端。残りの文を得る。 */
   flush(): StreamFinal;
 }
 
@@ -39,33 +36,10 @@ const MSG_OPEN_RE = /"message"\s*:\s*"/;
 const EMOTION_RE = /"emotion"\s*:\s*"([^"]*)"/;
 const ENTER_LISTENING_RE = /"enterListening"\s*:\s*true/; // 傾聴入室(listening-mode・true のみ拾う)
 
-/** tail(message 終了後の生バッファ)から command を取り出して検証する。 */
-function parseCommandFromTail(tail: string): OsCommand | undefined {
-  const key = tail.indexOf('"command"');
-  if (key === -1) return undefined;
-  const open = tail.indexOf('{', key);
-  if (open === -1) return undefined;
-  let depth = 0;
-  for (let i = open; i < tail.length; i += 1) {
-    if (tail[i] === '{') depth += 1;
-    else if (tail[i] === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        try {
-          return parseOsCommand(JSON.parse(tail.slice(open, i + 1)));
-        } catch {
-          return undefined;
-        }
-      }
-    }
-  }
-  return undefined;
-}
-
 export function createJsonStreamParser(): VoiceStreamParser {
   let phase: 'head' | 'message' | 'tail' = 'head';
   let head = ''; // message 開始前の生バッファ(type/emotion を含む)
-  let tail = ''; // message 終了後の生バッファ(command 抽出用)
+  let tail = ''; // message 終了後の生バッファ(enterListening 抽出用)
   let sentenceBuf = ''; // 未確定の発話文(unescape 済)
   let escaped = false;
   let inUnicode = false;
@@ -173,11 +147,9 @@ export function createJsonStreamParser(): VoiceStreamParser {
       const last = sentenceBuf.trim();
       if (last) sentences.push(last);
       sentenceBuf = '';
-      const command = phase === 'tail' ? parseCommandFromTail(tail) : undefined;
       if (!enterListening && ENTER_LISTENING_RE.test(tail)) enterListening = true;
       return {
         sentences,
-        ...(command ? { command } : {}),
         ...(enterListening ? { enterListening: true } : {}),
       };
     },

@@ -8,7 +8,7 @@ import type {
 // キャラクター人格のシステムプロンプト構築(設計書 §3.1 / §3.4)。
 //
 // ここで作るのは「キャラクターとしての人格・背景・知識の境界・AI自称防止」まで。
-// JSON 応答形式(chat / os_command)の指示は会話プロトコルの関心事のため、
+// JSON 応答形式(chat)の指示は会話プロトコルの関心事のため、
 // Conversation Layer の prompt-builder(task_05)が付与する(疎結合・設計書 §3.4)。
 //
 // 📌 AI自称防止は neverCallsSelf を identity.json から読んで明示する。

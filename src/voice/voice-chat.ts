@@ -4,7 +4,6 @@ import { detectAiSelfReference } from '../conversation/ai-self-check';
 import { stripRuby, rubyToReading } from './ruby';
 import { resolveStyle } from './voice-loader';
 import type { EmotionLabel } from '../shared/types/animation';
-import type { OsCommand } from '../shared/types/os';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 
 // 音声会話のストリーミング統合(task_17 C1/C2 / design-revision-voice §2,§3)。
@@ -40,7 +39,6 @@ export interface VoiceChatDeps {
 export interface VoiceChatResult {
   spokenText: string; // 実際に発話したテキスト(吹き出し表示にも使う)
   emotion: EmotionLabel;
-  command?: OsCommand; // 喋り終わり後に実行(自称打ち切り時は付かない)
   enterListening?: boolean; // 傾聴入室(listening-mode・明示宣言時のみ)
   blockedBySelfCheck: boolean; // C2 で自称検知し打ち切ったか
 }
@@ -107,7 +105,6 @@ export async function runVoiceChat(
   return {
     spokenText: spoken.join(''),
     emotion,
-    command: final.command,
     enterListening: final.enterListening,
     blockedBySelfCheck: blocked,
   };

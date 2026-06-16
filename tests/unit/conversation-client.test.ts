@@ -15,13 +15,6 @@ describe('chat — 4層防御の統合フロー (設計書 §3.4)', () => {
     expect(r).toEqual({ type: 'chat', message: 'ふん、教えてあげる' });
   });
 
-  it('os_command 応答を返す', async () => {
-    const r = await chat('メモ帳開いて', cc, mc, rr, 'key', {
-      callModel: async () => '{"type":"os_command","message":"開くわよ","command":{"action":"open_notepad"}}',
-    });
-    expect(r.type).toBe('os_command');
-  });
-
   it('パース失敗で fallback を返す', async () => {
     const r = await chat('x', cc, mc, rr, 'key', { callModel: async () => 'ぐちゃぐちゃ' });
     expect(r).toEqual(fallbackResponse());

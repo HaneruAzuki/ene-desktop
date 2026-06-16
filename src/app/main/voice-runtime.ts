@@ -100,9 +100,6 @@ export async function streamVoiceChat(
     log.warn('AI self-reference detected mid-stream; truncated (C2)');
     return fallbackResponse();
   }
-  if (result.command) {
-    return { type: 'os_command', message: result.spokenText, command: result.command };
-  }
   return {
     type: 'chat',
     message: result.spokenText,

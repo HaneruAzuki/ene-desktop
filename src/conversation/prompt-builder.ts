@@ -60,12 +60,8 @@ const OUTPUT_FORMAT_SPEC = [
   '  過去の出来事の雑談・短い話・通常のやり取りには付けない(付けすぎ厳禁)。',
   '  例:「今からプレゼンするから聞いてね」→ {"type": "chat", "emotion": "joy", "message": "うん、聞かせて", "enterListening": true}',
   '',
-  'OS操作(以下の3種類のみ。それ以外の action は使えない。message のルビ規則は同じ):',
-  'メモ帳を開く: {"type": "os_command", "message": "...", "command": {"action": "open_notepad"}}',
-  'ブラウザでURLを開く(http/https のみ): {"type": "os_command", "message": "...", "command": {"action": "open_browser", "target": "https://..."}}',
-  'フォルダを開く(ユーザーのホーム配下の絶対パスのみ): {"type": "os_command", "message": "...", "command": {"action": "open_folder", "target": "C:\\\\Users\\\\..."}}',
-  '',
-  'これら以外の操作を求められた場合は、chat 型で「それはできない」とあなたの口調で説明してください。',
+  'あなたは PC を操作する手段を持ちません。アプリ・ブラウザ・フォルダを開くなどの操作を頼まれても',
+  '実行できないので、chat 型で「それはできない」とあなたの口調で自然に伝えてください。',
 ].join('\n');
 
 function formatSemantic(semantic: SemanticMemory): string {

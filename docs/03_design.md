@@ -241,11 +241,8 @@ ene-desktop/
 │   │   │   ├── vad-runtime.ts          ← ハンズフリーVADランタイム(フレーム受信→区間検出→STT・task_17)
 │   │   │   ├── voice-turn-coordinator.ts ← 音声ターン調停(発話コアレッシング・無音窓の自動調整・2026-06)
 │   │   │   ├── backchannel-controller.ts ← 相槌コントローラ(聞くターンの配線・task_18)
-│   │   │   ├── idle-talk-manager.ts   ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
-│   │   │   └── os/                    ← OS Integration(ホワイトリスト実行・§3.5)
-│   │   │       ├── executor.ts        ← コマンド実行(shell API)
-│   │   │       ├── validators.ts      ← ホワイトリスト・パス/URL 検証
-│   │   │       └── actions.ts         ← action 定義
+│   │   │   └── idle-talk-manager.ts   ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
+│   │   │   (OS Integration(os/)は廃止・2026-06。トリミは PC を操作しない=頼まれても chat で断る)
 │   │   │
 │   │   ├── preload/                   ← Preload script
 │   │   │   ├── index.ts               ← メインUI向けAPI公開
@@ -361,7 +358,6 @@ ene-desktop/
 │       │   ├── memory.ts
 │       │   ├── conversation.ts
 │       │   ├── router.ts
-│       │   ├── os.ts
 │       │   ├── api-key.ts
 │       │   ├── animation.ts        ← アニメ状態/emotion ラベル型(task_13)
 │       │   ├── vrm.ts              ← VRM 表示設定の型(F)
@@ -1480,7 +1476,11 @@ async function chat(userText: string): Promise<ConversationResponse> {
 > (`makeLlmComplete(apiKey)` を `src/conversation/client.ts` に置く・Sonnet 使用)。
 > これにより Memory 層は Claude を直接知らず、依存方向は Conversation → Memory に保たれる(N-03-4)。
 
-### 3.5 OS Integration Layer
+### 3.5 OS Integration Layer 【廃止・2026-06】
+
+> **この層は廃止された。** トリミは PC を操作する手段を持たず、アプリ・ブラウザ・フォルダを
+> 開く等を頼まれても chat 型で「できない」と口調で断る(`ConversationResponse` は chat のみ)。
+> 以下は廃止前の記録(歴史)であり、現行コードには存在しない(os_command 型・os/ 実装・OsCommand 型は全廃)。
 
 #### 責務
 - ホワイトリスト方式のコマンド実行(action と target の両方を検証)

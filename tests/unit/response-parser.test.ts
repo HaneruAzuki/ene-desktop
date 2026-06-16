@@ -35,19 +35,6 @@ describe('parseConversationResponse - ルビ(振り仮名)', () => {
     });
   });
 
-  it('os_command でもルビを表示/音声へ分解する', () => {
-    expect(
-      parseConversationResponse(
-        '{"type":"os_command","message":"今日《きょう》のメモを開くね","command":{"action":"open_notepad"}}',
-      ),
-    ).toEqual({
-      type: 'os_command',
-      message: '今日のメモを開くね',
-      reading: 'きょうのメモを開くね',
-      command: { action: 'open_notepad' },
-    });
-  });
-
   it('不正な JSON は null', () => {
     expect(parseConversationResponse('not json')).toBeNull();
   });

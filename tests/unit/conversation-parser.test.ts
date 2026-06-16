@@ -20,35 +20,6 @@ describe('parseConversationResponse (設計書 §3.4)', () => {
     expect(parseConversationResponse('はい {"type":"chat","message":"x"} どうぞ')?.type).toBe('chat');
   });
 
-  it('os_command を action 検証つきでパースする', () => {
-    const r = parseConversationResponse(
-      '{"type":"os_command","message":"開くわよ","command":{"action":"open_browser","target":"https://example.com"}}',
-    );
-    expect(r).toEqual({
-      type: 'os_command',
-      message: '開くわよ',
-      command: { action: 'open_browser', target: 'https://example.com' },
-    });
-  });
-
-  it('open_browser で target が無ければ無効(null)', () => {
-    expect(
-      parseConversationResponse('{"type":"os_command","message":"x","command":{"action":"open_browser"}}'),
-    ).toBeNull();
-  });
-
-  it('未知の action は無効(null)', () => {
-    expect(
-      parseConversationResponse('{"type":"os_command","message":"x","command":{"action":"delete_all"}}'),
-    ).toBeNull();
-  });
-
-  it('open_notepad は target 不要', () => {
-    expect(
-      parseConversationResponse('{"type":"os_command","message":"x","command":{"action":"open_notepad"}}')?.type,
-    ).toBe('os_command');
-  });
-
   it('完全に壊れたデータは null', () => {
     expect(parseConversationResponse('これはJSONではない')).toBeNull();
   });

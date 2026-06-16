@@ -88,17 +88,6 @@ describe('runVoiceChat', () => {
     expect(calls[0].opts.styleId).toBe(0);
   });
 
-  it('末尾 os_command は喋り終わり後に command として返る', async () => {
-    const { tts } = recordingTts();
-    const result = await runVoiceChat(
-      streamOf([
-        '{"type":"os_command","emotion":"neutral","message":"開くね。","command":{"action":"open_notepad"}}',
-      ]),
-      { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} },
-    );
-    expect(result.spokenText).toBe('開くね。');
-    expect(result.command).toEqual({ action: 'open_notepad' });
-  });
 });
 
 describe('speakText', () => {

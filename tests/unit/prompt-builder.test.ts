@@ -48,12 +48,11 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     expect(stUser?.content).not.toContain('"type":"chat"');
   });
 
-  it('出力形式(os_command 仕様)が system(Tier0)に含まれる', () => {
+  it('出力形式は chat のみで、OS 操作の指示を含まない(OS Integration 廃止)', () => {
     const p = buildPrompt(makeCharContext(), makeMemoryContext(), makeRouterResult(), 'x');
-    expect(systemText(p)).toContain('os_command');
-    expect(systemText(p)).toContain('open_notepad');
-    expect(systemText(p)).toContain('open_browser');
-    expect(systemText(p)).toContain('open_folder');
+    expect(systemText(p)).toContain('"type": "chat"');
+    expect(systemText(p)).not.toContain('os_command');
+    expect(systemText(p)).not.toContain('open_notepad');
   });
 
   it('routerResult.behavior は揮発物として現 user ターンに同梱(system には出さない)', () => {
