@@ -49,6 +49,24 @@ module.exports = {
       to: { path: '^src/memory/episodic\\.ts$' },
     },
     {
+      name: 'no-cross-domain',
+      comment:
+        'ドメイン(character/knowledge/memory/conversation/voice)は互いに直接依存しない。' +
+        'ドメイン間の通信は shared/types の型契約・DI(LlmComplete 等)を介し、組み立て(配線)は' +
+        'app/main が一方向に行う(05_architecture §4 の理想を宣言から機械強制へ格上げ・N-ARCH-5)。' +
+        '例外は memory → character/active-character のみ:character は他ドメインに依存しない leaf で、' +
+        'memory が関係の事実(relationship facts)を読むための良性の下向き依存として意図的に許可する。',
+      severity: 'error',
+      from: { path: '^src/(character|knowledge|memory|conversation|voice)/' },
+      to: {
+        path: '^src/(character|knowledge|memory|conversation|voice)/',
+        pathNot: [
+          '^src/$1/', // 同一ドメイン内の依存は当然OK($1 は from で捕捉したドメイン名)
+          '^src/character/active-character', // 例外: memory→character(active-character)= 良性 leaf 依存
+        ],
+      },
+    },
+    {
       name: 'no-circular',
       comment: '循環依存を禁止(疎結合・CLAUDE.md §4.4)。',
       severity: 'error',

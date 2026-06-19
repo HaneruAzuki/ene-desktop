@@ -19,7 +19,7 @@ vi.mock('../../src/shared/node/paths', () => ({
 
 import { saveEpisodic } from '../../src/memory/episodic';
 import { retrieve } from '../../src/memory/retriever';
-import type { Embedder } from '../../src/memory/embedder';
+import type { Embedder } from '../../src/shared/node/embedder';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {

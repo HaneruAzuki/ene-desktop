@@ -3,7 +3,7 @@ import path from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { buildSystemPrompt } from '../../src/character/system-prompt-builder';
 import { chat } from '../../src/conversation/client';
-import { detectAiSelfReference } from '../../src/conversation/ai-self-check';
+import { detectAiSelfReference } from '../../src/shared/ai-self-check';
 import { makeRouterResult, makeMemoryContext } from '../unit/fixtures';
 import type { CharacterContext } from '../../src/shared/types/character';
 import type { MemoryContext } from '../../src/shared/types/memory';

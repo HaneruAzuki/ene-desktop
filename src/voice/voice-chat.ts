@@ -1,7 +1,7 @@
 import { createJsonStreamParser, type VoiceStreamParser } from './json-stream-parser';
 import { splitSentences } from './sentence-splitter';
-import { detectAiSelfReference } from '../conversation/ai-self-check';
-import { stripRuby, rubyToReading } from './ruby';
+import { detectAiSelfReference } from '../shared/ai-self-check';
+import { stripRuby, rubyToReading } from '../shared/ruby';
 import { resolveStyle } from './voice-loader';
 import type { EmotionLabel } from '../shared/types/animation';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';

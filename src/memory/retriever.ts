@@ -7,7 +7,7 @@ import {
 import { log } from '../shared/logger';
 import { loadRecallPool } from './recall-pool';
 import { queryInverted } from './index-inverted';
-import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from './embedder';
+import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../shared/node/embedder';
 import { searchVectors, syncVectorIndex } from './index-vector';
 import { clampMood } from './mood';
 import type { EpisodicMemory, EpisodicRecord, RetrievalQuery } from '../shared/types/memory';

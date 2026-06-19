@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildOffscreenLifePrompt,
   parseOffscreenLifeResponse,
-} from '../../src/conversation/offscreen-life';
+} from '../../src/app/main/offscreen-life';
 
 // P3: オフスクリーンライフの生成プロンプト/パース(純粋部分)。
 

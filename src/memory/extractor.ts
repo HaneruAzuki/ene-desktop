@@ -18,6 +18,7 @@ import type {
   SemanticMemory,
   ShortTermEntry,
 } from '../shared/types/memory';
+import type { LlmComplete } from '../shared/types/llm';
 
 // 会話からの記憶抽出(設計書 §3.3 / task_15)。
 //
@@ -26,13 +27,7 @@ import type {
 //  - entities(登場人物・固有名を canonical 正規化した配列)を抽出。
 //  - relevantMemories(想起した旧記憶)と矛盾/精緻化を検知し、確信が高い時のみ corrections を出力。
 // Claude の呼び出しは依存性注入(LlmComplete)で受け取り、Conversation Layer(task_05)が実装を渡す。
-
-/** LLM へ 1 回問い合わせて生テキストを返す関数(Conversation Layer が実装を注入)。 */
-export type LlmComplete = (req: {
-  system: string;
-  user: string;
-  maxTokens?: number;
-}) => Promise<string>;
+// LlmComplete の型(port)は shared/types/llm へ移設済み(N-ARCH-5・ドメイン間の境界契約は shared/types に置く)。
 
 export interface ExtractionResult {
   episodic?: EpisodicMemory;

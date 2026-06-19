@@ -1,7 +1,7 @@
 import { EPISODIC_SUMMARY_MAX_CHARS } from '../shared/constants';
 import { extractJsonObject, toStringArray } from '../shared/llm-parse';
 import type { EpisodicRecord } from '../shared/types/memory';
-import type { LlmComplete } from './extractor';
+import type { LlmComplete } from '../shared/types/llm';
 
 // 期間サマリ生成(忘却機構・§11.6)。月次/年次に、その期間の記録を1件のサマリへ再要約する。
 // 抽出器と同じく「中立的な観察者」として動作し、キャラ口調を混ぜない(task_03 禁止事項)。

@@ -7,7 +7,8 @@ import { retrieveRecords } from './retriever';
 import { applyCorrections } from './update';
 import { resolveOpenLoop } from './open-loops';
 import { getSemantic, updateSemantic, lockOwnerName } from './semantic';
-import { extractMemoryFromConversation, type LlmComplete } from './extractor';
+import { extractMemoryFromConversation } from './extractor';
+import type { LlmComplete } from '../shared/types/llm';
 
 // 抽出トリガの統合(設計書 §3.3 / §7.2 / task_15 の2層フロー)。
 // 呼出箇所: バックグラウンド抽出(extraction-scheduler の requestExtraction・未抽出が閾値以上で発火)、

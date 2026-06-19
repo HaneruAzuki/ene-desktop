@@ -20,7 +20,7 @@ import {
   syncVectorIndex,
   loadVectorIndex,
 } from '../../src/memory/index-vector';
-import type { Embedder } from '../../src/memory/embedder';
+import type { Embedder } from '../../src/shared/node/embedder';
 import type { EpisodicMemory, EpisodicRecord } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {

@@ -12,7 +12,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   setActiveCharacterId: vi.fn(),
 }));
 
-import { buildCharacterContext } from '../../src/character/context-builder';
+import { buildCharacterContext } from '../../src/character/character-context';
 
 beforeEach(async () => {
   h.dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-ctx-'));

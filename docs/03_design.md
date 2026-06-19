@@ -81,10 +81,11 @@
 > 📌 **MVP 0.3 確定(実装・検証済み 2026-06・task_17「声と耳」)**:双方向ローカル音声を追加したが、
 > **新規 npm ライブラリは増やしていない**(本表に追加なし)。内訳:
 > - **STT(音声認識)**:`@huggingface/transformers ^4.x`(上表既出)を再利用。モデルは既定
->   **`onnx-community/whisper-small`**(encoder fp32 / decoder q8)を**別ダウンロード**で
->   `data/models/whisper-small/` に配置(`scripts/download-stt-model.mjs`)。実行時に外部DLしない(§7.1)。
->   2026-06-09 計測で turbo→small へ既定変更(stt ~3000ms→~800ms・約1/4・精度ほぼ同等・**N-LAT-6**)。
->   高精度が要るときは `ENE_STT_MODEL_DIR=whisper-large-v3-turbo` で差し替え可。
+>   **`onnx-community/kotoba-whisper-v2.2-ONNX`**(encoder/decoder とも q8)を**別ダウンロード**で
+>   `data/models/kotoba-whisper-v2.2/` に配置(`scripts/download-stt-model.mjs`)。実行時に外部DLしない(§7.1)。
+>   2026-06-09 に turbo→small(stt ~3000ms→~800ms・N-LAT-6)、**2026-06-17 に small→kotoba-whisper-v2.2 へ既定変更**
+>   (日本語 CER 最良で聞き間違いを最小化・stt ~1.8s・q8 で 989MB・配布同梱)。
+>   レイテンシ優先で軽くしたいときは `ENE_STT_MODEL_DIR=whisper-small` で差し替え可。
 > - **VAD(音声区間検出)**:`onnxruntime-node` を**直接**使用(`@huggingface/transformers` の推移的依存として
 >   既に同梱・externalize 済=新規 npm なし)。モデルは **Silero VAD v4**(`silero_vad.onnx`・約1.8MB・MIT)を
 >   **`resources/` に同梱**(小容量のため別DLでなく配布物同梱)。**⚠️ v5/v5.1 は `onnxruntime-node` が
@@ -204,7 +205,7 @@ ene-desktop/
 │
 ├── scripts/                        ← 開発/セットアップ用(配布物に含めない・task_15/17)
 │   ├── download-model.mjs         ← 埋め込みモデル(ruri)をローカル取得
-│   ├── download-stt-model.mjs     ← STT(既定 whisper-small・env で turbo 等に切替)をローカル取得(task_17/N-LAT-6)
+│   ├── download-stt-model.mjs     ← STT(既定 kotoba-whisper-v2.2・env で whisper-small 等に切替)をローカル取得(task_17/N-LAT-6)
 │   ├── download-vad-model.mjs     ← VAD(silero v4)取得(task_17・通常は resources 同梱で不要)
 │   ├── setup-voice-engine.mjs     ← AivisSpeech エンジン一式を data/voice/engine/ へ配置(task_17/N-17-12)
 │   ├── voice-smoke.mjs            ← TTS スモーク(task_17・手動検証)
@@ -241,7 +242,8 @@ ene-desktop/
 │   │   │   ├── vad-runtime.ts          ← ハンズフリーVADランタイム(フレーム受信→区間検出→STT・task_17)
 │   │   │   ├── voice-turn-coordinator.ts ← 音声ターン調停(発話コアレッシング・無音窓の自動調整・2026-06)
 │   │   │   ├── backchannel-controller.ts ← 相槌コントローラ(聞くターンの配線・task_18)
-│   │   │   └── idle-talk-manager.ts   ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
+│   │   │   ├── idle-talk-manager.ts   ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
+│   │   │   └── offscreen-life.ts      ← オフスクリーンライフ生成(LLM×memory 跨ぎ・存在感P3・旧 conversation/・N-ARCH-5)
 │   │   │   (OS Integration(os/)は廃止・2026-06。トリミは PC を操作しない=頼まれても chat で断る)
 │   │   │
 │   │   ├── preload/                   ← Preload script
@@ -286,7 +288,7 @@ ene-desktop/
 │   │
 │   ├── character/                 ← あり方①:来歴・状態・個性(Character Layer)
 │   │   ├── loader.ts              ← Profileロード(loadCharacterProfile)
-│   │   ├── context-builder.ts     ← CharacterContext 構築
+│   │   ├── character-context.ts   ← CharacterContext 構築(旧 context-builder.ts・同名回避 N-ARCH-5)
 │   │   ├── system-prompt-builder.ts ← 人格システムプロンプト構築(N-02-2)
 │   │   ├── birthday-checker.ts    ← 誕生日判定
 │   │   ├── active-character.ts    ← active-character.json の読書(最小状態)
@@ -295,7 +297,7 @@ ene-desktop/
 │   ├── knowledge/                 ← あり方②:限られた知識(Knowledge Router)
 │   │   ├── local-classifier.ts    ← ローカル判別器(B-15・Haiku Router 置換・0往復)
 │   │   ├── domain-resolver.ts     ← topic→domain 解決
-│   │   └── fallback.ts            ← fallback ドメイン生成
+│   │   └── domain-fallback.ts     ← fallback ドメイン生成(旧 fallback.ts・同名回避 N-ARCH-5)
 │   │
 │   ├── memory/                    ← あり方③:人間のような記憶(Memory Layer・忘却・心)
 │   │   ├── short-term.ts
@@ -307,7 +309,6 @@ ene-desktop/
 │   │   ├── update.ts              ← 非破壊更新 supersede/refine/reattribute(task_15)
 │   │   ├── index-inverted.ts      ← entity/keyword 逆引き索引(派生キャッシュ)
 │   │   ├── index-vector.ts        ← 意味検索ベクトル索引(派生キャッシュ・Phase B)
-│   │   ├── embedder.ts            ← ローカル埋め込み ruri(Phase B・遅延ロード)
 │   │   ├── recall-pool.ts         ← user episodic ＋ canon の統合プール(task_16)
 │   │   ├── life-memory.ts         ← 人生記憶 canon ローダ(task_16・provenance:self)
 │   │   ├── mood.ts                ← 心情導出(task_16・非対称減衰＋中立プライア)
@@ -330,10 +331,8 @@ ene-desktop/
 │   │   ├── prompt-builder.ts      ← 統合プロンプト構築(出力形式付与・交互列正規化)
 │   │   ├── response-parser.ts     ← JSON応答の三段構えパース
 │   │   ├── prompt-enhancer.ts     ← 再生成時の強化プロンプト(4層防御 第3層)
-│   │   ├── ai-self-check.ts       ← AI自称検知(第2層)
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
 │   │   ├── greeting.ts            ← 起動挨拶生成(firstLaunch/forgotten/normal)
-│   │   ├── offscreen-life.ts      ← オフスクリーンライフ生成(会っていない間の暮らし＋挨拶・存在感P3)
 │   │   ├── idle-talk.ts           ← 自発発話の文面生成(話しかけ・存在感P)
 │   │   ├── model-selector.ts      ← 二段生成のモデル選択(雑談=Haiku/難題=Sonnet・B-15b・既定オフ)
 │   │   └── token-counter.ts       ← 入力トークンのローカル見積もり(N-05-3)
@@ -345,7 +344,6 @@ ene-desktop/
 │   │   ├── voice-chat.ts          ← 文単位の合成・C2ゲート(speakText / 将来のストリーミングC1=runVoiceChat・task_17)
 │   │   ├── json-stream-parser.ts  ← JSON応答のストリーミング解釈(C1・B-06)
 │   │   ├── sentence-splitter.ts   ← 日本語の文単位分割(純粋ロジック・task_17)
-│   │   ├── ruby.ts                ← 青空文庫式ルビの解決(Claude振り仮名方式・B-06)
 │   │   ├── stt-transcriber.ts     ← Whisper STT(transformers.js・ローカル・task_17)
 │   │   ├── silero-vad.ts          ← Silero VAD v4 ランナー(onnxruntime-node・task_17)
 │   │   ├── vad-segmenter.ts       ← 発話区間セグメンタ(無音でターン終了・barge-in判定・task_17)
@@ -368,7 +366,8 @@ ene-desktop/
 │       │   ├── voice.ts            ← TtsEngine/VoiceConfig/スタイル型(task_17)
 │       │   ├── stt.ts              ← 文字起こし結果型(task_17)
 │       │   ├── backchannel.ts      ← 相槌・思考フィラーの型(task_18)
-│       │   └── settings.ts         ← AppSettings/VoiceInputMode(task_17)
+│       │   ├── settings.ts         ← AppSettings/VoiceInputMode(task_17)
+│       │   └── llm.ts              ← LlmComplete port(LLM呼び出しの境界契約・DI・N-ARCH-5)
 │       ├── constants.ts
 │       ├── datetime.ts            ← ローカルTZ込み ISO ユーティリティ(§5.6)
 │       ├── moment.ts              ← 「今」の導出(時間帯ラベル等・存在感)
@@ -377,12 +376,15 @@ ene-desktop/
 │       ├── llm-parse.ts           ← LLM応答パースの共有ヘルパ(JSON抽出・emotion正規化等の集約)
 │       ├── vector-math.ts         ← コサイン類似度等のベクトル計算(router/ベクトル想起の共有)
 │       ├── api-key-error-messages.ts ← エラー種別→ユーザ表示文言(§3.7)
+│       ├── ai-self-check.ts     ← AI自称検知(4層防御 第2層・純粋・旧 conversation/・N-ARCH-5)
+│       ├── ruby.ts              ← 青空文庫式ルビの解決(純粋・旧 voice/・N-ARCH-5)
 │       └── node/                  ← Node(main プロセス)専用の基盤
 │           ├── paths.ts           ← パス管理(characterId キャッシュ)
 │           ├── json-store.ts      ← 平文JSONファイル操作
 │           ├── encryption.ts      ← safeStorageラッパー(APIキー)
 │           ├── app-settings.ts    ← アプリ設定の読み書き(data/config/app-settings.json・task_17)
-│           └── cloud-warning.ts   ← クラウド同期フォルダ警告判定
+│           ├── cloud-warning.ts   ← クラウド同期フォルダ警告判定
+│           └── embedder.ts        ← ローカル埋め込み ruri(onnx・memory/knowledge 共有・旧 memory/・N-ARCH-5)
 │
 ├── ene/                           ← 同梱キャラ定義(魚川トリミ・配布物に含む・読み取り専用)
 │   │                                ディレクトリ名 = characterId("ene"=コードネーム・CLAUDE.md §5.1)
@@ -428,7 +430,7 @@ ene-desktop/
 │       │           └── vectors.json    ← 意味検索ベクトル(モデル配置時)
 │       ├── models/                ← ローカルモデル(別DL・コア非汚染・task_15/17)
 │       │   ├── ruri-v3-310m/      ← 埋め込み ONNX int8(約316MB)・scripts/download-model.mjs(task_15)
-│       │   └── whisper-small/      ← STT ONNX(既定・env で turbo/kotoba 等に切替)・scripts/download-stt-model.mjs(task_17/N-LAT-6)
+│       │   └── kotoba-whisper-v2.2/ ← STT ONNX(既定・env で whisper-small 等に切替)・scripts/download-stt-model.mjs(task_17/N-LAT-6)
 │       ├── voice/                  ← 音声サイドカー資産(別配置・コア非汚染・task_17/N-17-12)
 │       │   └── engine/            ← AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/・約800MB)
 │       │                            起動時に main が spawn(shell:false)→/version ヘルス→終了時 kill

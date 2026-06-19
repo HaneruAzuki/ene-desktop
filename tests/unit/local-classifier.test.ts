@@ -4,7 +4,7 @@ import {
   classifyByEmbedding,
   classifyTopicLocal,
 } from '../../src/knowledge/local-classifier';
-import type { Embedder } from '../../src/memory/embedder';
+import type { Embedder } from '../../src/shared/node/embedder';
 import type { CharacterKnowledgeDomains, DomainLevel } from '../../src/shared/types/character';
 
 // B-15 ローカル判別器。キーワードは純粋・同期。埋め込みはフェイク embedder で決定化。

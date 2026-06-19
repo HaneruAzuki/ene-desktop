@@ -14,7 +14,7 @@ import { pruneVectorIndex } from './index-vector';
 import { planConsolidation, type SummaryTier } from './consolidation-policy';
 import { summarizePeriod, type PeriodSummary } from './summarizer';
 import { saveConsolidationState } from './consolidation-state';
-import type { LlmComplete } from './extractor';
+import type { LlmComplete } from '../shared/types/llm';
 import type { EpisodicMemory } from '../shared/types/memory';
 
 // 忘却機構の orchestrator(B-13 / 設計書 §11.6)。純粋計画(consolidation-policy)を実行する:

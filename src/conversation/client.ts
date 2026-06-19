@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { log } from '../shared/logger';
 import { buildPrompt } from './prompt-builder';
 import { parseConversationResponse } from './response-parser';
-import { detectAiSelfReference } from './ai-self-check';
+import { detectAiSelfReference } from '../shared/ai-self-check';
 import { enhancePromptForRegeneration } from './prompt-enhancer';
 import { fallbackResponse } from './fallback';
 import { countAndCheck, type TokenCheck } from './token-counter';
@@ -10,7 +10,7 @@ import type { CharacterContext } from '../shared/types/character';
 import type { MemoryContext, SemanticMemory } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';
 import type { BuiltPrompt, ConversationResponse } from '../shared/types/conversation';
-import type { LlmComplete } from '../memory/extractor';
+import type { LlmComplete } from '../shared/types/llm';
 
 // 本会話処理(設計書 §3.4「Conversation Layer の統合フロー」)。
 // AI自称防止の4層防御を統合する。Sonnet 呼び出し・トークン計測は DI 可能(テスト容易化)。

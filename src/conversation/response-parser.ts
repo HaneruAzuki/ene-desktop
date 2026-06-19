@@ -1,6 +1,6 @@
 import type { ConversationResponse } from '../shared/types/conversation';
 import { extractJsonObject, normalizeEmotion } from '../shared/llm-parse';
-import { stripRuby, rubyToReading } from '../voice/ruby';
+import { stripRuby, rubyToReading } from '../shared/ruby';
 
 // JSON 応答パースの三段構え(設計書 §3.4「パース成功率の三段構え」)。
 // zod 等は使わず手書きの型ガードで検証する。

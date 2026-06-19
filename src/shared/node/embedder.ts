@@ -1,14 +1,17 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { log } from '../shared/logger';
-import { getModelsDir } from '../shared/node/paths';
+import { log } from '../logger';
+import { getModelsDir } from './paths';
 import {
   EMBEDDING_MODEL_DIR,
   EMBEDDING_QUERY_PREFIX,
   EMBEDDING_DOCUMENT_PREFIX,
-} from '../shared/constants';
+} from '../constants';
 
 // ローカル埋め込み(ruri-v3-310m・ONNX・Phase B)。
+//
+// memory(意味検索)と knowledge(ローカル判別)の双方が使う共有のML能力なので、
+// どちらかのドメインに属させず shared/node に置く(Node/onnx 依存=プロセス依存基盤・N-ARCH-5)。
 //
 // 重要(§7.1 厳守): アプリ実行時に外部へモデルを取りに行かない。
 //   - env.allowRemoteModels = false でローカル限定にする。

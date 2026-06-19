@@ -1,19 +1,22 @@
-import { nowLocalIso } from '../shared/datetime';
-import { extractJsonObject } from '../shared/llm-parse';
-import { log } from '../shared/logger';
+import { nowLocalIso } from '../../shared/datetime';
+import { extractJsonObject } from '../../shared/llm-parse';
+import { log } from '../../shared/logger';
 import {
   DAILY_LIFE_CATEGORY,
   DAILY_LIFE_IMPORTANCE,
   EPISODIC_SUMMARY_MAX_CHARS,
-} from '../shared/constants';
-import { loadOpenLoopState, saveOpenLoopState } from '../memory/open-loops';
-import { readPresenceMemory } from '../memory/presence-reads';
-import { saveAndIndexEpisodic } from '../memory/episodic-write';
-import type { LlmComplete } from '../memory/extractor';
-import type { ActiveCharacter, CharacterContext } from '../shared/types/character';
-import type { EpisodicMemory } from '../shared/types/memory';
+} from '../../shared/constants';
+import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
+import { readPresenceMemory } from '../../memory/presence-reads';
+import { saveAndIndexEpisodic } from '../../memory/episodic-write';
+import type { LlmComplete } from '../../shared/types/llm';
+import type { ActiveCharacter, CharacterContext } from '../../shared/types/character';
+import type { EpisodicMemory } from '../../shared/types/memory';
 
 // オフスクリーンライフ(P3・N-PRES-3)。「会っていない間も生きている」を成立させる。
+//
+// LLM(conversation)を呼び、結果を episodic memory(memory)へ書き込む——2ドメインに跨る
+// オーケストレーションなので、配線層 app/main に置く(conversation→memory の具象依存を断つ・N-ARCH-5)。
 //
 // 起動時に1回 LLM を呼び、{greeting(挨拶), life(暮らしの断片)} を生成する。
 //  - greeting: 経過・時間帯・近況を織り込んだ第一声(定型文の使い回し #11 を解消)。

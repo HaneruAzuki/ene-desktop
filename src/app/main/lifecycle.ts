@@ -9,17 +9,17 @@ import {
   loadOrCreateActiveCharacter,
   markFirstLaunchCompleted,
 } from '../../character/active-character';
-import { buildCharacterContext } from '../../character/context-builder';
+import { buildCharacterContext } from '../../character/character-context';
 import { checkBirthday } from '../../character/birthday-checker';
 import { getUnextractedEntries, clearShortTerm } from '../../memory/short-term';
 import { extractFromShortTerm } from '../../memory/extraction-trigger';
 import { isForgettingEnabled, requestForgetting } from '../../memory/forgetting';
-import { warmEmbedder } from '../../memory/embedder';
+import { warmEmbedder } from '../../shared/node/embedder';
 import { warmStt } from '../../voice/stt-transcriber';
 import { warmLocalRouter } from '../../knowledge/local-classifier';
 import { makeLlmComplete } from '../../conversation/client';
 import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
-import { generateOffscreenLife } from '../../conversation/offscreen-life';
+import { generateOffscreenLife } from './offscreen-life';
 import { describeElapsed, timeOfDayLabel } from '../../shared/moment';
 import { openApiKeyDialog } from './api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';

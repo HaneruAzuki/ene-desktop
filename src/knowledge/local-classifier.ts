@@ -1,6 +1,6 @@
 import { resolveDomain } from './domain-resolver';
-import { buildFallbackResult } from './fallback';
-import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../memory/embedder';
+import { buildFallbackResult } from './domain-fallback';
+import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../shared/node/embedder';
 import { log } from '../shared/logger';
 import { cosineSimilarity } from '../shared/vector-math';
 import {

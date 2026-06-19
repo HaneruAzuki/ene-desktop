@@ -1022,6 +1022,19 @@
 - **残(意図的に据置)**: C1 は barge-in 判定を `responseActive`(main駆動)で単一化済みだが `speaking` は今も renderer→main IPC ミラー(役割分離は明文化済み=エコーガード/strict VAD 用)。C5 は逆引き索引の増分/全再生成/ベクトルの3経路が「派生キャッシュ・真実の源=episodic本体」として明文化済みの割り切り(性能の作り直し=D1 とともに別タスク)。
 - **検証**: typecheck / eslint / lint:deps(違反0・150 modules)/ **506 テスト** 全グリーン。✅ C3 のウィンドウ可視性は **実機検証済**(2026-06-16・最小化で描画停止/復帰で即再開=固着なし・ユーザー確認)。
 
+### N-ARCH-5 🟢 疎結合の機械強制(ドメイン間の直接依存を根絶・2026-06-19)
+- **狙い**: 「ドメイン間は `shared/types` の型契約・DI を介す」という 05_architecture §4 の理想が、実態では具象 domain→domain import 6本で破れていた(宣言と実装の乖離)。これを **例外1本まで畳み、lint で固定**する。
+- **leaf ユーティリティを `shared/` へ集約**(越境4本が自然消滅):
+  - `voice/ruby.ts` → `shared/ruby.ts`(純粋・青空文庫ルビ。conversation も voice も使う)→ conversation↔voice の folder 相互依存が解消。
+  - `conversation/ai-self-check.ts` → `shared/ai-self-check.ts`(純粋・AI自称検知)→ voice→conversation が解消。
+  - `memory/embedder.ts` → `shared/node/embedder.ts`(onnx 共有ML能力。memory と knowledge が使う)→ knowledge→memory が解消。
+  - `LlmComplete` port(`memory/extractor.ts` に同居)→ `shared/types/llm.ts`(ドメイン間の境界契約)→ conversation→memory の型依存が解消。memory は引き続き port を受け取るだけ(Claude を知らない)。
+- **`offscreen-life` を `app/main` へ**: LLM(conversation)×episodic 書込(memory)を跨ぐオーケストレーションは配線層が持つのが筋 → conversation→memory の具象依存(facade 呼び)が解消。
+- **同名ファイルの解消(④)**: `character/context-builder.ts` → `character-context.ts`、`knowledge/fallback.ts` → `domain-fallback.ts`(memory/context-builder・conversation/fallback と紛れない)。
+- **`memory→character` は意図的に残す**: `memory/context-builder` → `character/active-character`(関係の事実を読む)。character は他に依存しない leaf ゆえ循環リスク無し=良性の下向き依存。注入で消すより素直。
+- **機械強制(N-ARCH-2 の延長)**: `.dependency-cruiser.cjs` に `no-cross-domain`(error)を追加。`from` のドメインを `$1` で捕捉し `^src/$1/`(同一ドメイン)＋ `^src/character/active-character`(上記例外)のみ許可。**一時プローブ(memory が voice を import)で error を出すことを検証後に撤去**=ルールが実際に噛むことを確認。
+- **検証**: typecheck / eslint / lint:deps(違反0・152 modules)/ build / **491 テスト** 全グリーン。SSOT(03_design §2 ツリー・05_architecture §4)反映済み。
+
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。
 - **E2②(非原子的 save)**: `app-settings.ts` の4 save が read-modify-write で、設定パネルの素早い複数トグルで後勝ち取りこぼしの縁。`updateSettings` で promise チェーン直列化(短期記憶 withWriteLock と同方針)。

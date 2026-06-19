@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectAiSelfReference } from '../../src/conversation/ai-self-check';
+import { detectAiSelfReference } from '../../src/shared/ai-self-check';
 
 describe('detectAiSelfReference (設計書 §3.4 第2防御)', () => {
   it('「私はAIです」を検知する', () => {

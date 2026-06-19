@@ -68,7 +68,8 @@ memory/       : 会話から記憶抽出(extractor・scheduler)→ episodic へ�
 
 - **ドメイン(character / knowledge / memory / conversation / voice)は `app/` に依存しない**。
   組み立て(配線)は `app/main` が一方向に行う。
-- ドメイン間の通信は `src/shared/types/` の型契約を介す。
+- ドメイン間の通信は `src/shared/types/` の型契約・DI を介す(**`no-cross-domain` で機械強制**・
+  例外は `memory → character/active-character` の良性 leaf 依存のみ・N-ARCH-5)。
 - `memory/` は Claude を直接知らない(`LlmComplete` を DI・差し替え可能)。
 - Electron API に触れるのは土台のみ(`app/` と、Node 専用基盤の `shared/node/`)。
   `shared/` 直下はプロセス非依存の純粋ユーティリティ。
@@ -79,6 +80,9 @@ memory/       : 会話から記憶抽出(extractor・scheduler)→ episodic へ�
 - `npm run lint:deps`(**dependency-cruiser**・設定 `.dependency-cruiser.cjs`):
   - `no-domain-to-app` … ドメイン層 → `app/` の逆依存を禁止(error)。
   - `no-shared-to-upper` … `shared/` → app/ドメイン層 を禁止(error)。
+  - `no-cross-domain` … ドメイン間の直接依存を禁止(error・N-ARCH-5)。型契約・DI(`LlmComplete` 等)は
+    `shared/types` を介し、配線は `app/main` が行う。例外は `memory → character/active-character` のみ。
+  - `no-index-impl-outside-memory` / `no-episodic-store-outside-memory` … memory の索引・ストア実装を層外から隠す(error・§4.4)。
   - `no-circular` … 循環依存を禁止(error)。
 - `npm run lint`(**ESLint** `no-restricted-syntax`):ドメイン＋shared 層の**文字列リテラル**に
   キャラ固有名・性格(例:魚川トリミ/ツンデレ)を埋め込むことを禁止(CLAUDE.md §5.1。値は `{id}/*.json` へ)。

@@ -3,7 +3,7 @@ import { log } from '../shared/logger';
 import { getUnextractedEntries } from './short-term';
 import { extractFromShortTerm } from './extraction-trigger';
 import { EXTRACTION_BATCH_THRESHOLD, SHORT_TERM_HARD_MAX } from '../shared/constants';
-import type { LlmComplete } from './extractor';
+import type { LlmComplete } from '../shared/types/llm';
 
 // 記憶抽出のスケジューラ(B-01 / B-02・optimization-backlog / N-09-10)。
 //
