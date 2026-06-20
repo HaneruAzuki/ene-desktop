@@ -32,6 +32,11 @@ export interface OpenLoopSurface {
 export interface OpenLoopState {
   /** loop の id(= episodic 相対パス)→ 注入履歴。 */
   surfaced: Record<string, OpenLoopSurface>;
+  /**
+   * 自発的な「気にかけ／まだ知らないこと」を最後に提示した日時(ローカルTZ込み ISO・⑥)。
+   * 会話経路が PROACTIVE_SURFACE_COOLDOWN_HOURS の間引きに使う。他経路(idle/挨拶)は上書きしない。
+   */
+  lastProactiveAt?: string;
 }
 
 export interface OpenLoopSelection {
@@ -98,9 +103,13 @@ export function formatOpenLoopsForExtractor(records: EpisodicRecord[]): string {
 // --- クールダウン状態の I/O(派生状態・壊れても会話に影響させない) ---
 
 export async function loadOpenLoopState(): Promise<OpenLoopState> {
-  const raw = await readJson<{ surfaced?: Record<string, unknown> }>(getOpenLoopStatePath());
+  const raw = await readJson<{ surfaced?: Record<string, unknown>; lastProactiveAt?: unknown }>(
+    getOpenLoopStatePath(),
+  );
   if (raw && typeof raw === 'object' && raw.surfaced && typeof raw.surfaced === 'object') {
-    return { surfaced: normalizeSurfaced(raw.surfaced) };
+    const state: OpenLoopState = { surfaced: normalizeSurfaced(raw.surfaced) };
+    if (typeof raw.lastProactiveAt === 'string') state.lastProactiveAt = raw.lastProactiveAt;
+    return state;
   }
   return { surfaced: {} };
 }
@@ -125,7 +134,16 @@ function normalizeSurfaced(raw: Record<string, unknown>): Record<string, OpenLoo
 }
 
 export async function saveOpenLoopState(state: OpenLoopState): Promise<void> {
-  await writeJson(getOpenLoopStatePath(), state);
+  // lastProactiveAt 未指定の保存(idle-talk/挨拶は surfaced のみ更新)では、既存の間引きタイムスタンプを
+  // 保持する=別経路の保存で会話経路のクールダウンを消さない(⑥・共有 state の取り違え事故を防ぐ)。
+  let toSave = state;
+  if (state.lastProactiveAt === undefined) {
+    const raw = await readJson<{ lastProactiveAt?: unknown }>(getOpenLoopStatePath());
+    if (raw && typeof raw.lastProactiveAt === 'string') {
+      toSave = { ...state, lastProactiveAt: raw.lastProactiveAt };
+    }
+  }
+  await writeJson(getOpenLoopStatePath(), toSave);
 }
 
 /**

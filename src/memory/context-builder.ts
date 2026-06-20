@@ -12,7 +12,7 @@ import { loadOrCreateActiveCharacter } from '../character/active-character';
 import { log } from '../shared/logger';
 import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
 import { timeOfDayLabel, describeElapsed, finitenessHint } from '../shared/moment';
-import { RECALL_DEBUG_ENV } from '../shared/constants';
+import { RECALL_DEBUG_ENV, PROACTIVE_SURFACE_COOLDOWN_HOURS, DAY_MS } from '../shared/constants';
 import type {
   MemoryContext,
   RetrievalQuery,
@@ -87,21 +87,34 @@ async function buildMoment(
   sessionTurns: number,
 ): Promise<ConversationMoment> {
   const d = new Date();
+  const nowMs = d.getTime();
   const nowIso = nowLocalIso();
   const todayYmd = nowIso.slice(0, 10);
 
-  // P4: 気にかけ(クールダウン付き選択 → 注入分のみ state に記録)。失敗は握りつぶす。
+  // P4/P5: 自発的な「気にかけ」(openLoops)「まだ知らないこと」(knowledgeGaps)。
+  //   ⑥=毎ターン出すとツンデレが世話焼き化して崩れるため、一度提示したら
+  //   PROACTIVE_SURFACE_COOLDOWN_HOURS は自分から持ち出さない(間引き)。クールダウン中は両方とも載せない。
+  //   関連話題が会話に出れば retriever 経路で自然に再訪する(別経路・間引き対象外)。失敗は握りつぶす。
   let openLoops: string[] = [];
+  let knowledgeGaps: string[] = [];
   try {
     const state = await loadOpenLoopState();
-    const sel = selectOpenLoops(userRecords, state, d.getTime(), nowIso);
-    openLoops = sel.notes;
-    if (sel.notes.length > 0) await saveOpenLoopState({ surfaced: sel.surfaced });
+    const lastMs = state.lastProactiveAt ? Date.parse(state.lastProactiveAt) : NaN;
+    const cooldownMs = (PROACTIVE_SURFACE_COOLDOWN_HOURS * DAY_MS) / 24;
+    const cooledDown = Number.isNaN(lastMs) || nowMs - lastMs >= cooldownMs;
+    if (cooledDown) {
+      const sel = selectOpenLoops(userRecords, state, nowMs, nowIso);
+      openLoops = sel.notes;
+      knowledgeGaps = selectKnowledgeGaps(semantic, stage);
+      // 何か自発提示した回だけ間隔を空ける(surfaced=各 loop の上限管理 / lastProactiveAt=全体の間引き)。
+      if (openLoops.length > 0 || knowledgeGaps.length > 0) {
+        await saveOpenLoopState({ surfaced: sel.surfaced, lastProactiveAt: nowIso });
+      }
+    }
   } catch (e) {
-    log.warn('open-loop selection failed', { name: (e as Error).name });
+    log.warn('proactive surfacing failed', { name: (e as Error).name });
   }
 
-  const knowledgeGaps = selectKnowledgeGaps(semantic, stage);
   const moment: ConversationMoment = {
     nowIso,
     timeOfDay: timeOfDayLabel(d.getHours()),

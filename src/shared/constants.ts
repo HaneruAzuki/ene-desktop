@@ -338,8 +338,19 @@ export const MOOD_PRIOR_WEIGHT = 1;
 /** 想起バイアス係数。RRF スコアと同オーダーで「微細」(拮抗時のみ順位が動く・調律可)。 */
 export const RECALL_BIAS_LAMBDA = 0.01;
 
-/** 想起の softmax サンプリング温度(小さいほど上位が安定・調律可)。 */
-export const RECALL_SOFTMAX_TEMP = 0.01;
+/**
+ * 想起の softmax サンプリング温度(小さいほど関連度の高い記憶へ集中・調律可)。
+ * 0.01 だと RRF スコア帯(~0.016-0.033)に対し温度が大きく、上位~20候補をほぼ一様抽出して
+ * 無関係な記憶が混ざっていた(2026-06-21 実測)。やや下げて関連度上位へ寄せ、揺らぎは残す。
+ */
+export const RECALL_SOFTMAX_TEMP = 0.006;
+
+/**
+ * softmax サンプリングの母集団上限(スコア上位 N 件のみを抽出対象にする・調律可・N ≥ limit)。
+ * RRF は値域が狭く温度だけでは裾(低関連)が残るため、サンプリング前に上位 N でハードに切って
+ * 「無関係な記憶の混入(precision 低下)」を構造的に断つ。揺らぎは上位 N の中だけで起こす。
+ */
+export const RECALL_CANDIDATE_POOL = 8;
 
 /**
  * 開示ゲーティングの段階閾値(接触の事実3要素・連言・Lv5≈1年)。
@@ -437,8 +448,8 @@ export const GREETING_GENERATION_TIMEOUT_MS = 8000;
 
 /** 未解決の「気にかけ」を想起プールから探す対象期間(日)。古すぎる未解決は掘り起こさない。 */
 export const OPEN_LOOP_LOOKBACK_DAYS = 60;
-/** 1ターンの揮発コンテキストに載せる「気にかけ」の最大件数(尋問化を防ぐ)。 */
-export const OPEN_LOOP_SURFACE_MAX = 2;
+/** 1ターンの揮発コンテキストに載せる「気にかけ」の最大件数(尋問化を防ぐ・⑥で 2→1 に厳格化)。 */
+export const OPEN_LOOP_SURFACE_MAX = 1;
 /** 同じ気にかけを再び注入するまで空ける日数(複数回注入を許す場合の間隔。MAX=1 では事実上未使用)。 */
 export const OPEN_LOOP_COOLDOWN_DAYS = 3;
 /**
@@ -468,6 +479,14 @@ export const KNOWLEDGE_GAP_GATES: ReadonlyArray<{ slot: string; label: string; m
   ];
 /** 1ターンに注入する知識ギャップは1件まで(会話に偽装したフォームにしない)。 */
 export const KNOWLEDGE_GAP_SURFACE_MAX = 1;
+
+/**
+ * 自発的な「気にかけ／まだ知らないこと」を再び持ち出すまで空ける最小時間(時間・⑥)。
+ * 毎ターン注入するとツンデレが「世話焼き」化して崩れるため、一度提示したらこの時間は自分からは出さない。
+ * クールダウン中は両方とも載せない。関連話題が会話に出れば retriever 経路で自然に再訪する(別経路・対象外)。
+ * 小さいほど頻繁(0 で毎ターン=旧挙動)。会話経路のみが参照・更新する。
+ */
+export const PROACTIVE_SURFACE_COOLDOWN_HOURS = 6;
 
 // --- P7: 自発発話(アイドル時)+ 有限性(トーン=発言内容のみ) ---
 

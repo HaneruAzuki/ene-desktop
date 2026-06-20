@@ -3,6 +3,7 @@ import {
   RRF_K,
   RECALL_BIAS_LAMBDA,
   RECALL_SOFTMAX_TEMP,
+  RECALL_CANDIDATE_POOL,
 } from '../shared/constants';
 import { log } from '../shared/logger';
 import { loadRecallPool } from './recall-pool';
@@ -181,10 +182,13 @@ export async function retrieveRecords(
       return { id, score: rrf + RECALL_BIAS_LAMBDA * clamped * valence };
     });
 
-  // 4) 上位選択:RNG ありは softmax サンプリング、なしは決定論(スコア降順)
+  // 4) 上位選択。まずスコア上位 RECALL_CANDIDATE_POOL 件へ絞り(無関係な裾を除外=precision)、
+  //    その中から RNG ありは softmax サンプリング(揺らぎ)、なしは決定論(スコア降順)。
+  const ranked = [...scored].sort((a, b) => b.score - a.score);
+  const candidates = ranked.slice(0, Math.max(limit, RECALL_CANDIDATE_POOL));
   const orderedIds = deps.rng
-    ? softmaxSample(scored, limit, RECALL_SOFTMAX_TEMP, deps.rng)
-    : scored.sort((a, b) => b.score - a.score).map((s) => s.id);
+    ? softmaxSample(candidates, limit, RECALL_SOFTMAX_TEMP, deps.rng)
+    : candidates.map((s) => s.id);
 
   const picked: EpisodicRecord[] = [];
   const pickedIds = new Set<string>();
