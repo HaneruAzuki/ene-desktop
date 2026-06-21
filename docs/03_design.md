@@ -417,8 +417,10 @@ ene-desktop/
 │   ├── installer-icon.ico
 │   └── silero_vad.onnx            ← VAD モデル(task_17・Silero v4・約1.8MB・MIT・配布物に同梱)
 │
-├── (実行時に生成 / exeと同じディレクトリ) ─── ポータブルデータ(平文JSON)
-│   └── data/                     ← ユーザデータ(可搬性あり)
+├── (NSIS 配布・N-REL-2) ─── データは2系統に分離(置き場の SSOT=src/shared/node/paths.ts):
+│                              ① ユーザーデータ=Electron userData(`%APPDATA%/project-ene/`)・更新を跨ぎ残る
+│                              ② 同梱アセット=install dir 隣の `data/`(読取専用・更新で入替)
+│   └── data/                     ← 下記は論理構成。①(memory/config/logs)と②(models/voice)は別 root に座る
 │       ├── memory/
 │       │   └── {characterId}/    ← キャラ別に分離(例: ene/)
 │       │       ├── episodic/
@@ -435,10 +437,12 @@ ene-desktop/
 │       ├── voice/                  ← 音声サイドカー資産(別配置・コア非汚染・task_17/N-17-12)
 │       │   ├── engine/            ← AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/・約800MB)
 │       │   │                        起動時に main が spawn(shell:false)→/version ヘルス→終了時 kill
-│       │   └── userdata/          ← エンジンのデータ root=torimi モデル＋BERT(N-17-13・setup:engine-userdata で配置)
-│       │                            エンジンは保存先 %APPDATA%/AivisSpeech-Engine/ を固定する(変更不可)ため起動時に
-│       │                            ここへ**ジャンクションで一時借用**し終了時に外す(正常終了で痕跡ゼロ)。子プロセスは
-│       │                            死んだproxy＋offline＋--disable_sentry で完全オフライン化(外部送信=Claudeのみ)
+│       │   └── userdata/          ← 同梱のエンジンデータ root=torimi モデル＋BERT(N-17-13・setup:engine-userdata で配置)
+│       │                            エンジンは保存先 %APPDATA%/AivisSpeech-Engine/ を固定する(変更不可)ため、初回起動で
+│       │                            ここから**直接配置(ハードリンク/コピー・place-if-missing)**する(N-REL-2・ジャンクション撤去)。
+│       │                            共存時は torimi のみ追加し .ene-cleanup に記録、単独時は .ene-owns-engine を置き
+│       │                            アンインストール(installer.nsh)で除去。子プロセスは死んだproxy＋offline＋
+│       │                            --disable_sentry で完全オフライン化(外部送信=Claudeのみ)
 │       ├── logs/                  ← アプリ動作ログ(個人情報を含まないメタ情報のみ)
 │       ├── config/
 │       │   ├── window-position.json
@@ -447,29 +451,31 @@ ene-desktop/
 │       │   └── backchannel-calibration.json ← 相槌キャリブレーション(継続学習・task_18 Lv2b)
 │       └── characters-custom/    ← (旧)ユーザ追加キャラ用。固定キャラ方針で未使用(2026-06)
 │
-└── (実行時に生成 / OSユーザ領域) ─────── マシン固定データ(暗号化)
-    └── %APPDATA%/ene-desktop/    ← Windows標準位置
-        └── api-key.enc           ← safeStorageで暗号化されたAPIキー
+└── (実行時に生成 / OSユーザ領域=Electron userData) ─── ユーザーデータ root(NSIS・N-REL-2)
+    └── %APPDATA%/project-ene/    ← app.setName('project-ene')。上の memory/ config/ logs/ は物理的にここへ座る
+        └── api-key.enc           ← safeStorage(DPAPI)で暗号化された APIキー(機械固定=別PCは再入力)
 ```
 
-**重要な設計判断(部分暗号化方式)**:
+**重要な設計判断(NSIS 配布＋部分暗号化・N-REL-2)**:
 
-本プロダクトは「ポータブル性」と「APIキーのセキュリティ」を両立するため、
-**データを2箇所に分散保存する**部分暗号化方式を採用する。
+ユーザーデータは Electron userData(`%APPDATA%/project-ene/`)に集約し、同梱アセットは install dir に置く。
+APIキーのみ safeStorage(DPAPI)で暗号化する部分暗号化方式。旧「完全ポータブル(exe 隣 data/ へ全集約・
+`%APPDATA%` 痕跡ゼロ)」は、本当の目的だったクリーンなアンインストールが NSIS で達成できるため転換・廃止した。
 
-| 区分 | 保存場所 | 暗号化 | 可搬性 | 理由 |
-|------|---------|--------|--------|------|
-| ポータブルデータ | `(exeの隣)/data/` | なし | あり | ユーザが直接読める透明性・可搬性を優先 |
-| マシン固定データ | `%APPDATA%/ene-desktop/` | あり(safeStorage) | なし | APIキーの機密性確保。safeStorageの鍵はOS/ユーザ/マシン固定のため、`data/` に置いても別PCで復号不可 |
+| 区分 | 保存場所 | 暗号化 | 理由 |
+|------|---------|--------|------|
+| ユーザーデータ(記憶/設定/ログ) | userData(`%APPDATA%/project-ene/`) | なし(平文JSON) | 直接読める透明性。更新を跨ぎ残り、アンインストールでも既定保持。可搬は記憶エクスポート/インポートで担保 |
+| APIキー | userData(`%APPDATA%/project-ene/api-key.enc`) | あり(safeStorage/DPAPI) | 機密性。鍵は OS/ユーザ/マシン固定=別PCは再入力 |
+| 同梱アセット(モデル/音声エンジン) | install dir 隣の `data/` | なし | 読取専用・electron-updater が本体ごと入替・コア非汚染 |
 
-**ユースケース例**:USBにアプリと記憶を入れて別PCで使う場合
-1. USBから別PCで起動
-2. `data/memory/{characterId}/` 配下の記憶は読込成功(ENEは過去を覚えている)
-3. `%APPDATA%/ene-desktop/api-key.enc` が新PCには存在しない
-4. ENEがAPIキー再入力をユーザに求める
-5. ユーザが入力 → 新PCのAPPDATAに保存 → 通常会話開始
+**ユースケース例**:別PCへ記憶を引っ越す場合(NSIS 配布では記憶エクスポート/インポートで担保)
+1. 旧PCの設定パネル →「記憶を書き出す」で記憶＋設定を任意フォルダ(`torimi-memory-backup`)へ退避
+2. 退避フォルダを新PCへ運ぶ(USB・クラウド等)
+3. 新PCにインストーラで導入 → 設定パネル →「記憶を読み込む」で復元(再起動で反映)
+4. APIキーは機械固定(DPAPI)ゆえ新PCで再入力 → 通常会話開始
 
-これにより、ビジョン§3 柱4「ポータブル」と機密性が両立する。
+「フォルダ削除=ポータブル」は廃したが、アンインストールで痕跡が残らず(記憶は既定保持)、記憶の
+可搬性はエクスポート/インポートで保たれる(N-REL-2)。
 
 ---
 
@@ -1673,9 +1679,9 @@ export function getActiveCharacterPath(): string; // data/config/active-characte
 export function getLogsDir(): string;              // data/logs/(アプリ動作ログ・PII含めない)
 export function getWindowPositionPath(): string;  // data/config/window-position.json
 
-// マシン固定データ(%APPDATA%/ene-desktop/)
+// マシン固定データ(%APPDATA%/project-ene/)
 export function getMachineDataDir(): string;      // app.getPath('userData')
-export function getApiKeyPath(): string;          // %APPDATA%/ene-desktop/api-key.enc
+export function getApiKeyPath(): string;          // %APPDATA%/project-ene/api-key.enc
 
 // src/shared/node/encryption.ts (APIキー専用)
 export function encryptAndSaveApiKey(plaintext: string): Promise<void>;
@@ -1695,7 +1701,7 @@ export async function listJsonFiles(dir: string): Promise<string[]>;
 #### APIキー保存(部分暗号化方式)
 
 - Electron `safeStorage.encryptString()` で暗号化
-- 暗号化済みバイト列を `%APPDATA%/ene-desktop/api-key.enc` に保存
+- 暗号化済みバイト列を `%APPDATA%/project-ene/api-key.enc` に保存
   - パスは `app.getPath('userData')` で取得(Electron標準API)
   - `data/` 配下には**置かない**(別PCで復号不可になるため)
 - 起動時に `safeStorage.isEncryptionAvailable()` で利用可能性を確認
@@ -1758,17 +1764,17 @@ export function getPortableDataDir(): string {
 | 本番(その他・`app.isPackaged`) | `path.dirname(process.execPath)/data` | exe の隣に作成 |
 | 開発(`app.isPackaged === false`) | `process.cwd()/data` | リポジトリルートに作成 |
 
-> ✅ **N-11-4 解消(ポータブル運用・2026-06)**:`index.ts` で起動時に `app.setPath('logs', …)` を
-> `data/logs/` へ向け直すため、早期ログ含めパッケージ版でも `data/logs/` に出力される
-> (旧 B-07 の `%APPDATA%` 流出を解消)。
+> ⚠️ **NSIS 転換で更新(N-REL-2)**:旧「完全ポータブル」では `index.ts` が userData を exe 隣の
+> `data/app/` へ向け直していたが、NSIS 配布へ転換しこのリダイレクトは**撤去**した。`getPortableDataDir()`
+> は現在**同梱アセット(モデル/音声エンジン)の root**(パッケージ時=install dir 隣の `data/`)を指す。
 
 開発時に作られる `data/` は `.gitignore` に含まれるため、リポジトリには
 コミットされない(設計書 §2 のディレクトリ構成を参照)。
 
-なお `getMachineDataDir()` は `app.getPath('userData')` を返すが、ポータブル運用では
-`index.ts` が起動時に userData を **exe 隣の `data/app/`** へ向け直す(Local Storage・
-`api-key.enc`・キャッシュ・クラッシュダンプも含めて `data/` 配下へ集約)。これにより
-`%APPDATA%` に痕跡を残さず、フォルダ削除だけで完全に消える。
+ユーザーデータ(記憶/設定/ログ/`api-key.enc`)は `getUserDataDir()`(パッケージ時=Electron userData=
+`%APPDATA%/project-ene/`、開発時=`process.cwd()/data`)に集約する。`getConfigDir()`/`getLogsDir()`/
+`getMemoryDir()`/`getMachineDataDir()` はすべて `getUserDataDir()` 配下を返す。アンインストールでは
+NSIS が install dir を消し、userData は既定保持(`deleteAppDataOnUninstall:false`)=記憶は残る(N-REL-2)。
 
 唯一の例外は **AivisSpeech エンジン**で、保存先 `%APPDATA%/AivisSpeech-Engine/` を固定する
 (フラグ/設定/環境変数で変更不可・実機 spike で確認)。そこで `app/main` が起動時にこのパスを
@@ -1788,7 +1794,7 @@ export function getPortableDataDir(): string {
 
 #### 表示タイミング
 
-1. **初回起動時**:`%APPDATA%/ene-desktop/api-key.enc` が存在しない時
+1. **初回起動時**:`%APPDATA%/project-ene/api-key.enc` が存在しない時
 2. **キー失効時**:既存キーで疎通失敗した時(認証エラー検知時)
 3. **ユーザ任意操作時**:キャラ右クリックメニューの「APIキーを設定...」選択時
 
@@ -2331,7 +2337,7 @@ export function todayLocalYmd(): { year: number; month: number; day: number } {
    ├─ パスに "OneDrive" "Dropbox" "Google Drive" 等を含むか確認
    └─ 含む場合は警告ダイアログ表示(続行は可能)
    ↓
-5. APIキーの存在確認(%APPDATA%/ene-desktop/api-key.enc)
+5. APIキーの存在確認(%APPDATA%/project-ene/api-key.enc)
    ├─ なし → セットアップダイアログ表示
    └─ あり → 復号化してメモリ保持
    ↓
@@ -3025,28 +3031,40 @@ MVPでは Anthropic API のみを前提とするが、将来的に他のLLMプ�
 
 ### 11.8 プロダクトの更新運用
 
-#### MVPの更新方式:手動 exe 差し替え
+#### 更新方式:NSIS インストーラ＋ electron-updater 自動更新(N-REL-2)
 
-MVPでは**自動更新機構を実装しない**。新バージョン配布時は、ユーザが
-新しい exe を手動でダウンロードし、既存の exe を上書きする運用とする。
+IT に疎いユーザー(説明を読まない前提)でも何もせず最新版になることを最優先に、
+**NSIS インストーラで配布し、electron-updater で自動更新**する。旧「exe を手動で差し替える」運用は
+**廃止**した(エクスプローラ操作を期待しない)。
 
-##### 更新の手順(ユーザ目線)
+##### 更新の流れ(ユーザー目線=ほぼ無操作)
 
 ```
-1. 開発者が新バージョンの ene-desktop.exe を公開
-2. ユーザが新 exe をダウンロード
-3. 既存の ene-desktop.exe を新しいものに置き換え
-4. data/ ディレクトリはそのまま(記憶・設定が引き継がれる)
-5. %APPDATA%/ene-desktop/api-key.enc もそのまま(APIキー再入力不要)
-6. アプリ再起動
+1. 開発者が GitHub Releases に新版(Torimi-Setup-x.y.z.exe ＋ latest.yml)を公開
+2. アプリ起動時、トリミの「ちょっと待って…」(準備中フェーズ)の裏で更新有無を確認
+   (electron-updater・autoDownload=false・8秒タイムアウト=見つからなければ素通り)
+3. 更新があれば、準備完了の挨拶の前にダイアログ「今すぐ更新 / あとで」を出す
+   (設計方針:システムチックな表示は準備完了前のみ・準備後は一切出さない)
+4. 「今すぐ更新」→ 差分ダウンロード → quitAndInstall で再起動・適用
+   「あとで」→ そのまま起動(次回起動時に再度確認)
+5. ユーザーデータ(記憶/設定/APIキー)は userData に残るため何も失わない・再入力不要
 ```
 
 ##### この設計が成立する根拠
 
-- **コードとデータの分離**(設計書 §2):exe を上書きしても `data/` は無影響
-- **APIキーの分離**(設計書 §3.6 部分暗号化):`%APPDATA%` 配下のキーも残る
-- **設定ファイル**(`active-character.json`、`window-position.json`):`data/config/` で保持
-- 結果として、**ユーザは exe を差し替えるだけで、何も失わず最新版に移行できる**
+- **ユーザーデータとアプリの分離**(§2/§3.6):更新は install dir を入れ替えるだけ。userData
+  (`%APPDATA%/project-ene/`=記憶/設定/`api-key.enc`)は無影響で残る
+- **差分配信**:electron-updater は blockmap で差分のみ DL=同梱の約1.5GB を毎回落とさない
+- **配布バックエンド=GitHub Releases**(`publish: github`・HaneruAzuki/ene-desktop)。署名は当面見送り
+  (未署名+SmartScreen 警告は初回のみ・N-REL-2)
+- 実装:`src/app/main/auto-update.ts`(`checkUpdateFlow`・準備中フェーズで実行)＋
+  `electron-builder.yml` の `nsis`/`publish` ブロック
+
+#### off-screen-life(内容)の更新
+
+機能更新(本体)とは別に、画面の外の暮らし(off-screen-life)のパックは**静かな自動 pull**で取り込む
+(裏で取得し差し替え・ユーザー操作なし)。配信先・フォールバック・取得手順は
+`docs/off-screen-life-plan.md` を SSOT とする(本体更新とは独立)。
 
 #### 更新が必要になるシナリオ
 
@@ -3055,28 +3073,19 @@ MVPでは**自動更新機構を実装しない**。新バージョン配布時�
 | Electron のセキュリティ脆弱性 | 必須(同梱ライブラリの更新) | 年2〜4回 |
 | @anthropic-ai/sdk の API追従 | 必要(API仕様変更時) | 数ヶ月〜年単位 |
 | バグ修正・新機能 | 任意 | 開発者判断 |
+| off-screen-life の内容追加 | 任意(自動 pull・本体更新不要) | 年4回＋随時 |
 | OS のメジャー更新 | 必要に応じて(Electron が対応すれば自動追従) | 数年単位 |
 
 #### 後方互換性の維持義務
 
-新バージョンは、**既存ユーザの `data/` を読み込めること**を必須要件とする。
+新バージョンは、**既存ユーザーの userData(記憶/設定)を読み込めること**を必須要件とする。
 
 - 記憶ファイルのスキーマ変更は破壊的変更であり、原則禁止
 - やむを得ず変更する場合は、起動時にマイグレーション処理を実装すること
   - 例:`semantic.json` の `version: 1` を読んで `version: 2` に変換する
 - スキーマバージョンフィールドを尊重する(`SemanticMemory.version` 等)
-
-#### 将来の自動更新(MVP対象外)
-
-将来的にユーザ数が増えた場合、`electron-updater` ライブラリ等で
-自動更新機構を導入する選択肢がある。実装する場合は以下を考慮:
-
-- 配布サーバ(GitHub Releases 等)の準備
-- コード署名証明書の取得(Windows のセキュリティ警告回避)
-- バックグラウンドダウンロード・適用フロー
-- ユーザへの更新通知UI
-
-MVPではこれらすべてを見送り、シンプルな手動配布から始める。
+- アンインストールでも userData は既定保持(`deleteAppDataOnUninstall:false`)。万一に備え
+  設定パネルの記憶エクスポート/インポートでユーザー自身も退避/復元できる(N-REL-2)
 
 ---
 

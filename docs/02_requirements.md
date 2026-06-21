@@ -15,9 +15,10 @@
 ### 1.1 プロダクト定義
 - **名称**:Project_ENE(キャラクター:魚川トリミ)
 - **対象プラットフォーム**:Windows 10 / 11(Windows 専用)
-- **配布形態**:インストール不要の**完全ポータブル**。アプリフォルダ内の `data/` に全状態を保持し、
-  Electron の userData も `data/app/` へ向け直す。`%APPDATA%` 等に痕跡を残さず、
-  **フォルダ削除＝完全アンインストール**が成立する(NFR-PRIV / NFR-PORT)。
+- **配布形態**:**NSIS インストーラ**で配布し、`electron-updater` で自動更新する(N-REL-2)。ユーザーデータ
+  (記憶/設定/APIキー)は Electron userData(`%APPDATA%/project-ene/`)、同梱アセットは install dir に置く。
+  **アンインストールで痕跡を残さない**(再生成可能なゴミは installer.nsh で除去・記憶は既定保持)。記憶の
+  可搬性は設定パネルのエクスポート/インポートで担保する(NFR-PRIV / NFR-PORT)。
 
 ### 1.2 v1.0 のスコープ
 
@@ -274,7 +275,7 @@ v1.0 が提供するもの(ロードマップ・段階の全体像は `01_vision
 | ID | 要件 |
 |----|------|
 | F-KEY-01 | API キーは Electron `safeStorage`(Windows は DPAPI)で暗号化して保存する |
-| F-KEY-02 | 暗号化 API キーは**アプリフォルダ内の `data/app/api-key.enc`** に保存する(Electron userData を `data/app/` へリダイレクト・ポータブル運用・§4.2) |
+| F-KEY-02 | 暗号化 API キーは **Electron userData の `api-key.enc`**(`%APPDATA%/project-ene/api-key.enc`)に保存する(記憶/設定と同じ userData・更新を跨ぎ残る・§4.2・N-REL-2) |
 | F-KEY-03 | 初回起動時、または保存済みキーが見つからない場合に API キー管理ダイアログを表示する |
 | F-KEY-04 | ダイアログには Anthropic Console へのリンクと取得手順を表示する |
 | F-KEY-05 | 入力時に形式バリデーション(`sk-ant-` で始まる、最低50文字)を行う |
@@ -344,7 +345,7 @@ v1.0 が提供するもの(ロードマップ・段階の全体像は `01_vision
 | ID | 要件 |
 |----|------|
 | NFR-SEC-01 | API キーは Electron `safeStorage`(DPAPI)で暗号化して保存される |
-| NFR-SEC-02 | 暗号化 API キーの保存先は**アプリフォルダ内の `data/app/api-key.enc`**(ポータブル運用・%APPDATA% に痕跡を残さない) |
+| NFR-SEC-02 | 暗号化 API キーの保存先は **Electron userData の `api-key.enc`**(`%APPDATA%/project-ene/`・N-REL-2)。アンインストールでも既定保持=再インストールで再入力不要 |
 | NFR-SEC-03 | 外部送信は Claude API への会話テキストのみに限定(送信先 URL を固定) |
 | NFR-SEC-04 | テレメトリ・統計収集・クラッシュレポートを行わない |
 | NFR-SEC-05 | OS 操作機能を持たない。任意コマンド実行(`exec`)・`shell:true` spawn を行わない |
@@ -354,10 +355,10 @@ v1.0 が提供するもの(ロードマップ・段階の全体像は `01_vision
 
 | ID | 要件 |
 |----|------|
-| NFR-PRIV-01 | ユーザデータはすべてローカルの `data/` に保存される |
-| NFR-PRIV-02 | ユーザはデータ全体を物理削除できる。**フォルダ削除＝完全アンインストール**(%APPDATA% 等に痕跡を残さない) |
+| NFR-PRIV-01 | ユーザーデータ(記憶/設定/APIキー)はすべてローカルの userData(`%APPDATA%/project-ene/`)に保存される |
+| NFR-PRIV-02 | ユーザーはデータ全体を物理削除できる。**アンインストールで痕跡を残さない**(再生成可能なゴミは installer.nsh で除去)。記憶は既定保持し、完全削除はアンインストール時の選択/手動削除による(N-REL-2) |
 | NFR-PRIV-03 | 録音音声・会話テキストは端末外へ出さない(脳へ送るのは確定テキストのみ・音声はローカル STT 入力に限る) |
-| NFR-PRIV-04 | API キーは暗号化済み。フォルダごと別 PC へコピーしても safeStorage 鍵がマシン固定のため復号できず、再入力になる(=ポータブルとして正直な挙動) |
+| NFR-PRIV-04 | API キーは暗号化済み。userData を別 PC へ移しても safeStorage 鍵がマシン固定のため復号できず、再入力になる(=機械固定として正直な挙動) |
 
 ### 3.5 可搬性
 
@@ -414,32 +415,32 @@ v1.0 が提供するもの(ロードマップ・段階の全体像は `01_vision
 | 声(JSON＋モデル) | voice.json / backchannels.json / `.aivmx` 声モデル |
 | 見た目 | portrait.png(立ち絵) / animation.json / vrm.json / `.vrm` |
 
-### 4.2 ユーザデータ(実行時生成・すべて `data/` 配下=ポータブル)
+### 4.2 ユーザデータ(実行時生成・Electron userData=`%APPDATA%/project-ene/` 配下)
 
-部分暗号化方式:**API キーのみ暗号化**、それ以外は平文 JSON。すべてアプリフォルダ内の
-`data/` に集約し、Electron の userData も `data/app/` へ向け直す(`%APPDATA%` を使わない)。
+部分暗号化方式:**API キーのみ暗号化**、それ以外は平文 JSON。ユーザーデータは Electron userData
+(`%APPDATA%/project-ene/`)に集約する(NSIS 配布・N-REL-2)。同梱アセット(モデル/音声エンジン)は
+install dir 隣の `data/` に置く(読取専用・更新で入替)。
 
-| ディレクトリ・ファイル | 内容 | 暗号化 |
+| ディレクトリ・ファイル(userData=`%APPDATA%/project-ene/` 配下) | 内容 | 暗号化 |
 |----------------------|------|:---:|
-| `data/memory/{characterId}/short-term.json` | 短期記憶(キャラ別) | — |
-| `data/memory/{characterId}/semantic.json` | 長期記憶(性格・好み等) | — |
-| `data/memory/{characterId}/episodic/{year}/{category}/` | 中期記憶 | — |
-| `data/config/active-character.json` | キャラの最小状態(初回起動フラグ・誕生日の記録・接触の事実) | — |
-| `data/config/window-position.json` | ウィンドウ位置 | — |
-| `data/config/app-settings.json` | アプリ設定(マイク方式・話しかけ頻度等) | — |
-| `data/app/api-key.enc` | 暗号化 API キー | ✅ DPAPI |
-| `data/app/` | Electron userData(Local Storage・cache 等) | — |
-| `data/logs/` | アプリ動作ログ(個人情報を含まないメタ情報) | — |
-| `data/models/` | STT モデル(別配置) | — |
+| `memory/{characterId}/short-term.json` | 短期記憶(キャラ別) | — |
+| `memory/{characterId}/semantic.json` | 長期記憶(性格・好み等) | — |
+| `memory/{characterId}/episodic/{year}/{category}/` | 中期記憶 | — |
+| `config/active-character.json` | キャラの最小状態(初回起動フラグ・誕生日の記録・接触の事実) | — |
+| `config/window-position.json` | ウィンドウ位置 | — |
+| `config/app-settings.json` | アプリ設定(マイク方式・話しかけ頻度等) | — |
+| `api-key.enc` | 暗号化 API キー | ✅ DPAPI |
+| `logs/` | アプリ動作ログ(個人情報を含まないメタ情報) | — |
+| (install dir 隣)`data/models/`・`data/voice/` | STT/埋め込みモデル・音声エンジン(同梱アセット・読取専用) | — |
 
 ### 4.3 データの所有権と管理
 
 | 要件 |
 |------|
-| ユーザは `data/` を自由にバックアップ・削除できる |
-| アプリフォルダごと別 PC にコピーして継続利用できる(API キーのみマシン固定で再入力) |
-| **完全なアンインストールはアプリフォルダの削除のみで完結する**(%APPDATA% 等に残骸を残さない) |
-| 起動時、`data/app/` に API キーが無ければセットアップダイアログを表示する |
+| ユーザーは userData(記憶/設定)を自由にバックアップ・削除でき、設定パネルからエクスポート/インポートできる(N-REL-2) |
+| 別 PC へは記憶エクスポート/インポートで引っ越せる(API キーのみマシン固定で再入力) |
+| **アンインストールで痕跡を残さない**(再生成可能なゴミは installer.nsh で除去・記憶は既定保持) |
+| 起動時、userData に API キーが無ければセットアップダイアログを表示する |
 
 ---
 
@@ -486,7 +487,7 @@ v1.0 公開時、以下がすべて成立していること(ビジョン§7「�
 | 心(感情価バイアス想起) | 直近会話から導出した心情で想起に重みをかける機構(保存スカラーは持たない) |
 | Few-shot | LLM に振る舞いを学習させる応答例 |
 | Fallback | 判定不能・失敗時のデフォルト動作 |
-| ポータブル | アプリフォルダに全データを集約し、フォルダ削除＝完全アンインストールが成立する方式 |
+| ポータブル(データ可搬性) | 記憶/設定を平文 JSON で持ち、エクスポート/インポートで別 PC へ移せる性質(配布は NSIS・N-REL-2) |
 
 ---
 
