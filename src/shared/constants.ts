@@ -481,12 +481,18 @@ export const KNOWLEDGE_GAP_GATES: ReadonlyArray<{ slot: string; label: string; m
 export const KNOWLEDGE_GAP_SURFACE_MAX = 1;
 
 /**
- * 自発的な「気にかけ／まだ知らないこと」を再び持ち出すまで空ける最小時間(時間・⑥)。
- * 毎ターン注入するとツンデレが「世話焼き」化して崩れるため、一度提示したらこの時間は自分からは出さない。
- * クールダウン中は両方とも載せない。関連話題が会話に出れば retriever 経路で自然に再訪する(別経路・対象外)。
- * 小さいほど頻繁(0 で毎ターン=旧挙動)。会話経路のみが参照・更新する。
+ * 「気にかけ」(open-loops)を再び持ち出すまで空ける最小時間(時間・⑥)。毎ターン注入するとツンデレが
+ * 「世話焼き」化して崩れるため、一度提示したらこの時間は自分からは出さない。関連話題が会話に出れば
+ * retriever 経路で自然に再訪する(別経路・対象外)。小さいほど頻繁(0 で毎ターン=旧挙動)。会話経路のみが参照・更新。
  */
-export const PROACTIVE_SURFACE_COOLDOWN_HOURS = 6;
+export const OPEN_LOOP_GLOBAL_COOLDOWN_HOURS = 6;
+
+/**
+ * 「まだ知らないこと」(knowledge-gaps=名前・誕生日などを自分から尋ねる機会)を再び提示するまで空ける最小時間
+ * (時間・⑥)。open-loops とは**独立したクールダウン**=学習(名前等)は気にかけより低リスクなので別頻度で回す。
+ * 既定 24=「1日に一度まで自分から尋ねる」(ユーザ決定)。0 で毎ターン。会話経路のみが参照・更新。
+ */
+export const KNOWLEDGE_GAP_COOLDOWN_HOURS = 24;
 
 // --- P7: 自発発話(アイドル時)+ 有限性(トーン=発言内容のみ) ---
 

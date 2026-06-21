@@ -5,14 +5,24 @@ import { loadLifeMemory } from './life-memory';
 import { retrieve, type RetrieverDeps } from './retriever';
 import { deriveMood } from './mood';
 import { deriveFamiliarityStage } from './familiarity';
-import { selectOpenLoops, loadOpenLoopState, saveOpenLoopState } from './open-loops';
+import {
+  selectOpenLoops,
+  loadOpenLoopState,
+  saveOpenLoopState,
+  type OpenLoopState,
+} from './open-loops';
 import { selectKnowledgeGaps } from './knowledge-gaps';
 import { checkUserBirthdayToday } from './user-birthday';
 import { loadOrCreateActiveCharacter } from '../character/active-character';
 import { log } from '../shared/logger';
 import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
 import { timeOfDayLabel, describeElapsed, finitenessHint } from '../shared/moment';
-import { RECALL_DEBUG_ENV, PROACTIVE_SURFACE_COOLDOWN_HOURS, DAY_MS } from '../shared/constants';
+import {
+  RECALL_DEBUG_ENV,
+  OPEN_LOOP_GLOBAL_COOLDOWN_HOURS,
+  KNOWLEDGE_GAP_COOLDOWN_HOURS,
+  DAY_MS,
+} from '../shared/constants';
 import type {
   MemoryContext,
   RetrievalQuery,
@@ -91,25 +101,44 @@ async function buildMoment(
   const nowIso = nowLocalIso();
   const todayYmd = nowIso.slice(0, 10);
 
-  // P4/P5: 自発的な「気にかけ」(openLoops)「まだ知らないこと」(knowledgeGaps)。
-  //   ⑥=毎ターン出すとツンデレが世話焼き化して崩れるため、一度提示したら
-  //   PROACTIVE_SURFACE_COOLDOWN_HOURS は自分から持ち出さない(間引き)。クールダウン中は両方とも載せない。
-  //   関連話題が会話に出れば retriever 経路で自然に再訪する(別経路・間引き対象外)。失敗は握りつぶす。
+  // P4: 気にかけ(open-loops)/ P5: まだ知らないこと(knowledge-gaps)。⑥=毎ターン出すとツンデレが
+  //   世話焼き化して崩れるため、**それぞれ独立したクールダウン**で間引く(気にかけ=6h / 学習=1日1回)。
+  //   各クールダウン中はその種類を載せない。関連話題が出れば retriever 経路で自然に再訪する(別経路・対象外)。
+  //   提示できた種類だけタイムスタンプを進める。失敗は握りつぶす。
   let openLoops: string[] = [];
   let knowledgeGaps: string[] = [];
   try {
     const state = await loadOpenLoopState();
-    const lastMs = state.lastProactiveAt ? Date.parse(state.lastProactiveAt) : NaN;
-    const cooldownMs = (PROACTIVE_SURFACE_COOLDOWN_HOURS * DAY_MS) / 24;
-    const cooledDown = Number.isNaN(lastMs) || nowMs - lastMs >= cooldownMs;
-    if (cooledDown) {
+    const cooled = (last: string | undefined, hours: number): boolean => {
+      const t = last ? Date.parse(last) : NaN;
+      return Number.isNaN(t) || nowMs - t >= (hours * DAY_MS) / 24;
+    };
+    let surfaced = state.surfaced;
+    let lastOpenLoopAt = state.lastOpenLoopAt;
+    let lastGapAt = state.lastGapAt;
+    let changed = false;
+
+    if (cooled(state.lastOpenLoopAt, OPEN_LOOP_GLOBAL_COOLDOWN_HOURS)) {
       const sel = selectOpenLoops(userRecords, state, nowMs, nowIso);
       openLoops = sel.notes;
-      knowledgeGaps = selectKnowledgeGaps(semantic, stage);
-      // 何か自発提示した回だけ間隔を空ける(surfaced=各 loop の上限管理 / lastProactiveAt=全体の間引き)。
-      if (openLoops.length > 0 || knowledgeGaps.length > 0) {
-        await saveOpenLoopState({ surfaced: sel.surfaced, lastProactiveAt: nowIso });
+      if (openLoops.length > 0) {
+        surfaced = sel.surfaced;
+        lastOpenLoopAt = nowIso;
+        changed = true;
       }
+    }
+    if (cooled(state.lastGapAt, KNOWLEDGE_GAP_COOLDOWN_HOURS)) {
+      knowledgeGaps = selectKnowledgeGaps(semantic, stage);
+      if (knowledgeGaps.length > 0) {
+        lastGapAt = nowIso;
+        changed = true;
+      }
+    }
+    if (changed) {
+      const next: OpenLoopState = { surfaced };
+      if (lastOpenLoopAt) next.lastOpenLoopAt = lastOpenLoopAt;
+      if (lastGapAt) next.lastGapAt = lastGapAt;
+      await saveOpenLoopState(next);
     }
   } catch (e) {
     log.warn('proactive surfacing failed', { name: (e as Error).name });

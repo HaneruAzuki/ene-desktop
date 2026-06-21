@@ -33,10 +33,15 @@ export interface OpenLoopState {
   /** loop の id(= episodic 相対パス)→ 注入履歴。 */
   surfaced: Record<string, OpenLoopSurface>;
   /**
-   * 自発的な「気にかけ／まだ知らないこと」を最後に提示した日時(ローカルTZ込み ISO・⑥)。
-   * 会話経路が PROACTIVE_SURFACE_COOLDOWN_HOURS の間引きに使う。他経路(idle/挨拶)は上書きしない。
+   * 「気にかけ」(open-loops)を最後に提示した日時(ローカルTZ込み ISO・⑥)。
+   * 会話経路が OPEN_LOOP_GLOBAL_COOLDOWN_HOURS の間引きに使う。他経路(idle/挨拶)は上書きしない。
    */
-  lastProactiveAt?: string;
+  lastOpenLoopAt?: string;
+  /**
+   * 「まだ知らないこと」(knowledge-gaps)を最後に提示した日時(ローカルTZ込み ISO・⑥)。
+   * 会話経路が KNOWLEDGE_GAP_COOLDOWN_HOURS の間引きに使う(open-loop とは独立)。
+   */
+  lastGapAt?: string;
 }
 
 export interface OpenLoopSelection {
@@ -103,12 +108,15 @@ export function formatOpenLoopsForExtractor(records: EpisodicRecord[]): string {
 // --- クールダウン状態の I/O(派生状態・壊れても会話に影響させない) ---
 
 export async function loadOpenLoopState(): Promise<OpenLoopState> {
-  const raw = await readJson<{ surfaced?: Record<string, unknown>; lastProactiveAt?: unknown }>(
-    getOpenLoopStatePath(),
-  );
+  const raw = await readJson<{
+    surfaced?: Record<string, unknown>;
+    lastOpenLoopAt?: unknown;
+    lastGapAt?: unknown;
+  }>(getOpenLoopStatePath());
   if (raw && typeof raw === 'object' && raw.surfaced && typeof raw.surfaced === 'object') {
     const state: OpenLoopState = { surfaced: normalizeSurfaced(raw.surfaced) };
-    if (typeof raw.lastProactiveAt === 'string') state.lastProactiveAt = raw.lastProactiveAt;
+    if (typeof raw.lastOpenLoopAt === 'string') state.lastOpenLoopAt = raw.lastOpenLoopAt;
+    if (typeof raw.lastGapAt === 'string') state.lastGapAt = raw.lastGapAt;
     return state;
   }
   return { surfaced: {} };
@@ -134,14 +142,19 @@ function normalizeSurfaced(raw: Record<string, unknown>): Record<string, OpenLoo
 }
 
 export async function saveOpenLoopState(state: OpenLoopState): Promise<void> {
-  // lastProactiveAt 未指定の保存(idle-talk/挨拶は surfaced のみ更新)では、既存の間引きタイムスタンプを
-  // 保持する=別経路の保存で会話経路のクールダウンを消さない(⑥・共有 state の取り違え事故を防ぐ)。
+  // lastOpenLoopAt / lastGapAt 未指定の保存(idle-talk/挨拶は surfaced のみ更新)では、既存の間引き
+  // タイムスタンプを保持する=別経路の保存で会話経路のクールダウンを消さない(⑥・共有 state の取り違え防止)。
   let toSave = state;
-  if (state.lastProactiveAt === undefined) {
-    const raw = await readJson<{ lastProactiveAt?: unknown }>(getOpenLoopStatePath());
-    if (raw && typeof raw.lastProactiveAt === 'string') {
-      toSave = { ...state, lastProactiveAt: raw.lastProactiveAt };
-    }
+  if (state.lastOpenLoopAt === undefined || state.lastGapAt === undefined) {
+    const raw = await readJson<{ lastOpenLoopAt?: unknown; lastGapAt?: unknown }>(
+      getOpenLoopStatePath(),
+    );
+    const merged: OpenLoopState = { ...state };
+    if (merged.lastOpenLoopAt === undefined && raw && typeof raw.lastOpenLoopAt === 'string')
+      merged.lastOpenLoopAt = raw.lastOpenLoopAt;
+    if (merged.lastGapAt === undefined && raw && typeof raw.lastGapAt === 'string')
+      merged.lastGapAt = raw.lastGapAt;
+    toSave = merged;
   }
   await writeJson(getOpenLoopStatePath(), toSave);
 }
