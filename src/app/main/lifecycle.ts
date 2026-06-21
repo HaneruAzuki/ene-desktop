@@ -30,7 +30,7 @@ import { IdleTalkManager } from './idle-talk-manager';
 import type { AppRuntime } from './app-runtime';
 import { initVoice } from './voice-runtime';
 import { ensureVoiceEngine } from './voice-engine';
-import { initAutoUpdate } from './auto-update';
+import { checkUpdateFlow } from './auto-update';
 import { generateGreeting } from '../../conversation/greeting';
 import {
   loadWindowPosition,
@@ -176,6 +176,10 @@ export async function runStartupSequence(
   registerIpcHandlers(mainWindow, runtime);
   registerSettingsIpc(mainWindow, runtime); // 設定パネル(段階6)の IPC を別モジュールで登録
 
+  // 自動更新チェックを準備フェーズの先頭で発火(packaged のみ・並行)。更新ありなら「ちょっと待って」中に
+  // トリミ口調ダイアログを出す(準備完了前=システム的UI許容・方針整合・N-REL-2)。readiness は下でこれを待つ。
+  const updateReady = checkUpdateFlow(mainWindow);
+
   // 自発発話(P7): アイドル監視を開始(best-effort・既定 low・ENE_IDLE_TALK=0 で無効・v1 はテキストのみ)。
   // 初回 tick は IDLE_TALK_CHECK_INTERVAL_MS 後=起動直後には鳴らない。失敗しても起動に影響しない。
   const idleTalk = new IdleTalkManager(mainWindow, runtime);
@@ -206,6 +210,8 @@ export async function runStartupSequence(
         runtime.warmVad?.() ?? Promise.resolve(),
       ]),
     )
+    // 更新フロー(チェック＋ユーザー判断)が済むまで ready にしない=ダイアログは必ず準備完了前(N-REL-2)。
+    .then(() => updateReady)
     .then(() => {
       runtime.ready = true;
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.APP_READY);
@@ -239,9 +245,6 @@ export async function runStartupSequence(
     runtime.greetingPromise = null;
     await markFirstLaunchCompleted();
   }
-
-  // 自動更新チェック(packaged のみ・背景・失敗は黙殺・N-REL-2)。起動の最後に発火しウォームと競合させない。
-  initAutoUpdate(mainWindow);
 
   log.info('app ready');
   return { mainWindow, active };
