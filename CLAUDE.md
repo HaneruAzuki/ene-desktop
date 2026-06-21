@@ -381,6 +381,8 @@
 | 実装過程の判断ログ(N-xx) | `docs/implementation-notes.md` |
 | 人生記憶 canon の内容計画 | `docs/character-life-memory-canon-plan.md` |
 | 画面の外の暮らし(off-screen-life)の設計・配信・フォールバック | `docs/off-screen-life-plan.md` |
+| off-screen-life の内容(カテゴリ別の出来事・反応グラマー・X投稿例) | `docs/off-screen-life-bible.md` |
+| off-screen-life の生成手順(指南書・現在トレンドの扱い・安全ガード) | `docs/off-screen-life-authoring-guide.md` |
 | 過去の経緯(マージ済み改訂・草案) | `docs/archive/`(現行ではない・対応表は archive/README) |
 | プロダクトの本質・判断基準 | `docs/01_vision.md` |
 | プロダクトの思想・なぜこの形か(四つのあり方＋関係) | `docs/00_philosophy.md` |

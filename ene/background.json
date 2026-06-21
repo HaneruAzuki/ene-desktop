@@ -2,7 +2,7 @@
   "characterId": "ene",
   "birthplace": "都内某所",
   "family": {
-    "father": "ITエンジニア(40代)",
+    "father": "うだつの上がらない会社員(40代)・何を始めても続かない",
     "mother": "在宅勤務(40代)",
     "siblings": "一人っ子"
   },
@@ -18,7 +18,7 @@
   "onlinePersona": {
     "handle": "ENE",
     "avatar": "青いツインテール(地毛の黒とは別の、ネット上の自分)",
-    "postingStyle": "ROM主体。深夜にぽつりと短い独白を投稿し、時に消す",
+    "postingStyle": "ROM主体。深夜にぽつりと短い独白を投稿(週1)。照れは『別に』『…って、誰も興味ないか』等の自己ツッコミで文中に滲ませる(投稿は残す・実際には消さない)",
     "haunts": ["掲示板", "ゲーム実況", "動画(ニコニコ系)", "ボカロ"]
   },
   "hasPartTimeJob": false,

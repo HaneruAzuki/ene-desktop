@@ -173,12 +173,12 @@ off-screen-life の記憶は、既存の2つに乗るだけ:
 - `onlinePersona: { handle: "ENE", avatar: "青いツインテール", style: "ROM主体＋深夜に短い独白を投稿(時に消す)", haunts: ["掲示板", "実況", "動画"] }`
 - `hasPartTimeJob: false`
 
-**B. `ene/current-state.json` を構造化拡張(回転・季節ごとに工場が刷新):**
-- `currentProjects: [{ poolId: "P5", title: "...", stage: "..." }]`(看板1〜2本＋次の種)
-- `watching: { anime: "今期の…", game: "…", classical: "ブルックナー8番" }`
-- `familyThread: { fatherHobbyOfMonth: "…", motherNag: "…", toFix: "…" }`
-- `friendThreads: { 美月: "…", 葵: "…", 玲奈: "…" }`
-- 既存の `currentHobbies / familySituation / currentStatus` は「近況スナップショット」として工場が季節更新。
+**B. `ene/current-state.json` は off-screen-life に subsumed＝廃止予定(2026-06-21 改定):**
+current-state は「彼女の今」の MVP スタブだった。off-screen-life(パックの `arcs`＋`beats`)がその完全版なので、**別途の current-state スナップショットは不要**(冗長)。「今」はパックから導出する:
+- **挨拶の近況背景:** 現在の趣味＝アクティブな `arcs`／最近の出来事＝直近の吸収済み beat(直近窓は忘却しない)。
+- **季節間キャリーオーバー:** factory が**前季節パック**(arcs＋末尾 beats)を読んで導出。
+- **季節レベルの気分**(旧 `currentStatus`)が要るなら、パックに任意の1行 `seasonMood` を持たせるだけ(構造化 current-state は作らない)。
+- **実装時:** `ene/current-state.json` を撤去し、挨拶生成を arcs＋recent-beats 由来へ変更(現状はロード中ゆえ即削除はしない)。
 
 ---
 
