@@ -1137,7 +1137,7 @@
 
 ---
 
-### N-17-13 🟡 音声エンジンのポータブル化:AivisSpeech の %APPDATA% 流出を「一時借用」で解消(2026-06-19・設計確定/実装前)
+### N-17-13 🟢 音声エンジンのポータブル化＋完全オフライン化:AivisSpeech の %APPDATA% 流出を「一時借用」で解消(2026-06-19 設計確定→2026-06-20 実装＋SSOT反映)
 - **タスク/契機**: ポータブル配布(フォルダ削除＝完全アンインストール・%APPDATA% 痕跡ゼロ・[[release-portable-2026-06]])のアップデート運用を検討中、AivisSpeech エンジンの保存先が制御不能と判明。本項は**設計確定の記録**(実装はこの後)。
 - **該当箇所**: 03_design §2(`data/voice` ツリー・line 437「.aivmx/BERT は %APPDATA%…変更不可」)・§3.6(部分暗号化/ポータブル)・§4.2/§7.1(外部送信は Claude のみ)・§11.8(更新運用)。`src/app/main/voice-engine.ts`・`src/shared/node/paths.ts`・`ene/voice.json`・`electron-builder.yml`。
 - **判明した実態(実機確認)**:
@@ -1159,6 +1159,7 @@
   - **✅ 検証完了(2026-06-20 spike #2・本番ネットワーク遮断構成)**: 死んだ HTTP_PROXY で **全 AivisHub 通信が ConnectError で失敗**することを実証。AivisHub への接続は4種(`fetch_model_detail`／**`fetch_forced_removal_rules`=遠隔強制削除ルール**／`fetch_default_models`／既定モデル本体DL)＋`AivisHubClient` 起動イベント。**毎起動接続を試みる(初回限定でない)**。遮断下でも **engine healthy＋オフライン合成 200/90KB** で継続。
   - **不変条件(根幹)**: AivisHub 遮断は "load-bearing"。①proxy 遮断は常時必須 ②エンジン更新のたびにネットワーク挙動を再監査 ③「エンジンの外向き成功=ゼロ」を smoke で機械検証。`forced_removal_rules` 遮断は「声を遠隔で消されない」=永続性(§5.2)の保護でもある。
   - **起動速度**: 遮断時は既定DLの3リトライで起動 ~34s。**cache 同梱(pre-seed)で既定モデル install を起こさせない**ことで短縮(正しさは proxy で担保済・速度最適化)。
+- **✅ 実装＋SSOT反映済(2026-06-20・commit fad43d0 ほか)**: 実装=`src/shared/node/engine-userdata.ts`(純粋 plan＋副作用 prepare/cleanup＋engineOfflineEnv)・`voice-engine.ts` 配線・`voice.json` の uuid・`electron-builder.yml` 同梱・単体テスト6件(全497緑)。SSOT 反映=03_design **§2**(`data/voice/userdata` 追記・line437 改訂)・**§3.4 末尾の音声エンジン例外**(「localhost 完結・初回取得のみ」の旧記述を「エンジンは AivisHub へ通信する→死んだproxy/offlineで遮断=外部送信は Claude のみ」へ訂正)・**§3.6**(%APPDATA% 一時借用＋共存ハードリンクを明記)。**§11.8(更新運用)は別機能=未実装ゆえ未反映**。残=実機 setup:engine-userdata＋smoke(%APPDATA 痕跡ゼロ・外向きゼロ)。
 
 ---
 

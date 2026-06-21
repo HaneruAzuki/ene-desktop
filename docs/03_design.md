@@ -432,9 +432,12 @@ ene-desktop/
 │       │   ├── ruri-v3-310m/      ← 埋め込み ONNX int8(約316MB)・scripts/download-model.mjs(task_15)
 │       │   └── kotoba-whisper-v2.2/ ← STT ONNX(既定・env で whisper-small 等に切替)・scripts/download-stt-model.mjs(task_17/N-LAT-6)
 │       ├── voice/                  ← 音声サイドカー資産(別配置・コア非汚染・task_17/N-17-12)
-│       │   └── engine/            ← AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/・約800MB)
-│       │                            起動時に main が spawn(shell:false)→/version ヘルス→終了時 kill
-│       │                            ※声モデル(.aivmx)/BERT は %APPDATA%/AivisSpeech-Engine/(エンジン仕様で変更不可)
+│       │   ├── engine/            ← AivisSpeech エンジン一式(run.exe + engine_internal/ + resources/・約800MB)
+│       │   │                        起動時に main が spawn(shell:false)→/version ヘルス→終了時 kill
+│       │   └── userdata/          ← エンジンのデータ root=torimi モデル＋BERT(N-17-13・setup:engine-userdata で配置)
+│       │                            エンジンは保存先 %APPDATA%/AivisSpeech-Engine/ を固定する(変更不可)ため起動時に
+│       │                            ここへ**ジャンクションで一時借用**し終了時に外す(正常終了で痕跡ゼロ)。子プロセスは
+│       │                            死んだproxy＋offline＋--disable_sentry で完全オフライン化(外部送信=Claudeのみ)
 │       ├── logs/                  ← アプリ動作ログ(個人情報を含まないメタ情報のみ)
 │       ├── config/
 │       │   ├── window-position.json
@@ -1617,8 +1620,14 @@ export async function execute(cmd: OsCommand): Promise<OsCommandResult> {
 > **固定パスの既知バイナリ + 引数配列(`--host 127.0.0.1 --port 10101`)+ `shell:false` + `windowsHide:true`**。
 > 既に到達可能なら spawn しない(ポート衝突回避)。終了時は自分が起動した場合のみ `child.kill()`、
 > 残れば Windows は `taskkill /PID <pid> /T /F`(これも固定引数・`shell:false`)でツリーを停止する。
-> 外部送信は無く(localhost 完結)、§4.2/§7.1 の「Claude 以外への外部通信禁止」には抵触しない
-> (エンジン/モデルの**初回取得**のみが N-17-6 で承認された限定例外)。
+> **重要(N-17-13・実機 spike で判明し是正)**:AivisSpeech エンジンは素のままだと**毎起動 AivisHub
+> (api.aivis-project.com)へ接続**を試み(既定モデルDL・強制削除ルール取得・起動テレメトリ)、さらに BERT を
+> HuggingFace から実行時DLする。これは §4.2/§7.1「Claude 以外への外部通信禁止」に抵触する(旧版の
+> 「localhost 完結・初回取得のみの例外」という記述は誤りだった)。そこで spawn 時に**子プロセスへ死んだ proxy
+> (`HTTP(S)_PROXY=http://127.0.0.1:9`)＋`HF_HUB_OFFLINE=1`＋`--disable_sentry`** を渡し、エンジンの全 outbound を
+> 端末内で connection refused にする(=外部に出ない)。BERT は `data/voice/userdata` に同梱して使う。これにより
+> **外部送信は Claude のみ**を機械的に維持する(合成はローカル 127.0.0.1:10101 完結)。この遮断は load-bearing=
+> エンジン同梱版はピン留めし、更新時はネットワーク挙動を再監査する。詳細は §3.6 と実装ノート N-17-13。
 
 #### キャラ応答との統合
 
@@ -1759,6 +1768,14 @@ export function getPortableDataDir(): string {
 `index.ts` が起動時に userData を **exe 隣の `data/app/`** へ向け直す(Local Storage・
 `api-key.enc`・キャッシュ・クラッシュダンプも含めて `data/` 配下へ集約)。これにより
 `%APPDATA%` に痕跡を残さず、フォルダ削除だけで完全に消える。
+
+唯一の例外は **AivisSpeech エンジン**で、保存先 `%APPDATA%/AivisSpeech-Engine/` を固定する
+(フラグ/設定/環境変数で変更不可・実機 spike で確認)。そこで `app/main` が起動時にこのパスを
+**ポータブル `data/voice/userdata`(torimi＋BERT 同梱)へジャンクション**して「一時借用」し、終了時に外す
+(`src/shared/node/engine-userdata.ts`・N-17-13)。実体は常に `data/` 側に在り、正常終了で `%APPDATA%` に
+痕跡は残らない(クラッシュ時のみ空のジャンクションが残り、次回起動で自己修復)。標準版 AivisSpeech が
+同居する環境では相手の dir を占有せず、torimi だけを `<uuid>.aivmx` でハードリンクして持ち込む
+(相手のモデル/設定は無改変)。エンジンの外向き通信は上記(§3.4 末尾)のとおり死んだ proxy で遮断する。
 
 ### 3.7 APIキー管理ダイアログ(API Key Management)
 
