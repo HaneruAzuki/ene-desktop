@@ -10,6 +10,7 @@
 export const IPC = {
   APP_READY: 'ene:app-ready',
   BACKCHANNEL: 'ene:backchannel',
+  EXPORT_MEMORY: 'ene:export-memory',
   GET_AUDIO_PREFS: 'ene:get-audio-prefs',
   GET_AUTO_LAUNCH: 'ene:get-auto-launch',
   GET_CHARACTER_INFO: 'ene:get-character-info',
@@ -20,6 +21,7 @@ export const IPC = {
   GET_VOICE_EQ: 'ene:get-voice-eq',
   GET_VRM_CONFIG: 'ene:get-vrm-config',
   GOODBYE: 'ene:goodbye',
+  IMPORT_MEMORY: 'ene:import-memory',
   IS_READY: 'ene:is-ready',
   LISTENING: 'ene:listening',
   MOVE_WINDOW: 'ene:move-window',

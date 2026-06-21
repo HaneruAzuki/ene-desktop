@@ -70,6 +70,8 @@ export const SettingsPanel = forwardRef<HTMLDivElement, Props>(function Settings
   // 親(App)が保存後に props を更新するので、props 変化でローカルを同期する(=保存後は「変更なし」状態へ戻る)。
   const [name, setName] = useState(ownerName);
   const [reading, setReading] = useState(ownerReading);
+  // 記憶のバックアップ結果メッセージ(エクスポート/インポートの成否をその場で表示)。
+  const [backupStatus, setBackupStatus] = useState('');
   useEffect(() => {
     setName(ownerName);
     setReading(ownerReading);
@@ -180,6 +182,25 @@ export const SettingsPanel = forwardRef<HTMLDivElement, Props>(function Settings
         <button className="settings-action" onClick={onAbout}>
           このアプリについて / クレジット
         </button>
+      </div>
+
+      <div className="settings-panel__section">
+        <div className="settings-panel__label">記憶のバックアップ</div>
+        <button
+          className="settings-action"
+          onClick={() => void window.ene.exportMemory().then((r) => setBackupStatus(r.message))}
+        >
+          記憶を書き出す(バックアップ)
+        </button>
+        <button
+          className="settings-action"
+          onClick={() => void window.ene.importMemory().then((r) => setBackupStatus(r.message))}
+        >
+          記憶を読み込む(復元)
+        </button>
+        {backupStatus && (
+          <p style={{ margin: '6px 2px 0', fontSize: 12, opacity: 0.8 }}>{backupStatus}</p>
+        )}
       </div>
     </div>
   );

@@ -65,6 +65,10 @@ export interface EneAPI {
   showAbout(): Promise<void>;
   openDataFolder(): Promise<void>;
   openConsole(): Promise<void>;
+  /** 記憶(＋設定)を選択フォルダへ書き出す。api-key は機械固定ゆえ含めない(N-REL-2)。 */
+  exportMemory(): Promise<{ ok: boolean; message: string }>;
+  /** バックアップフォルダから記憶(＋設定)を上書き復元する。反映には再起動が必要(N-REL-2)。 */
+  importMemory(): Promise<{ ok: boolean; message: string }>;
   getAutoLaunch(): Promise<boolean>;
   setAutoLaunch(on: boolean): Promise<void>;
   // 主人の呼び方(＋読み)の取得/登録(本名 userFullName は会話で覚える=設定では扱わない)。
