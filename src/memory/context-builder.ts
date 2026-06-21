@@ -3,7 +3,7 @@ import { getShortTerm } from './short-term';
 import { loadAllEpisodicFiles } from './episodic';
 import { loadLifeMemory } from './life-memory';
 import { retrieve, type RetrieverDeps } from './retriever';
-import { recentUserTone } from './mood';
+import { recentUserTone } from './user-tone';
 import { deriveFamiliarityStage } from './familiarity';
 import {
   selectOpenLoops,

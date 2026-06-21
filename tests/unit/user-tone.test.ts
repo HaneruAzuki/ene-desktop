@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recentUserTone } from '../../src/memory/mood';
+import { recentUserTone } from '../../src/memory/user-tone';
 import type { EpisodicRecord } from '../../src/shared/types/memory';
 
 // 相手のトーン導出(recentUserTone)の検証。純関数・now 注入で決定的。
