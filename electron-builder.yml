@@ -36,22 +36,39 @@ asarUnpack:
   - 'resources/silero_vad.onnx' # VAD モデルは native onnxruntime-node が直接読む=asar 外が必須(task_17 Phase C)
 win:
   target:
-    # ポータブル配布(2026-06): 展開フォルダを zip 1個で配る。
-    # ユーザは zip を任意の書込可能な場所へ展開 → Torimi.exe を実行 → フォルダ削除で完全アンインストール。
-    # (自己展開 portable exe は %TEMP% 展開で 1.5GB 同梱に不向きなため zip フォルダ方式へ・N-REL)
-    - target: zip
+    # NSIS インストーラ配布(2026-06・N-REL-2): 「説明を読まない人」が DL→ダブルクリック→自動セットアップ。
+    # per-user(管理者不要)・自動更新(electron-updater)・標準アンインストール。旧ポータブル zip から転換。
+    - target: nsis
       arch:
         - x64
   icon: resources/icon.ico
-# 配布物の ASCII 安全名(日本語ファイル名は DL で文字化け・破損リスク)。
-artifactName: Torimi-${version}.${ext}
+# NSIS インストーラ設定(N-REL-2)。
+#  - oneClick=最小UX(読まずに入る・完了後に自動起動)/ perMachine:false=ユーザー領域=管理者不要(UAC なし)
+#  - deleteAppDataOnUninstall:false=**ユーザーの記憶は既定で残す**(不具合→再インストールで戻せる)。
+#    完全削除/エクスポートはアプリ内で行う。AivisSpeech エンジン残骸は include のフックで除去(共存セーフ)。
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+# 自動更新のバックエンド(electron-updater が GitHub Releases の latest.yml をここから取得)。公開リポジトリ。
+publish:
+  provider: github
+  owner: HaneruAzuki
+  repo: ene-desktop
+# 配布物の ASCII 安全名(日本語ファイル名は DL で文字化け・破損リスク)。インストーラ= Torimi-Setup-<ver>.exe。
+artifactName: Torimi-Setup-${version}.${ext}
 # モデル/音声エンジン(計約1.5GB)を **asar 外の素ファイル**として exe 隣の data/ へ同梱する。
 # transformers.js / AivisSpeech エンジンは実体ファイルを直接読むため asar には入れられない。
 # 同梱先は dev と同じ相対パス(data/models・data/voice/engine)=getModelsDir/getVoiceEngineDir は無改修。
 # ⚠️ 同梱元(下記 from)は配置済みであること(npm run download:model / download:stt-model / setup:voice-engine)。
 # 声モデル(torimi)＋BERT はエンジンが %APPDATA%\AivisSpeech-Engine へ保存する(変更不可)ため、それらを
-# data/voice/userdata に同梱し、起動時に %APPDATA% へ**ジャンクションで一時借用**する(N-17-13・engine-userdata.ts)。
-# 同梱元は npm run setup:engine-userdata で配置。終了時に借用を外すので %APPDATA% に痕跡を残さない。
+# data/voice/userdata に同梱し、初回起動で %APPDATA% へ**配置**する(N-REL-2・engine-userdata.ts)。
+# 標準版 AivisSpeech 同居時は torimi(UUID)だけ追加し、アンインストール時にフック(installer.nsh)で除去する。
+# 同梱元は npm run setup:engine-userdata で配置。
 extraFiles:
   # 第三者ライセンス表記(配布物の分かりやすい場所=exe 隣に置く。LGPL/MIT/Apache の表示義務＋つくよみクレジット)
   - from: THIRD_PARTY_NOTICES.md
@@ -63,8 +80,8 @@ extraFiles:
     to: data/models/ruri-v3-310m
   - from: data/voice/engine
     to: data/voice/engine
-  # エンジンのユーザデータ root(torimi モデル＋BERT)。起動時に %APPDATA%\AivisSpeech-Engine へ
-  # ジャンクションして一時借用する(N-17-13)。npm run setup:engine-userdata で配置。
+  # エンジンのユーザデータ root(torimi モデル＋BERT)。初回起動で %APPDATA%\AivisSpeech-Engine へ
+  # 配置する(N-REL-2・共存時は torimi のみ)。npm run setup:engine-userdata で配置。
   - from: data/voice/userdata
     to: data/voice/userdata
 # 配布サイズ削減: 同梱するロケールを絞る(NF-SIZE-01)

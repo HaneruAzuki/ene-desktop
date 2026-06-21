@@ -1,7 +1,7 @@
 import { promises as fs, constants as fsConstants } from 'node:fs';
 import { app, dialog, type BrowserWindow } from 'electron';
 import { log, initLogger } from '../../shared/logger';
-import { getPortableDataDir, getLogsDir } from '../../shared/node/paths';
+import { getUserDataDir, getLogsDir } from '../../shared/node/paths';
 import { isCloudSyncFolder } from '../../shared/node/cloud-warning';
 import { loadAndDecryptApiKey } from '../../shared/node/encryption';
 import { todayLocalYmd, nowLocalIso } from '../../shared/datetime';
@@ -30,6 +30,7 @@ import { IdleTalkManager } from './idle-talk-manager';
 import type { AppRuntime } from './app-runtime';
 import { initVoice } from './voice-runtime';
 import { ensureVoiceEngine } from './voice-engine';
+import { initAutoUpdate } from './auto-update';
 import { generateGreeting } from '../../conversation/greeting';
 import {
   loadWindowPosition,
@@ -51,8 +52,8 @@ export async function runStartupSequence(
   initLogger(getLogsDir());
   log.info('app starting');
 
-  // Step 3: ポータブル書込チェック
-  const dataDir = getPortableDataDir();
+  // Step 3: ユーザーデータ書込チェック(記憶/設定/APIキーを書く userData root)
+  const dataDir = getUserDataDir();
   try {
     await fs.mkdir(dataDir, { recursive: true });
     await fs.access(dataDir, fsConstants.W_OK);
@@ -238,6 +239,9 @@ export async function runStartupSequence(
     runtime.greetingPromise = null;
     await markFirstLaunchCompleted();
   }
+
+  // 自動更新チェック(packaged のみ・背景・失敗は黙殺・N-REL-2)。起動の最後に発火しウォームと競合させない。
+  initAutoUpdate(mainWindow);
 
   log.info('app ready');
   return { mainWindow, active };

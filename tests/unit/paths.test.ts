@@ -20,6 +20,7 @@ vi.mock('../../src/shared/node/json-store', () => ({ readJson: h.readJson }));
 import { app } from 'electron';
 import {
   getPortableDataDir,
+  getUserDataDir,
   getMemoryDir,
   getEpisodicDir,
   getSemanticPath,
@@ -54,14 +55,10 @@ describe('paths (設計書 §3.6 / §5.5)', () => {
     expect(getPortableDataDir()).toBe(path.join(path.dirname(process.execPath), 'data'));
   });
 
-  it('portable 本番時は PORTABLE_EXECUTABLE_DIR/data を返す', () => {
+  it('getUserDataDir は開発時 cwd/data、本番時 Electron userData を返す(N-REL-2)', () => {
+    expect(getUserDataDir()).toBe(path.join(process.cwd(), 'data'));
     setPackaged(true);
-    process.env.PORTABLE_EXECUTABLE_DIR = 'D:\\apps\\ENE';
-    try {
-      expect(getPortableDataDir()).toBe(path.join('D:\\apps\\ENE', 'data'));
-    } finally {
-      delete process.env.PORTABLE_EXECUTABLE_DIR;
-    }
+    expect(getUserDataDir()).toBe(path.join(os.tmpdir(), 'ene-ud'));
   });
 
   it('getMemoryDir は active キャラ ID を反映する', () => {
@@ -85,8 +82,11 @@ describe('paths (設計書 §3.6 / §5.5)', () => {
     expect(getShortTermPath()).toBe(path.join(base, 'short-term.json'));
   });
 
-  it('マシン固定データと API キーパスは userData 配下', () => {
-    expect(getMachineDataDir()).toBe(path.join(os.tmpdir(), 'ene-ud'));
+  it('マシン固定データと API キーパスはユーザーデータ root 配下(N-REL-2)', () => {
+    // dev(isPackaged=false)= cwd/data。packaged では Electron userData。
+    expect(getMachineDataDir()).toBe(path.join(process.cwd(), 'data'));
+    expect(getApiKeyPath()).toBe(path.join(process.cwd(), 'data', 'api-key.enc'));
+    setPackaged(true);
     expect(getApiKeyPath()).toBe(path.join(os.tmpdir(), 'ene-ud', 'api-key.enc'));
   });
 

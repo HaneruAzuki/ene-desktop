@@ -7,7 +7,7 @@ import path from 'node:path';
 // safeStorage はモック(往復可能で平文を含まない「文字列反転」で代用)。
 const h = vi.hoisted(() => ({ dir: '' }));
 vi.mock('electron', () => ({
-  app: { isPackaged: false, getPath: (): string => h.dir },
+  app: { isPackaged: true, getPath: (): string => h.dir }, // packaged=true で userData(=h.dir)へ解決(N-REL-2)
   safeStorage: {
     isEncryptionAvailable: (): boolean => true,
     encryptString: (s: string): Buffer => Buffer.from([...s].reverse().join(''), 'utf8'),
@@ -37,9 +37,9 @@ describe('受入: API キーの暗号化(成功基準6)', () => {
     expect(await loadAndDecryptApiKey()).toBe('sk-ant-roundtrip-99');
   });
 
-  it('保存先は Electron の userData 配下(ポータブル運用では app フォルダ内へリダイレクト)', () => {
-    // ポータブル: packaged 時に index.ts が userData を exe 隣の data/app へ向け直す。
-    // api-key.enc はそこに置かれ、DPAPI 暗号で機械固定=別PCにフォルダごとコピーしても復号不可→再入力(§6.3)。
+  it('保存先は Electron の userData 配下(NSIS 配布・N-REL-2)', () => {
+    // NSIS 配布(N-REL-2): api-key.enc は userData(%APPDATA%/project-ene)直下。DPAPI 暗号で機械固定=
+    // 別PCにコピーしても復号不可→再入力(§6.3)。アンインストールでも既定保持(記憶と同じ扱い)。
     expect(getApiKeyPath()).toBe(path.join(h.dir, 'api-key.enc'));
   });
 });

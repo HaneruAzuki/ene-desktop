@@ -15,12 +15,7 @@ import {
   VOICE_ENGINE_STOP_GRACE_MS,
 } from '../../shared/constants';
 import { loadVoiceConfig } from '../../voice/voice-loader';
-import {
-  prepareEngineUserData,
-  cleanupEngineUserData,
-  engineOfflineEnv,
-  type EngineUserDataHandle,
-} from '../../shared/node/engine-userdata';
+import { prepareEngineUserData, engineOfflineEnv } from '../../shared/node/engine-userdata';
 
 // AivisSpeech サイドカーのライフサイクル管理(task_17 / N-17-6・N-17-12・N-17-13)。
 //
@@ -99,8 +94,6 @@ let engineChild: ChildProcess | null = null;
 let ownsEngine = false;
 /** 終了処理が走ったか。背景起動(ensureVoiceEngine)中の quit で spawn が遅れて孤児になるのを防ぐ。 */
 let stopping = false;
-/** データ root 一時借用の解除情報(prepare が返し、stop で外す)。 */
-let engineUserDataHandle: EngineUserDataHandle | null = null;
 
 export type EnsureEngineResult = 'running' | 'started' | 'absent' | 'failed';
 
@@ -115,10 +108,10 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
   const baseUrl = VOICE_ENGINE_BASE_URL;
   const exePath = getVoiceEngineExePath();
 
-  // spawn 前にエンジンのデータ root を用意(一時借用 or 共存配置)。共存時のみ UUID が要る。
-  // best-effort(prepare 内で握りつぶす)。skip 経路でも prepare 済み=cleanup は stop で必ず行う。
+  // spawn 前に同梱 torimi＋BERT を %APPDATA% のエンジン dir へ直接配置(共存=UUID選択・N-REL-2)。
+  // best-effort(prepare 内で握りつぶす)。配置は永続=アンインストール時に installer.nsh が除去する。
   const voiceConfig = await loadVoiceConfig(getActiveCharacterId()).catch(() => null);
-  engineUserDataHandle = await prepareEngineUserData(voiceConfig?.uuid ?? null);
+  await prepareEngineUserData(voiceConfig?.uuid ?? null);
 
   const reachable = await probeVersion(baseUrl);
   const present = existsSync(exePath);
@@ -190,9 +183,8 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
 }
 
 /**
- * 自分が起動したエンジンを停止し、データ root の一時借用を解除する(冪等)。
- * 外部起動のエンジンは止めない。借用解除(cleanup)は spawn の有無に関わらず必ず行う
- * (skip 経路でも prepare 済みのため・正常終了で %APPDATA% に痕跡を残さない・N-17-13)。
+ * 自分が起動したエンジンを停止する(冪等)。外部起動のエンジンは止めない。
+ * データ配置(torimi＋BERT)は永続なので終了時クリーンアップは無い(除去はアンインストール時・N-REL-2)。
  */
 export async function stopVoiceEngine(): Promise<void> {
   stopping = true;
@@ -203,17 +195,6 @@ export async function stopVoiceEngine(): Promise<void> {
     await killEngineProcess(child);
   } else {
     ownsEngine = false;
-  }
-
-  // 一時借用(ジャンクション/ハードリンク)の解除。冪等。
-  if (engineUserDataHandle) {
-    const handle = engineUserDataHandle;
-    engineUserDataHandle = null;
-    try {
-      await cleanupEngineUserData(handle);
-    } catch (e) {
-      log.warn('engine userdata cleanup failed', { name: (e as Error).name });
-    }
   }
 }
 

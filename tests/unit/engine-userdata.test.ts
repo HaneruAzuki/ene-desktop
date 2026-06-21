@@ -19,59 +19,60 @@ function inputs(over: Partial<EngineUserDataInputs>): EngineUserDataInputs {
   return {
     appdataDir: APP,
     portableDir: PORT,
-    exists: false,
-    isOurJunction: false,
-    modelUuid: UUID,
+    dirExists: false,
+    weOwn: false,
     sharedBertExists: false,
+    modelUuid: UUID,
     ...over,
   };
 }
 
-describe('planEngineUserData', () => {
-  it('標準版なし(dir 不在)→ borrow: 全体を一時借用する', () => {
-    const plan = planEngineUserData(inputs({ exists: false }));
-    expect(plan.mode).toBe('borrow');
-    expect(plan.appdataJunction).toEqual({ link: APP, target: PORT });
-    expect(plan.modelHardlink).toBeNull();
-    expect(plan.bertJunction).toBeNull();
-    expect(plan.staleJunctionToRemove).toBeNull();
+const modelSrc = join(PORT, 'Models', `${UUID}.aivmx`);
+const modelDest = join(APP, 'Models', `${UUID}.aivmx`);
+const bertSrc = join(PORT, 'BertModelCaches');
+const bertDest = join(APP, 'BertModelCaches');
+
+describe('planEngineUserData (N-REL-2: %APPDATA% 直接配置)', () => {
+  it('dir 無し → create-owned(専有作成・マーカー・torimi＋BERT)', () => {
+    const p = planEngineUserData(inputs({ dirExists: false }));
+    expect(p.mode).toBe('create-owned');
+    expect(p.writeOwnsMarker).toBe(true);
+    expect(p.writeCleanupList).toBe(false);
+    expect(p.model).toEqual({ src: modelSrc, dest: modelDest });
+    expect(p.bert).toEqual({ src: bertSrc, dest: bertDest });
   });
 
-  it('前回の残骸(我々のジャンクション)→ borrow＋起動前に外す', () => {
-    const plan = planEngineUserData(inputs({ exists: true, isOurJunction: true }));
-    expect(plan.mode).toBe('borrow');
-    expect(plan.staleJunctionToRemove).toBe(APP);
-    expect(plan.appdataJunction).toEqual({ link: APP, target: PORT });
+  it('我々のマーカー有り → ensure-owned(不足分のみ補充・マーカーは書かない)', () => {
+    const p = planEngineUserData(inputs({ dirExists: true, weOwn: true }));
+    expect(p.mode).toBe('ensure-owned');
+    expect(p.writeOwnsMarker).toBe(false);
+    expect(p.writeCleanupList).toBe(false);
+    expect(p.model).not.toBeNull();
+    expect(p.bert).not.toBeNull();
   });
 
-  it('標準版あり(実dir が占有)＋BERT 不在 → coexist: torimi ハードリンク＋BERT サブdir junction', () => {
-    const plan = planEngineUserData(inputs({ exists: true, isOurJunction: false, sharedBertExists: false }));
-    expect(plan.mode).toBe('coexist');
-    expect(plan.appdataJunction).toBeNull(); // 相手の dir を占有しない
-    expect(plan.modelHardlink).toEqual({
-      link: join(APP, 'Models', `${UUID}.aivmx`),
-      source: join(PORT, 'Models', `${UUID}.aivmx`),
-    });
-    expect(plan.bertJunction).toEqual({ link: join(APP, 'BertModelCaches'), target: join(PORT, 'BertModelCaches') });
+  it('標準版同居(マーカー無し)＋BERT 無し → coexist(torimi＋BERT を足す・cleanup 記録)', () => {
+    const p = planEngineUserData(inputs({ dirExists: true, weOwn: false, sharedBertExists: false }));
+    expect(p.mode).toBe('coexist');
+    expect(p.writeOwnsMarker).toBe(false); // 相手の dir を専有しない
+    expect(p.writeCleanupList).toBe(true);
+    expect(p.model).toEqual({ src: modelSrc, dest: modelDest });
+    expect(p.bert).toEqual({ src: bertSrc, dest: bertDest });
   });
 
-  it('標準版あり＋BERT 既存 → 相手の BERT を再利用(bertJunction を作らない)', () => {
-    const plan = planEngineUserData(inputs({ exists: true, isOurJunction: false, sharedBertExists: true }));
-    expect(plan.mode).toBe('coexist');
-    expect(plan.modelHardlink).not.toBeNull();
-    expect(plan.bertJunction).toBeNull();
+  it('標準版同居＋BERT 既存 → coexist(torimi のみ・BERT は相手のを再利用=null)', () => {
+    const p = planEngineUserData(inputs({ dirExists: true, weOwn: false, sharedBertExists: true }));
+    expect(p.mode).toBe('coexist');
+    expect(p.model).not.toBeNull();
+    expect(p.bert).toBeNull();
   });
 
-  it('標準版あり＋UUID 不明 → skip(安全側=相手に何も持ち込まない)', () => {
-    const plan = planEngineUserData(inputs({ exists: true, isOurJunction: false, modelUuid: null }));
-    expect(plan.mode).toBe('skip');
-    expect(plan.appdataJunction).toBeNull();
-    expect(plan.modelHardlink).toBeNull();
-    expect(plan.bertJunction).toBeNull();
-  });
-
-  it('共存判定: 実dir 占有でも、それが我々のジャンクションなら borrow(=自分の残骸は他者でない)', () => {
-    const plan = planEngineUserData(inputs({ exists: true, isOurJunction: true, modelUuid: UUID }));
-    expect(plan.mode).toBe('borrow');
+  it('UUID 不明 → skip(安全側=何もしない)', () => {
+    const p = planEngineUserData(inputs({ modelUuid: null }));
+    expect(p.mode).toBe('skip');
+    expect(p.model).toBeNull();
+    expect(p.bert).toBeNull();
+    expect(p.writeOwnsMarker).toBe(false);
+    expect(p.writeCleanupList).toBe(false);
   });
 });

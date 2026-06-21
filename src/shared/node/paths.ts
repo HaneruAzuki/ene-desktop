@@ -47,23 +47,27 @@ export async function refreshActiveCharacterId(): Promise<string> {
   return activeCharacterId;
 }
 
-// --- ポータブルデータ ---
+// --- データ配置(N-REL-2: NSIS 化でユーザーデータと同梱アセットを分離) ---
+//  - getPortableDataDir(): 同梱アセット(モデル/音声エンジン・読取専用・更新で入れ替わる)の root。
+//    本番 = install dir 隣の data/。electron-updater が本体ごと入れ替えるため、ここにユーザーデータは置かない。
+//  - getUserDataDir()    : ユーザーデータ(記憶/設定/APIキー/ログ・更新を跨いで残す)の root。
+//    本番 = Electron userData(%APPDATA%/project-ene)。アンインストールでも既定保持(N-REL-2)。
+//  dev ではどちらもプロジェクトルートの data/(従来どおり・検証容易)。
 
-/** ポータブルデータのルート(本番: exe の隣 / 開発: プロジェクトルート)の data/。 */
+/** 同梱アセット(モデル/音声エンジン)の root。本番=install dir 隣の data/ / 開発=プロジェクトルートの data/。 */
 export function getPortableDataDir(): string {
-  if (app.isPackaged) {
-    // portable exe は自己展開されて %TEMP% から実行されるため、process.execPath は
-    // 一時ディレクトリを指す。電子-builder の portable ターゲットは元の exe の場所を
-    // PORTABLE_EXECUTABLE_DIR で渡すので、それを優先する(無ければ execPath の隣)。
-    const baseDir = process.env['PORTABLE_EXECUTABLE_DIR'] ?? path.dirname(process.execPath);
-    return path.join(baseDir, 'data');
-  }
-  // 開発(npm run dev時): プロジェクトルートの data/
+  if (app.isPackaged) return path.join(path.dirname(process.execPath), 'data');
+  return path.join(process.cwd(), 'data');
+}
+
+/** ユーザーデータ(記憶/設定/APIキー/ログ)の root。本番=Electron userData(%APPDATA%/project-ene)/ 開発=プロジェクトルートの data/。 */
+export function getUserDataDir(): string {
+  if (app.isPackaged) return app.getPath('userData');
   return path.join(process.cwd(), 'data');
 }
 
 function getConfigDir(): string {
-  return path.join(getPortableDataDir(), 'config');
+  return path.join(getUserDataDir(), 'config');
 }
 
 /**
@@ -124,16 +128,16 @@ export function getAppSettingsPath(): string {
   return path.join(getConfigDir(), 'app-settings.json');
 }
 
-/** data/logs/(アプリ動作ログ・個人情報を含めない)。 */
+/** ユーザーデータ root/logs/(アプリ動作ログ・個人情報を含めない)。 */
 export function getLogsDir(): string {
-  return path.join(getPortableDataDir(), 'logs');
+  return path.join(getUserDataDir(), 'logs');
 }
 
 // --- 記憶系(active キャラ ID に依存) ---
 
-/** data/memory/{activeCharacterId}/ */
+/** {userData}/memory/{activeCharacterId}/ */
 export function getMemoryDir(): string {
-  return path.join(getPortableDataDir(), 'memory', activeCharacterId);
+  return path.join(getUserDataDir(), 'memory', activeCharacterId);
 }
 
 /** data/memory/{activeCharacterId}/episodic/{year}/{category}/ */
@@ -248,15 +252,14 @@ export function getVadModelPath(): string {
 // --- Electron userData(暗号化 API キーの保存先) ---
 
 /**
- * Electron の userData ディレクトリ(app.getPath('userData'))。
- * ポータブル運用では index.ts が起動時に data/app/ へ向け直すため、ここもフォルダ内を指す
- * (リダイレクト前の既定は %APPDATA%/project-ene)。
+ * マシン固定データ(暗号化 API キー)の保存先 = ユーザーデータ root(getUserDataDir())。
+ * 本番 = Electron userData(%APPDATA%/project-ene)。DPAPI 暗号ゆえ別PCでは復号不可=再入力(§6.3)。
  */
 export function getMachineDataDir(): string {
-  return app.getPath('userData');
+  return getUserDataDir();
 }
 
-/** api-key.enc(ポータブル運用では data/app/api-key.enc・DPAPI 暗号・別PCでは再入力)。 */
+/** api-key.enc(ユーザーデータ root 直下・DPAPI 暗号・別PCでは再入力)。 */
 export function getApiKeyPath(): string {
   return path.join(getMachineDataDir(), 'api-key.enc');
 }

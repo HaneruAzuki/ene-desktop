@@ -1161,6 +1161,21 @@
   - **起動速度**: 遮断時は既定DLの3リトライで起動 ~34s。**cache 同梱(pre-seed)で既定モデル install を起こさせない**ことで短縮(正しさは proxy で担保済・速度最適化)。
 - **✅ 実装＋SSOT反映済(2026-06-20・commit fad43d0 ほか)**: 実装=`src/shared/node/engine-userdata.ts`(純粋 plan＋副作用 prepare/cleanup＋engineOfflineEnv)・`voice-engine.ts` 配線・`voice.json` の uuid・`electron-builder.yml` 同梱・単体テスト6件(全497緑)。SSOT 反映=03_design **§2**(`data/voice/userdata` 追記・line437 改訂)・**§3.4 末尾の音声エンジン例外**(「localhost 完結・初回取得のみ」の旧記述を「エンジンは AivisHub へ通信する→死んだproxy/offlineで遮断=外部送信は Claude のみ」へ訂正)・**§3.6**(%APPDATA% 一時借用＋共存ハードリンクを明記)。**§11.8(更新運用)は別機能=未実装ゆえ未反映**。残=実機 setup:engine-userdata＋smoke(%APPDATA 痕跡ゼロ・外向きゼロ)。
 
+### N-REL-2 🟡 配布方式を完全ポータブル→NSIS インストーラへ転換＋自動更新(electron-updater)(2026-06-21・設計確定/段階実装中)
+- **契機**: 「説明を読まない IT に疎いユーザー」が直感的に導入できる必要。素のポータブル zip は展開・配置でつまずく(zip 内から直接実行すると data/ が揃わず壊れる罠等)。→ 配布を **NSIS インストーラ**へ転換。
+- **真の要件の明確化(重要)**: 「ポータブル(可搬)」は目的でなく手段だった。本当の目的は **アンインストールで痕跡を残さないこと**。NSIS でも「アプリ固有の痕跡の完全除去」は達成可能(install dir・レジストリ・キャッシュ・エンジンデータを削除)。**厳密な痕跡ゼロはどのアプリでも不可能**(OS が Prefetch/MUICache 等へ実行履歴を残す=ポータブルでも同じ)。→ ポータブルに固執しない。
+- **決定**:
+  - 配布=**NSIS(perMachine:false・管理者不要)**＋`publish: github`。**手動DL＋旧フォルダ検出＋移植の設計は破棄**。
+  - 更新=**electron-updater**(起動時チェック→ダイアログ→差分DL→再起動)。✅依存追加済(`^6.8.9`・§1.2 反映)。
+  - データ置き場=exe 隣 data/ → **userData(%APPDATA%)**(electron-updater の入れ替えに耐える)。`index.ts` の `data/app` リダイレクトは撤去。
+  - **junction は撤去**(N-17-13 の一時借用):NSIS で原目的(無痕跡/可搬)が消え、残す user/future-dev 価値が無く、Windows の脆い機構(クロスボリューム/AV/再帰削除事故)を公開物に残すのは逆効果。代わりに **%APPDATA% 直接配置(標準版同居時は torimi を UUID 選択で追加)＋アンインストールフックで除去**。**オフライン化(死んだproxy/HF_HUB_OFFLINE/--disable_sentry/BERT同梱)は維持**(§4.2)。
+  - **ユーザーデータはアンインストールで既定保持**(`deleteAppDataOnUninstall: false`)。記憶=作り直せないプロダクトの心臓ゆえ「不具合→アンインストール→再インストール」で消えてはならない。**明示オプション「思い出も完全に削除」(既定=残す)** ＋ **アプリ内に記憶のエクスポート/インポートを常設**(平時バックアップ＋NSIS で失う可搬性の回復)。エンジンデータ等の再生成可能なゴミは常に削除。
+  - **コード署名=しない**(初回インストール時のみ SmartScreen 警告・許容)。
+- **off-screen-life の静かな自動pull＋DL数(別件・§7.1 判断保留)**: GitHub Release アセットで配信し `releases/latest/download/<asset>` 固定URLで最新取得。パックの `download_count` を active user の近似に使う(**アプリに計測コードは入れない**=GitHub サーバー側の匿名値を開発者が読むのみ)。**§7.1 テレメトリ禁止に触れるため、計測例外を認めるかはユーザー決定待ち**。認める場合「GitHub ネイティブDL数のみ・識別子/ビーコンなし・開示」を設計書に明記。
+- **段階計画**: ①electron-updater 追加[✅] ②electron-builder=nsis+publish+installer.nsh ③paths/index=userData 化 ④engine-userdata=junction 撤去→直接配置 ⑤updater 配線(ダイアログ→quitAndInstall) ⑥installer.nsh=アンインストールフック(共存セーフ・記憶は残す) ⑦docs/CLAUDE/memory 全面改訂(ポータブル→NSIS) ⑧off-screen-life pull+DL数(§7.1 決定後) ⑨記憶エクスポート/インポート。
+- **検証の制約**: パッケージ/インストール/更新/アンインストールは**実機検証必須**(コンテナの %APPDATA% 仮想化＋winCodeSign 制約・N-12-3)。コードは typecheck/lint/test で担保、実機確認はユーザー。
+- **覆る既存方針(⑦で要 SSOT 改訂)**: [[release-portable-2026-06]] 完全ポータブル/痕跡ゼロ・CLAUDE.md §6.3(api-key=data/app)・§12(data/ 以外書込禁止)・03_design §2/§3.6/§11.8・N-17-13 の一部(junction)。
+
 ---
 
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動

@@ -36,6 +36,7 @@
 | ローカル埋め込み | @huggingface/transformers | `^4.x` | 記憶の意味検索(task_15 Phase B)。ruri-v3-310m(ONNX)をローカル実行。**native ランタイム `onnxruntime-node` を推移的に同梱**(配布は win-x64・CPU推論のみ=GPU用 DirectML/他OS/`onnxruntime-web` は除外しサイズ抑制)。承認済み 2026-06・N-15-9 |
 | 3D表示 | three | `^0.169.x` | VRMキャラのWebGL描画。MIT。tree-shake後の配布JS増分は小(gzip ~155KB)。承認済み 2026-06 |
 | VRMローダ/表情 | @pixiv/three-vrm | `^3.x` | VRM 1.0 の読込・表情(Expression)・SpringBone・LookAt。MIT。three にのみ依存。承認済み 2026-06 |
+| 自動更新 | electron-updater | `^6.x` | NSIS インストーラの自動更新(起動時チェック→差分DL→再起動)。GitHub Releases をバックエンドにする。MIT。配布物に含まれる。承認済み 2026-06(NSIS 配布方式への転換・N-REL-2) |
 
 > 📌 **キャラ表示の3D化(VRM・three-vrm・2026-06 承認)**:立ち絵差分(PNG)に加え `three`＋`@pixiv/three-vrm` で VRM 1.0 を表示する。
 > - **配布JS増分は約1MB**(three gzip ~155KB＋three-vrm)。three-vrm は純JSのため vite が `out/renderer` にバンドル(onnxruntime のような external 化は不要・`electron-builder.yml` の変更も不要)。型は `@types/three`(devDependencies)。

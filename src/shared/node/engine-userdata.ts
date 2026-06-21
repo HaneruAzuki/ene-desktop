@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { existsSync, lstatSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, dirname } from 'node:path';
 import { log } from '../logger';
 import { getEngineUserDataDir, getPortableEngineUserDataDir } from './paths';
 import {
@@ -9,102 +9,88 @@ import {
   VOICE_ENGINE_DEAD_PROXY,
 } from '../constants';
 
-// 音声エンジンのポータブル化＋完全オフライン化(N-17-13・実機 spike 検証済)。
+// 音声エンジンのポータブル化＋完全オフライン化(N-17-13 / N-REL-2・実機 spike 検証済)。
 //
 // 課題: AivisSpeech エンジンは保存先 %APPDATA%\AivisSpeech-Engine を固定する(フラグ/設定/環境変数で
 //   変えられない)。さらに起動のたびに AivisHub(api.aivis-project.com)へ接続を試み(既定モデルDL・
-//   強制削除ルール・テレメトリ)、BERT を HuggingFace から実行時DLする。素のままでは「ローカル完結・
-//   フォルダ削除で痕跡ゼロ・外部送信は Claude のみ」(§4.2/§4.3/§6.3)を破る。
+//   強制削除ルール・テレメトリ)、BERT を HuggingFace から実行時DLする。
 //
-// 対処(2軸):
-//   1) 置き場: 起動時に %APPDATA%\AivisSpeech-Engine を**ポータブル data/voice/userdata へジャンクション**
-//      (一時借用)し、終了時に外す。正常終了で %APPDATA% に痕跡ゼロ。標準版 AivisSpeech が同居する場合は
-//      全体ジャンクション不可なので、torimi だけ `<uuid>.aivmx` を**ハードリンク**で持ち込み、BERT は相手の
-//      再利用 or サブディレクトリ・ジャンクションで賄う(相手のモデル/設定は無改変)。
+// 対処(NSIS 配布・N-REL-2):
+//   1) 置き場: 起動時に同梱の torimi＋BERT を %APPDATA%\AivisSpeech-Engine へ**直接配置**する。
+//      同一ボリュームは**ハードリンク**(実体複製なし・即時)、別ボリュームはコピー。いずれも place-if-missing で冪等。
+//      ジャンクションは廃止(NSIS で原目的=無痕跡/可搬 が消え、脆い機構を公開物に残さない)。除去は installer.nsh:
+//      - 専有作成(標準版 AivisSpeech 無し)時はマーカー .ene-owns-engine を書く → アンインストールで dir ごと削除。
+//      - 共存(標準版あり)時は torimi(<uuid>.aivmx)だけ足し、置いたファイルを .ene-cleanup に記録(相手は無改変)。
 //   2) 通信: 子プロセスへ**死んだ proxy**＋offline フラグを渡し、エンジンの全 outbound を端末内で失敗させる。
 //
-// 設計: 純粋な判断(planEngineUserData)と副作用(prepare/cleanup)を分離し、判断を単体テスト対象にする
-//   (N-17-12 の decideEngineAction/waitHealthy と同方針)。
+// 設計: 純粋な判断(planEngineUserData)と副作用(prepareEngineUserData)を分離し、判断を単体テスト対象にする。
+//
+// ⚠️ マーカー名は installer.nsh(アンインストールフック)と**文字列一致**で連携する(下記 const)。変更時は両方直す。
 
-// ジャンクション/ハードリンクは「リンクのみ」を消す。再帰削除は実体(ポータブル側/相手データ)へ
-// 追従して破壊するため厳禁(spike で確認した Windows の地雷)。
+/** 専有作成マーカー。これがあれば %APPDATA% のエンジン dir は ENE 専有=アンインストールで dir ごと削除可。 */
+export const ENGINE_OWNS_MARKER = '.ene-owns-engine';
+/** 共存時に ENE が置いたファイル一覧(相対パス・改行区切り)。アンインストール時に個別削除する。 */
+export const ENGINE_CLEANUP_LIST = '.ene-cleanup';
+
+export type EngineUserDataMode = 'create-owned' | 'ensure-owned' | 'coexist' | 'skip';
 
 export interface EngineUserDataInputs {
   /** %APPDATA%\AivisSpeech-Engine。 */
   appdataDir: string;
-  /** data/voice/userdata(同梱 torimi＋BERT)。 */
+  /** 同梱元 data/voice/userdata。 */
   portableDir: string;
   /** appdataDir が存在するか。 */
-  exists: boolean;
-  /** appdataDir が我々の張ったジャンクションか(=前回起動の残骸)。 */
-  isOurJunction: boolean;
-  /** torimi の AIVM UUID(voice.json 由来)。共存時の配置に必要。null なら共存配置をしない。 */
-  modelUuid: string | null;
-  /** 共存時、相手の BertModelCaches が既に存在するか(あれば再利用=何も置かない)。 */
+  dirExists: boolean;
+  /** .ene-owns-engine マーカーがあるか(= ENE が専有作成済)。 */
+  weOwn: boolean;
+  /** BertModelCaches が既存か(共存時=再利用して BERT を置かない)。 */
   sharedBertExists: boolean;
+  /** torimi の AIVM UUID(voice.json 由来)。null なら配置しない。 */
+  modelUuid: string | null;
 }
-
-export type EngineUserDataMode = 'borrow' | 'coexist' | 'skip';
 
 export interface EngineUserDataPlan {
   mode: EngineUserDataMode;
-  /** 起動前に外す前回の残骸ジャンクション(リンクのみ)。 */
-  staleJunctionToRemove: string | null;
-  /** borrow: %APPDATA% 全体をポータブルへ向けるジャンクション。 */
-  appdataJunction: { link: string; target: string } | null;
-  /** coexist: torimi を相手 Models へ持ち込むハードリンク。 */
-  modelHardlink: { link: string; source: string } | null;
-  /** coexist: BERT をポータブルへ向けるサブディレクトリ・ジャンクション(相手に無い時のみ)。 */
-  bertJunction: { link: string; target: string } | null;
+  writeOwnsMarker: boolean;
+  writeCleanupList: boolean;
+  /** torimi の配置(src=同梱元 / dest=%APPDATA% 側)。place-if-missing。 */
+  model: { src: string; dest: string } | null;
+  /** BERT の配置(共存で相手にあれば null=再利用)。 */
+  bert: { src: string; dest: string } | null;
 }
 
 /**
- * 状態から「何をするか」を決める(純粋・副作用なし)。
- * - 標準版なし(or 我々の残骸のみ) → borrow: 全体を一時借用。
- * - 標準版あり(実ディレクトリが占有) → coexist: torimi だけ持ち込む(UUID 不明なら skip=安全側)。
+ * 状態から配置内容を決める(純粋・副作用なし)。
+ * - dir 無し → create-owned(専有作成・マーカーを書く・torimi＋BERT)
+ * - dir 有り＆我々のマーカー有り → ensure-owned(不足分のみ補う)
+ * - dir 有り＆マーカー無し → coexist(標準版同居・torimi だけ足す・BERT は相手にあれば再利用)
+ * - UUID 不明 → skip(安全側=何もしない)
  */
 export function planEngineUserData(i: EngineUserDataInputs): EngineUserDataPlan {
-  const stale = i.isOurJunction ? i.appdataDir : null;
-  // 「他者が占有」= 実在し、かつ我々のジャンクションでない(=標準版 AivisSpeech の実ディレクトリ)。
-  const occupiedByOther = i.exists && !i.isOurJunction;
-
-  if (!occupiedByOther) {
-    return {
-      mode: 'borrow',
-      staleJunctionToRemove: stale,
-      appdataJunction: { link: i.appdataDir, target: i.portableDir },
-      modelHardlink: null,
-      bertJunction: null,
-    };
-  }
-
-  // 共存: 相手のデータ root は触れない。torimi だけ持ち込む。UUID が無ければ何もしない。
   if (!i.modelUuid) {
-    return { mode: 'skip', staleJunctionToRemove: stale, appdataJunction: null, modelHardlink: null, bertJunction: null };
+    return { mode: 'skip', writeOwnsMarker: false, writeCleanupList: false, model: null, bert: null };
   }
-  const modelsDir = join(i.appdataDir, VOICE_ENGINE_MODELS_SUBDIR);
-  const bertDir = join(i.appdataDir, VOICE_ENGINE_BERT_SUBDIR);
+  const model = {
+    src: join(i.portableDir, VOICE_ENGINE_MODELS_SUBDIR, `${i.modelUuid}.aivmx`),
+    dest: join(i.appdataDir, VOICE_ENGINE_MODELS_SUBDIR, `${i.modelUuid}.aivmx`),
+  };
+  const bert = {
+    src: join(i.portableDir, VOICE_ENGINE_BERT_SUBDIR),
+    dest: join(i.appdataDir, VOICE_ENGINE_BERT_SUBDIR),
+  };
+  if (!i.dirExists) {
+    return { mode: 'create-owned', writeOwnsMarker: true, writeCleanupList: false, model, bert };
+  }
+  if (i.weOwn) {
+    return { mode: 'ensure-owned', writeOwnsMarker: false, writeCleanupList: false, model, bert };
+  }
   return {
     mode: 'coexist',
-    staleJunctionToRemove: stale,
-    appdataJunction: null,
-    modelHardlink: {
-      link: join(modelsDir, `${i.modelUuid}.aivmx`),
-      source: join(i.portableDir, VOICE_ENGINE_MODELS_SUBDIR, `${i.modelUuid}.aivmx`),
-    },
-    // 相手が BERT を持っていれば再利用(何も置かない)。無ければポータブルの BERT を junction で見せる。
-    bertJunction: i.sharedBertExists
-      ? null
-      : { link: bertDir, target: join(i.portableDir, VOICE_ENGINE_BERT_SUBDIR) },
+    writeOwnsMarker: false,
+    writeCleanupList: true,
+    model,
+    bert: i.sharedBertExists ? null : bert,
   };
-}
-
-/** 終了時に外すリンクの記録(prepare が返し、cleanup が消費する)。 */
-export interface EngineUserDataHandle {
-  /** リンクのみ rmdir するジャンクション。 */
-  junctionsToRemove: string[];
-  /** unlink するハードリンク。 */
-  hardlinksToRemove: string[];
 }
 
 function isJunction(p: string): boolean {
@@ -115,107 +101,102 @@ function isJunction(p: string): boolean {
   }
 }
 
-/** ジャンクションの「リンクのみ」を削除する(中身=向き先へ追従しない)。冪等。 */
-async function removeLinkOnly(p: string): Promise<void> {
-  try {
-    if (existsSync(p)) await fs.rmdir(p);
-  } catch (e) {
-    log.warn('engine-userdata: rmdir(link) failed', { name: (e as Error).name });
-  }
-}
-
 async function gatherInputs(modelUuid: string | null): Promise<EngineUserDataInputs> {
   const appdataDir = getEngineUserDataDir();
   const portableDir = getPortableEngineUserDataDir();
-  const exists = existsSync(appdataDir);
+  const dirExists = existsSync(appdataDir);
   return {
     appdataDir,
     portableDir,
-    exists,
-    isOurJunction: exists && isJunction(appdataDir),
-    modelUuid,
+    dirExists,
+    weOwn: existsSync(join(appdataDir, ENGINE_OWNS_MARKER)),
     sharedBertExists: existsSync(join(appdataDir, VOICE_ENGINE_BERT_SUBDIR)),
+    modelUuid,
   };
 }
 
-/**
- * エンジン起動前にデータ root を用意する(一時借用 or 共存配置)。spawn の前に必ず呼ぶ。
- * best-effort: 失敗しても投げない(音声はベストエフォート・呼び出し側はそのまま起動を試み、
- * 立たなければテキストのみへフォールバックする)。返り値は終了時に cleanup へ渡す。
- */
-export async function prepareEngineUserData(modelUuid: string | null): Promise<EngineUserDataHandle> {
-  const handle: EngineUserDataHandle = { junctionsToRemove: [], hardlinksToRemove: [] };
+/** ファイルをハードリンク(同一ボリューム=複製なし・即時)。別ボリュームはコピーにフォールバック。 */
+async function linkOrCopyFile(src: string, dest: string): Promise<void> {
   try {
-    const plan = planEngineUserData(await gatherInputs(modelUuid));
+    await fs.link(src, dest);
+  } catch {
+    await fs.copyFile(src, dest);
+  }
+}
 
-    if (plan.staleJunctionToRemove) {
-      await removeLinkOnly(plan.staleJunctionToRemove);
-      log.info('engine-userdata: removed stale junction from a previous run (self-heal)');
+/** ディレクトリツリーを再帰的にハードリンク(各ファイル)。別ボリュームは各ファイルをコピー。 */
+async function linkOrCopyTree(src: string, dest: string): Promise<void> {
+  await fs.mkdir(dest, { recursive: true });
+  for (const entry of await fs.readdir(src, { withFileTypes: true })) {
+    const s = join(src, entry.name);
+    const d = join(dest, entry.name);
+    if (entry.isDirectory()) await linkOrCopyTree(s, d);
+    else await linkOrCopyFile(s, d);
+  }
+}
+
+/** src を dest へ配置(place-if-missing)。配置したら true。既存/ src 無しは false。 */
+async function placeAsset(src: string, dest: string): Promise<boolean> {
+  if (existsSync(dest)) return false; // 冪等: 既にあれば触らない
+  if (!existsSync(src)) {
+    log.warn('engine-userdata: bundled asset missing', { name: src });
+    return false;
+  }
+  await fs.mkdir(dirname(dest), { recursive: true });
+  if (lstatSync(src).isDirectory()) await linkOrCopyTree(src, dest);
+  else await linkOrCopyFile(src, dest);
+  return true;
+}
+
+/**
+ * エンジン起動前に、同梱の torimi＋BERT を %APPDATA%\AivisSpeech-Engine へ配置する(spawn 前に必ず呼ぶ)。
+ * best-effort: 失敗しても投げない(未配置でもエンジンは起動し、声が出ないだけ=テキストへフォールバック)。
+ * 配置は永続(per-exit cleanup は廃止)。除去はアンインストール時に installer.nsh が行う。
+ */
+export async function prepareEngineUserData(modelUuid: string | null): Promise<void> {
+  try {
+    const inputs = await gatherInputs(modelUuid);
+
+    // 旧版(ジャンクション era)の残骸があれば外す(直接配置への移行の自己修復・リンクのみ除去)。
+    if (inputs.dirExists && isJunction(inputs.appdataDir)) {
+      try {
+        await fs.rmdir(inputs.appdataDir);
+      } catch {
+        /* best-effort */
+      }
+      inputs.dirExists = false;
+      inputs.weOwn = false;
+      inputs.sharedBertExists = false;
+      log.info('engine-userdata: removed legacy junction (migrating to direct placement)');
     }
 
-    if (plan.appdataJunction) {
-      // 同梱物が未配置でもジャンクション先(空 dir)は作る=エンジンは起動し、声が出ないだけ。
-      await fs.mkdir(plan.appdataJunction.target, { recursive: true });
-      await fs.symlink(plan.appdataJunction.target, plan.appdataJunction.link, 'junction');
-      handle.junctionsToRemove.push(plan.appdataJunction.link);
-      log.info('engine-userdata: borrowing %APPDATA% engine dir via junction');
+    const plan = planEngineUserData(inputs);
+    if (plan.mode === 'skip') {
+      log.warn('engine-userdata: model uuid unknown; placement skipped');
+      return;
+    }
+    await fs.mkdir(inputs.appdataDir, { recursive: true });
+
+    const placed: string[] = [];
+    if (plan.model && (await placeAsset(plan.model.src, plan.model.dest))) {
+      placed.push(relative(inputs.appdataDir, plan.model.dest));
+    }
+    if (plan.bert && (await placeAsset(plan.bert.src, plan.bert.dest))) {
+      placed.push(relative(inputs.appdataDir, plan.bert.dest));
     }
 
-    if (plan.bertJunction) {
-      await fs.symlink(plan.bertJunction.target, plan.bertJunction.link, 'junction');
-      handle.junctionsToRemove.push(plan.bertJunction.link);
-      log.info('engine-userdata: coexist BERT via subdir junction');
+    if (plan.writeOwnsMarker) {
+      await fs.writeFile(join(inputs.appdataDir, ENGINE_OWNS_MARKER), '');
     }
-
-    if (plan.modelHardlink) {
-      await placeCoexistModel(plan.modelHardlink, handle);
+    if (plan.writeCleanupList && plan.model) {
+      // 共存: ENE が管理するファイル(torimi ＋ 置いた場合の BERT)を記録 → アンインストールで個別削除。
+      const managed = [relative(inputs.appdataDir, plan.model.dest)];
+      if (plan.bert) managed.push(relative(inputs.appdataDir, plan.bert.dest));
+      await fs.writeFile(join(inputs.appdataDir, ENGINE_CLEANUP_LIST), managed.join('\n'));
     }
+    log.info(`engine-userdata: ready (${plan.mode}; placed ${placed.length} item(s))`);
   } catch (e) {
     log.warn('engine-userdata: prepare failed (continuing best-effort)', { name: (e as Error).name });
-  }
-  return handle;
-}
-
-/** 共存時、torimi を相手 Models へハードリンク(同一ボリューム・管理者不要)。別ボリュームはコピー。 */
-async function placeCoexistModel(
-  link: { link: string; source: string },
-  handle: EngineUserDataHandle,
-): Promise<void> {
-  if (!existsSync(link.source)) {
-    log.warn('engine-userdata: portable model missing; coexist model not placed');
-    return;
-  }
-  // 同 UUID(我々の残骸/同名)が既にあれば外してから張り直す(冪等)。UUID は torimi 固有=我々の物。
-  if (existsSync(link.link)) {
-    try {
-      await fs.unlink(link.link);
-    } catch {
-      /* best-effort */
-    }
-  }
-  try {
-    await fs.link(link.source, link.link); // ハードリンク=実体複製なし・即時
-  } catch {
-    await fs.copyFile(link.source, link.link); // 別ボリューム等はコピーにフォールバック
-  }
-  handle.hardlinksToRemove.push(link.link);
-  log.info('engine-userdata: coexist model placed (hardlink/copy)');
-}
-
-/**
- * 終了時に、用意したリンク/ハードリンクだけを外す(向き先=ポータブル側/相手データは消さない)。冪等。
- * ハードリンク→ジャンクションの順(ハードリンクは中身を残し名前だけ消える)。
- */
-export async function cleanupEngineUserData(handle: EngineUserDataHandle): Promise<void> {
-  for (const link of handle.hardlinksToRemove) {
-    try {
-      if (existsSync(link)) await fs.unlink(link);
-    } catch (e) {
-      log.warn('engine-userdata: unlink(hardlink) failed', { name: (e as Error).name });
-    }
-  }
-  for (const link of handle.junctionsToRemove) {
-    await removeLinkOnly(link);
   }
 }
 

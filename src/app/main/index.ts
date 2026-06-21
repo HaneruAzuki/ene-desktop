@@ -1,11 +1,9 @@
 import { app, type BrowserWindow } from 'electron';
-import path from 'node:path';
 import { log } from '../../shared/logger';
 import { acquireSingleInstanceLock } from './single-instance';
 import { runStartupSequence } from './lifecycle';
 import { runShutdownSequence } from './shutdown';
 import { stopVoiceEngine } from './voice-engine';
-import { getPortableDataDir } from '../../shared/node/paths';
 import type { AppRuntime } from './app-runtime';
 
 // Electron main エントリポイント(設計書 §7)。
@@ -16,22 +14,10 @@ import type { AppRuntime } from './app-runtime';
 // 既定の userData が日本語パスへ動く。表示名と保存先識別子を分離するための明示設定。
 app.setName('project-ene');
 
-// ポータブル運用(§3.6/§6.3): Electron の状態(userData=Local Storage/Network/api-key.enc・
-// キャッシュ・ログ・クラッシュダンプ)を、exe の隣(dev はプロジェクトルート)の data/ 配下へ向け直す。
-// これで %APPDATA% に痕跡を残さず「フォルダ削除＝完全アンインストール」が成立する。
-//   - api-key.enc は data/app/ へ移る(getApiKeyPath は userData 基準ゆえ自動追従)。DPAPI 暗号は不変=
-//     別PCにフォルダごとコピーしても復号不可で再入力(=ポータブルとして正直な挙動・§6.3)。
-//   - getPortableDataDir() は process.execPath/cwd 由来で app.ready 前でも安全に解決できる。
-//   - app.ready より前に呼ぶ必要があるため、ここ(モジュール先頭)で設定する。
-{
-  const dataDir = getPortableDataDir();
-  const appStateDir = path.join(dataDir, 'app');
-  app.setPath('userData', appStateDir);
-  app.setPath('sessionData', appStateDir);
-  app.setPath('cache', path.join(appStateDir, 'cache'));
-  app.setPath('logs', path.join(dataDir, 'logs'));
-  app.setPath('crashDumps', path.join(appStateDir, 'crashes'));
-}
+// NSIS 配布(N-REL-2): Electron の状態は既定の userData(= %APPDATA%/project-ene・上の app.setName で固定)
+// に置く。electron-updater による本体入れ替えを跨いでユーザーデータ(記憶/設定/APIキー)を残すため、
+// 旧ポータブル運用の「exe 隣 data/app へリダイレクト」は撤去した(getUserDataDir が userData を返す)。
+// 同梱アセット(モデル/音声エンジン)は install dir 隣の data/(getPortableDataDir)から読み取る。
 
 const runtime: AppRuntime = {
   charContext: null,

@@ -7,7 +7,7 @@ import path from 'node:path';
 // 暗号化の模擬は「文字列の反転」(往復可能 & 平文を含まない)。
 const h = vi.hoisted(() => ({ dir: '' }));
 vi.mock('electron', () => ({
-  app: { isPackaged: false, getPath: (): string => h.dir },
+  app: { isPackaged: true, getPath: (): string => h.dir }, // packaged=true で userData(=h.dir)へ解決(N-REL-2)
   safeStorage: {
     isEncryptionAvailable: (): boolean => true,
     encryptString: (s: string): Buffer => Buffer.from([...s].reverse().join(''), 'utf8'),
