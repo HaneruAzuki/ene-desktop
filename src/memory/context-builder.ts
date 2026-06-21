@@ -34,7 +34,7 @@ import type { ActiveCharacter } from '../shared/types/character';
 
 // MemoryContext の組み立て(設計書 §3.3 / task_15 / task_16)。
 // 長期(semantic)+ 短期(shortTerm)+ 関連する中期(retriever)を統合する。
-// 想起は Router 非依存(ユーザー発言が引き金)。心(mood)・開示(familiarityStage)は deps で注入する。
+// 想起は Router 非依存(ユーザー発言が引き金)。相手の波長(recentUserTone)・関心(interests)・開示(familiarityStage)は deps で注入する。
 
 export async function buildMemoryContext(
   query: RetrievalQuery,
@@ -55,8 +55,8 @@ export async function buildMemoryContext(
  *  - 相手の波長(recentUserTone):直近の user episodic から導出(canon は含めない・元気づけ用)、
  *  - 開示(familiarityStage):active-character の関係の事実から導出、
  *  - 想起プール(recallPool):user ＋ canon を retriever へ直接渡す(再ロードさせない)、
- * の3つで使い回す。これにより従来 buildHeartDeps と retrieve(loadRecallPool)で
- * 二重に走っていた loadAllEpisodicFiles を1回に削減する(レイテンシ・I/O の無駄取り)。
+ * の3つで使い回す。これにより、従来は相手の波長/開示の導出と retrieve(loadRecallPool)が別々に
+ * 走らせていた loadAllEpisodicFiles を1回に削減する(レイテンシ・I/O の無駄取り)。
  *
  * now はここで確定(`Date.now()`)。テストは buildMemoryContext に deps を直接渡して決定化する。
  */

@@ -7,7 +7,7 @@ import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
 //
 // canon = 作家が書いたキャラ自身の人生(provenance:'self')。キャラ資産として
 // {id}/life-memory.json に同梱され、**読み取り専用・忘却外・supersede 外**。
-// 想起プールには user episodic と統合して入るが、保存・更新・mood 導出の対象にはしない。
+// 想起プールには user episodic と統合して入るが、保存・更新・recentUserTone(相手のトーン)導出の対象にはしない。
 
 /** canon 記録の ID。data/ の相対パスと衝突しないよう "self/" 名前空間にする。 */
 function canonId(index: number): string {

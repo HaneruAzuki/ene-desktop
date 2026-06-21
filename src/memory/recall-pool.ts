@@ -7,8 +7,8 @@ import type { EpisodicRecord } from '../shared/types/memory';
 //
 // 注意の分担:
 // - 横断想起(語彙/ベクトル/RRF/開示)の母集団 = 本プール(user + canon)。
-// - mood 導出・「直近×高importance」安全網 = user のみ(canon は直近の出来事ではない)。
-//   → 呼び出し側(retriever/mood)が provenance で絞る。
+// - recentUserTone(相手のトーン)導出・「直近×高importance」安全網 = user のみ(canon は直近の出来事ではない)。
+//   → 呼び出し側(retriever / user-tone)が provenance で絞る。
 
 export async function loadRecallPool(): Promise<EpisodicRecord[]> {
   const [user, canon] = await Promise.all([loadAllEpisodicFiles(), loadLifeMemory()]);

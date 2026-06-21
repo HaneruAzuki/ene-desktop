@@ -32,7 +32,7 @@ export function isForgettingEnabled(): boolean {
   return process.env[FORGETTING_ENABLED_ENV] !== '0';
 }
 
-/** サマリの EpisodicMemory を組み立てる(専用カテゴリ・合成日アンカー・mood を動かさない valence=0)。 */
+/** サマリの EpisodicMemory を組み立てる(専用カテゴリ・合成日アンカー・相手のトーンを動かさない valence=0)。 */
 function buildSummaryMemory(
   s: PeriodSummary,
   tier: SummaryTier,
@@ -56,7 +56,7 @@ function buildSummaryMemory(
     importance,
     category: FORGET_SUMMARY_CATEGORY,
     provenance: 'user',
-    valence: 0, // サマリは mood を動かさない(感情の主役は生の記憶)
+    valence: 0, // サマリは相手のトーン(recentUserTone)を動かさない(感情の主役は生の記憶)
     disclosureLevel: 1,
     extra: { summaryTier: tier, period, sourceCount },
   };
