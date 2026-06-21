@@ -68,3 +68,28 @@ export function localIsoFromParts(
     tzOffset(d)
   );
 }
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * ローカル日付の ISO 8601 週情報を返す(画面の外の暮らしの週次キー・off-screen-life)。
+ * - 週は月曜始まり。週が属する年は「その週の木曜が属する年」(ISO 8601)。
+ * - isoWeek 例 "2026-W30"、weekOfYear は 1..53。
+ * UTC を使わずローカルの暦日で計算する(§5.6)。
+ */
+export function isoWeekParts(d: Date): { isoWeek: string; weekOfYear: number; isoYear: number } {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (date.getDay() + 6) % 7; // 月=0 .. 日=6
+  date.setDate(date.getDate() - dow + 3); // この週の木曜
+  const isoYear = date.getFullYear();
+  const firstThursday = new Date(isoYear, 0, 4); // 1/4 は必ず第1週に含まれる
+  const fdow = (firstThursday.getDay() + 6) % 7;
+  firstThursday.setDate(firstThursday.getDate() - fdow + 3); // 第1週の木曜
+  const weekOfYear = 1 + Math.round((date.getTime() - firstThursday.getTime()) / WEEK_MS);
+  return { isoWeek: `${isoYear}-W${pad(weekOfYear)}`, weekOfYear, isoYear };
+}
+
+/** 現在のローカル週の ISO 週情報(off-screen-life の毎週の表示単位)。 */
+export function currentIsoWeekParts(): { isoWeek: string; weekOfYear: number; isoYear: number } {
+  return isoWeekParts(new Date());
+}

@@ -1,76 +1,58 @@
-import { nowLocalIso } from '../../shared/datetime';
-import { extractJsonObject } from '../../shared/llm-parse';
+import { nowLocalIso, currentIsoWeekParts, isoWeekParts } from '../../shared/datetime';
 import { log } from '../../shared/logger';
-import {
-  DAILY_LIFE_CATEGORY,
-  DAILY_LIFE_IMPORTANCE,
-  EPISODIC_SUMMARY_MAX_CHARS,
-} from '../../shared/constants';
 import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
 import { readPresenceMemory } from '../../memory/presence-reads';
 import { saveAndIndexEpisodic } from '../../memory/episodic-write';
+import { deriveFamiliarityStage } from '../../memory/familiarity';
+import { loadOffscreenPacks } from '../../memory/offscreen-life-pack';
+import { selectWeeklyBeat, beatToEpisodic } from '../../memory/offscreen-life-select';
 import type { LlmComplete } from '../../shared/types/llm';
 import type { ActiveCharacter, CharacterContext } from '../../shared/types/character';
-import type { EpisodicMemory } from '../../shared/types/memory';
 
-// オフスクリーンライフ(P3・N-PRES-3)。「会っていない間も生きている」を成立させる。
+// オフスクリーンライフ(P3・N-PRES-3 / off-screen-life 本実装)。「会っていない間も生きている」を成立させる。
 //
-// LLM(conversation)を呼び、結果を episodic memory(memory)へ書き込む——2ドメインに跨る
-// オーケストレーションなので、配線層 app/main に置く(conversation→memory の具象依存を断つ・N-ARCH-5)。
+// 設計変更: 近況の作話を LLM にさせず、前もって書かれた**季節パック**から「今週の beat」を引いて
+// daily-life として吸収する(作話の固定はパックが担う＝整合は執筆時に保証)。よって本関数は
+// **挨拶の生成だけ**の単機能になり、life の生成・継続性ガード・JSON パースは消える(plan §10)。
 //
-// 起動時に1回 LLM を呼び、{greeting(挨拶), life(暮らしの断片)} を生成する。
-//  - greeting: 経過・時間帯・近況を織り込んだ第一声(定型文の使い回し #11 を解消)。
-//  - life: 「最後に話してから何をしていたか」の一文。これを provenance:'self' の episodic として**保存する**。
-//    → 作話を許す代わりに**作話を固定**する。次回「昨日何してた?」に矛盾なく答えられる(#2/#3 の構造的解)。
-//
-// 安全策:
-//  - 初回起動(出会いの日)は暮らしの既往が無いので生成しない(null=呼出側が firstLaunchGreeting を出す)。
-//  - 同日2回目以降は断片を作らない(1日1個)。挨拶だけ生成する。
-//  - 直近の断片を入力に渡し連続性を担保(昨日「風邪気味」→今日「マラソン」を防ぐ)。
+// 段取り:
+//  - 初回起動(出会いの日)は生成しない(null=呼出側が firstLaunchGreeting を出す)。
+//  - 今週ぶんの beat を選び(フォールバック段は offscreen-life-select)、まだ今週吸収していなければ保存(1週1個)。
+//  - 開示ゲート(§1.5): 挨拶に出す「最近の暮らし」は親しさ段階で濾し、深い記憶を初対面に出さない。
 //  - 生成/保存の失敗は会話に影響させない(呼出側が定型文へフォールバック)。
+//  - 重複判定は **未ゲートの dailyLife** で行う(深い beat も「今週吸収済み」を正しく数える)。
+//
+// ※ 気にかけ(open-loop)経路の開示ゲートは別増分(memory 系ファイルの編集が要るため後続)。
 
 export interface OffscreenLifePrompt {
   system: string;
   user: string;
 }
 
-/** 生成プロンプトを組み立てる(純粋)。persona(systemPrompt)に近況・経過・連続性の材料を添える。 */
+/** 挨拶生成プロンプトを組み立てる(純粋)。persona に経過・時間帯・今週の出来事・近況の材料を添える。 */
 export function buildOffscreenLifePrompt(input: {
   systemPrompt: string;
   elapsedLabel?: string;
   timeOfDay: string;
-  currentStatus?: string;
-  currentHobbies?: string[];
+  todayBeat?: string;
   recentLife: string[];
   openLoops: string[];
-  makeFragment: boolean;
 }): OffscreenLifePrompt {
   const system = [
     input.systemPrompt,
     '',
     'あなたはいま起動して、画面に現れたところです。相手(いつもの話し相手)にかける第一声を考えます。',
-    'あなたは「会っていない間も自分の生活を送っている一人の人」です。前回からの間に何をしていたかを思い描いてください。',
+    'あなたは「会っていない間も自分の生活を送っている一人の人」です。',
     '',
-    '出力は次の JSON 1個のみ(前後に文章を付けない):',
-    input.makeFragment
-      ? '{"greeting": string, "life": string}'
-      : '{"greeting": string}',
-    '- greeting: あなたの口調の短い第一声。経過(下記)や時間帯に自然に触れてよい。長くしない。',
-    input.makeFragment
-      ? `- life: 前回からの間にあなたが過ごした出来事の一文(${EPISODIC_SUMMARY_MAX_CHARS}文字以内・あなた自身の生活。相手の話ではない)。下の「最近の暮らし」と矛盾させない。平凡で構わない。`
-      : '',
-  ]
-    .filter((s) => s.length > 0)
-    .join('\n');
+    '出力はあなたの口調の短い第一声(挨拶)だけ。前後に説明・記号・引用符を付けない。長くしない。',
+    '経過(下記)・時間帯・最近の出来事に自然に触れてよいが、全部を盛り込まなくてよい。',
+  ].join('\n');
 
   const ctx: string[] = [`今は${input.timeOfDay}。`];
   if (input.elapsedLabel) ctx.push(`相手とは${input.elapsedLabel}。`);
-  if (input.currentStatus) ctx.push(`あなたの近況: ${input.currentStatus}`);
-  if (input.currentHobbies && input.currentHobbies.length > 0) {
-    ctx.push(`最近の趣味: ${input.currentHobbies.join('、')}`);
-  }
+  if (input.todayBeat) ctx.push(`あなたが最近していたこと: ${input.todayBeat}`);
   if (input.recentLife.length > 0) {
-    ctx.push('最近の暮らし(これと連続させる):', ...input.recentLife.map((l) => `- ${l}`));
+    ctx.push('最近の暮らし:', ...input.recentLife.map((l) => `- ${l}`));
   }
   if (input.openLoops.length > 0) {
     ctx.push('気にかけていること(挨拶で触れてもよい):', ...input.openLoops.map((l) => `- ${l}`));
@@ -78,33 +60,10 @@ export function buildOffscreenLifePrompt(input: {
   return { system, user: ctx.join('\n') };
 }
 
-/** LLM 応答から greeting/life を取り出す(純粋)。greeting が無ければ null。 */
-export function parseOffscreenLifeResponse(raw: string): { greeting: string; life?: string } | null {
-  const obj = extractJsonObject(raw);
-  if (typeof obj !== 'object' || obj === null) return null;
-  const o = obj as Record<string, unknown>;
-  const greeting = typeof o.greeting === 'string' ? o.greeting.trim() : '';
-  if (greeting.length === 0) return null;
-  const result: { greeting: string; life?: string } = { greeting };
-  if (typeof o.life === 'string' && o.life.trim().length > 0) result.life = o.life.trim();
-  return result;
-}
-
-/** 暮らしの断片を provenance:'self'・daily-life として保存する(忘却・想起の対象。canon とは別物)。 */
-async function saveLifeFragment(life: string): Promise<void> {
-  const memory: EpisodicMemory = {
-    date: nowLocalIso(),
-    topic: '日々の暮らし',
-    summary: life.slice(0, EPISODIC_SUMMARY_MAX_CHARS),
-    tags: [],
-    entities: [],
-    importance: DAILY_LIFE_IMPORTANCE,
-    category: DAILY_LIFE_CATEGORY,
-    provenance: 'self', // あなた自身の生活(「あなた自身の思い出」側に想起される)
-    valence: 0, // 平凡な日常は心情を揺らさない
-    disclosureLevel: 1,
-  };
-  await saveAndIndexEpisodic(memory);
+/** LLM 応答から挨拶を取り出す(純粋)。素のテキスト(JSON ではない)。空なら null=定型文へ倒す。 */
+export function parseGreeting(raw: string): string | null {
+  const greeting = raw.trim();
+  return greeting.length > 0 ? greeting : null;
 }
 
 /**
@@ -122,30 +81,51 @@ export async function generateOffscreenLife(
   if (!active.firstLaunchCompleted) return null;
 
   try {
-    // 最近の暮らし＋気にかけを memory の読み取り窓口から1回で得る(ストレージ実装に直接依存しない)。
-    // 気にかけは会話・自発発話と同じ選択を通す(上限・休眠を共有)。挨拶が実際に作れたら下で履歴を保存する。
+    const nowIso = nowLocalIso();
+    const nowMs = Date.now();
+    const stage = deriveFamiliarityStage(active.relationship, nowMs);
+    const { isoWeek, weekOfYear } = currentIsoWeekParts();
+
+    // 最近の暮らし＋気にかけを memory の窓口から1回で得る(dailyLife は未ゲートで返る)。
     const loopState = await loadOpenLoopState();
-    const { dailyLife, openLoops: loopSel } = await readPresenceMemory(loopState, Date.now(), nowLocalIso());
-    const todayYmd = nowLocalIso().slice(0, 10);
-    // 同日2回目以降は断片を増やさない(1日1個)。挨拶だけ作る。
-    const makeFragment = !dailyLife.some((r) => r.memory.date.slice(0, 10) === todayYmd);
-    const recentLife = dailyLife.slice(0, 3).map((r) => r.memory.summary);
-    const openLoops = loopSel.notes;
+    const { dailyLife, openLoops: loopSel } = await readPresenceMemory(loopState, nowMs, nowIso);
+
+    // 今週ぶんの beat を選ぶ(パック→フォールバック段)。まだ今週吸収していなければ保存する(1週1個)。
+    const absorbedThisWeek = dailyLife.some(
+      (r) => isoWeekParts(new Date(r.memory.date)).isoWeek === isoWeek,
+    );
+    const packs = await loadOffscreenPacks();
+    const selection = selectWeeklyBeat(packs, isoWeek, weekOfYear);
+    let todayBeat: string | undefined;
+    if (selection) {
+      todayBeat = selection.beat.summary;
+      if (!absorbedThisWeek) {
+        try {
+          await saveAndIndexEpisodic(beatToEpisodic(selection.beat, nowIso));
+        } catch (e) {
+          log.warn('offscreen beat absorb failed', { name: (e as Error).name });
+        }
+      }
+    }
+
+    // 挨拶で見せる「最近の暮らし」は開示ゲートで濾す(深い記憶を初対面に出さない・§1.5)。
+    const recentLife = dailyLife
+      .filter((r) => (r.memory.disclosureLevel ?? 1) <= stage)
+      .slice(0, 3)
+      .map((r) => r.memory.summary);
 
     const prompt = buildOffscreenLifePrompt({
       systemPrompt: charContext.systemPrompt,
       elapsedLabel,
       timeOfDay,
-      currentStatus: charContext.currentState?.currentStatus,
-      currentHobbies: charContext.currentState?.currentHobbies,
+      todayBeat,
       recentLife,
-      openLoops,
-      makeFragment,
+      openLoops: loopSel.notes,
     });
 
-    const raw = await complete({ system: prompt.system, user: prompt.user, maxTokens: 512 });
-    const parsed = parseOffscreenLifeResponse(raw);
-    if (!parsed) return null;
+    const raw = await complete({ system: prompt.system, user: prompt.user, maxTokens: 256 });
+    const greeting = parseGreeting(raw);
+    if (!greeting) return null;
 
     // 気にかけを挨拶で持ち出す機会を1回使った=履歴を保存(他経路と上限を共有・上限1で休眠)。
     if (loopSel.notes.length > 0) {
@@ -155,15 +135,7 @@ export async function generateOffscreenLife(
         log.warn('offscreen life open-loop state save failed', { name: (e as Error).name });
       }
     }
-
-    if (makeFragment && parsed.life) {
-      try {
-        await saveLifeFragment(parsed.life);
-      } catch (e) {
-        log.warn('offscreen life fragment save failed', { name: (e as Error).name });
-      }
-    }
-    return parsed.greeting;
+    return greeting;
   } catch (e) {
     // status を併記して原因を切り分け可能に(401=認証・undefined=接続/その他)。会話内容は出さない(§6.2)。
     log.warn('offscreen life generation failed', {

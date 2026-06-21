@@ -195,6 +195,11 @@ export function getCurrentStatePath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'current-state.json');
 }
 
+/** {characterId}/off-screen-life/(画面の外の暮らしの季節パック・常緑年・読取専用)。 */
+export function getOffscreenLifeDir(characterId: string): string {
+  return path.join(getCharacterDir(characterId), 'off-screen-life');
+}
+
 /** {characterId}/animation.json(アニメ定義・任意・task_13)。 */
 export function getAnimationPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'animation.json');
