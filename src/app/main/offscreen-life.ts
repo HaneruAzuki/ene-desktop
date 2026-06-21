@@ -88,7 +88,7 @@ export async function generateOffscreenLife(
 
     // 最近の暮らし＋気にかけを memory の窓口から1回で得る(dailyLife は未ゲートで返る)。
     const loopState = await loadOpenLoopState();
-    const { dailyLife, openLoops: loopSel } = await readPresenceMemory(loopState, nowMs, nowIso);
+    const { dailyLife, openLoops: loopSel } = await readPresenceMemory(loopState, nowMs, nowIso, stage);
 
     // 今週ぶんの beat を選ぶ(パック→フォールバック段)。まだ今週吸収していなければ保存する(1週1個)。
     const absorbedThisWeek = dailyLife.some(

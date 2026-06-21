@@ -30,11 +30,14 @@ export async function readPresenceMemory(
   state: OpenLoopState,
   nowMs: number,
   nowIso: string,
+  stage: number = 5,
 ): Promise<PresenceMemory> {
   const all = await loadAllEpisodicFiles();
+  // dailyLife は**未ゲート**で返す(挨拶の重複判定で深い beat も数えるため)。開示の濾しは表示側(recentLife)が行う。
   const dailyLife = all
     .filter((r) => r.memory.category === DAILY_LIFE_CATEGORY)
     .sort((a, b) => b.memory.date.localeCompare(a.memory.date));
-  const openLoops = selectOpenLoops(all, state, nowMs, nowIso);
+  // 気にかけ(open-loops)は開示ゲート(§1.5): 親密度より深い気にかけは出さない(stage 未指定=全開示)。
+  const openLoops = selectOpenLoops(all, state, nowMs, nowIso, stage);
   return { dailyLife, openLoops };
 }

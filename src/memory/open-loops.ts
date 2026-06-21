@@ -64,6 +64,7 @@ export function selectOpenLoops(
   state: OpenLoopState,
   nowMs: number,
   nowIso: string,
+  stage: number = 5,
 ): OpenLoopSelection {
   const lookbackMs = OPEN_LOOP_LOOKBACK_DAYS * DAY_MS;
   const cooldownMs = OPEN_LOOP_COOLDOWN_DAYS * DAY_MS;
@@ -72,6 +73,8 @@ export function selectOpenLoops(
     .filter((r) => {
       const ol = r.memory.openLoop;
       if (!ol || ol.resolvedAt) return false;
+      // 開示ゲート(§1.5): 親密度(stage)より深い気にかけは自分から持ち出さない。未指定(5)=全開示(後方互換)。
+      if ((r.memory.disclosureLevel ?? 1) > stage) return false;
       const ts = Date.parse(r.memory.date);
       if (!Number.isNaN(ts) && nowMs - ts > lookbackMs) return false; // 古すぎる未解決は掘らない
       const prev = state.surfaced[r.id];

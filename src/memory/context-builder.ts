@@ -123,7 +123,7 @@ async function buildMoment(
     let changed = false;
 
     if (cooled(state.lastOpenLoopAt, OPEN_LOOP_GLOBAL_COOLDOWN_HOURS)) {
-      const sel = selectOpenLoops(userRecords, state, nowMs, nowIso);
+      const sel = selectOpenLoops(userRecords, state, nowMs, nowIso, stage);
       openLoops = sel.notes;
       if (openLoops.length > 0) {
         surfaced = sel.surfaced;
