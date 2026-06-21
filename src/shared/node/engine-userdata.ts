@@ -189,10 +189,15 @@ export async function prepareEngineUserData(modelUuid: string | null): Promise<v
       await fs.writeFile(join(inputs.appdataDir, ENGINE_OWNS_MARKER), '');
     }
     if (plan.writeCleanupList && plan.model) {
-      // 共存: ENE が管理するファイル(torimi ＋ 置いた場合の BERT)を記録 → アンインストールで個別削除。
+      // 共存: ENE が置いたファイル(torimi ＋ 置いた場合の BERT)を記録 → アンインストール時に installer.nsh が
+      // 1行ずつ読んで個別削除する(相手の標準版 AivisSpeech のファイルは触らない)。
+      // エンコーディングは UTF-16LE + BOM:electron-builder の NSIS は Unicode ビルドで、FileRead は BOM から
+      // 文字コードを判定するため(UTF-8 だと化ける)。相対パスは Windows の "\" 区切り=NSIS と一致。CRLF 区切り。
       const managed = [relative(inputs.appdataDir, plan.model.dest)];
       if (plan.bert) managed.push(relative(inputs.appdataDir, plan.bert.dest));
-      await fs.writeFile(join(inputs.appdataDir, ENGINE_CLEANUP_LIST), managed.join('\n'));
+      // 先頭に BOM(U+FEFF)を付け 'utf16le' で書くと UTF-16LE+BOM になる(Node は utf16le で BOM を自動付与しない)。
+      const body = '﻿' + managed.join('\r\n') + '\r\n';
+      await fs.writeFile(join(inputs.appdataDir, ENGINE_CLEANUP_LIST), body, 'utf16le');
     }
     log.info(`engine-userdata: ready (${plan.mode}; placed ${placed.length} item(s))`);
   } catch (e) {
