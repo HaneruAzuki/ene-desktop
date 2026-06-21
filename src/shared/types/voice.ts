@@ -37,6 +37,12 @@ export interface VoiceConfig {
   engine: string; // 'aivisspeech' 等(将来 VOICEVOX 等へ差し替え)
   baseUrl: string; // ローカル API(例 http://127.0.0.1:10101)
   model?: string; // 採用音声モデル識別(任意・記録用)
+  /**
+   * AIVM モデルの UUID(.aivmx に埋め込まれた識別子)。標準版 AivisSpeech が同居する環境で、
+   * エンジンの Models へ `<uuid>.aivmx` をハードリンクで持ち込むために使う(N-17-13・ポータブル化)。
+   * キャラ依存値ゆえコードにハードコードせず voice.json に外出しする(§4.5)。
+   */
+  uuid?: string;
   credit?: string; // 必須ライセンス文言(about/クレジット画面に常時表示・つくよみコーパス規約)
   styles: Partial<Record<EmotionLabel, VoiceStyleParams>>; // neutral は必須(フォールバック先)
   eq?: EqBand[]; // 出力音声の音色補正(任意・声を落ち着かせる等。F0 は変えない=劣化なし)

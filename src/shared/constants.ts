@@ -109,17 +109,18 @@ export const RRF_K = 60;
 // --- 音声入力(STT・task_17 Phase B) ---
 
 /**
- * STT モデル(whisper-small・ONNX)のディレクトリ名。data/models/ 配下に別DLで配置。
- * 2026-06-09 計測で turbo→small へ既定変更:エンコーダ12層で stt ~3000ms→~800ms(約1/4)、
- * 日本語精度は turbo と実質同等(通常文は完全一致・固有名詞の誤認は全モデル共通)。N-LAT-6。
- * より高精度が要るときは ENE_STT_MODEL_DIR=whisper-large-v3-turbo で差し替え可(下記 env)。
+ * STT モデル(kotoba-whisper-v2.2・ONNX)のディレクトリ名。data/models/ 配下に別DLで配置。
+ * 既定 = kotoba-whisper-v2.2(2026-06-17 ユーザ決定):日本語 CER 最良で「聞き間違い」を最小化する。
+ * stt は ~1.8s(whisper-small の ~800ms より +約1秒/ターン)だが、誤認は人らしさを壊すため精度を優先。
+ * q8 量子化(encoder/decoder とも _quantized)を配置=stt-transcriber が自動で q8 を選ぶ。
+ * レイテンシ優先で軽い small に戻したいときは ENE_STT_MODEL_DIR=whisper-small で差し替え可(下記 env)。
  */
-export const STT_MODEL_DIR = 'whisper-small';
+export const STT_MODEL_DIR = 'kotoba-whisper-v2.2';
 
 /**
- * STT モデルディレクトリの env 上書き(A/B 比較・高精度フォールバック用)。値=data/models/ 配下のディレクトリ名。
- * 例 `ENE_STT_MODEL_DIR=whisper-large-v3-turbo` で高精度モデルへ差し替える。
- * 既定(未指定)は STT_MODEL_DIR(=whisper-small)。
+ * STT モデルディレクトリの env 上書き(A/B 比較・低レイテンシ/高精度の差し替え用)。値=data/models/ 配下のディレクトリ名。
+ * 例 `ENE_STT_MODEL_DIR=whisper-small` で軽量・低レイテンシモデルへ差し替える。
+ * 既定(未指定)は STT_MODEL_DIR(=kotoba-whisper-v2.2)。
  */
 export const STT_MODEL_DIR_ENV = 'ENE_STT_MODEL_DIR';
 
@@ -388,6 +389,23 @@ export const VOICE_ENGINE_HEALTH_TIMEOUT_MS = 30000;
 export const VOICE_ENGINE_HEALTH_INTERVAL_MS = 600;
 /** kill 要求後、プロセスツリーを強制終了(taskkill)に切り替えるまでの猶予(ms)。 */
 export const VOICE_ENGINE_STOP_GRACE_MS = 2000;
+
+// --- 音声エンジンのポータブル化＋完全オフライン化(N-17-13) ---
+// エンジンは保存先 %APPDATA%\AivisSpeech-Engine を固定する(フラグ/設定/環境変数で変えられない)ため、
+// 起動時にそこをポータブル data/voice/userdata へジャンクション(一時借用)し、終了時に外す。標準版が
+// 同居する場合は torimi をハードリンクで持ち込む。さらに子プロセスへ「死んだ proxy」を渡し、エンジンの
+// AivisHub(api.aivis-project.com)/ HuggingFace への外向き通信を端末内で失敗させる
+// (外部送信は Claude のみ=§4.2/§7.1 を機械的に担保)。実機 spike で検証済(N-17-13)。
+/** エンジンが %APPDATA% 下に固定で使うデータ root のディレクトリ名。 */
+export const VOICE_ENGINE_USERDATA_DIRNAME = 'AivisSpeech-Engine';
+/** data/voice/ 配下に同梱するエンジンデータ root(torimi＋BERT・ジャンクションの向き先)。 */
+export const VOICE_ENGINE_PORTABLE_USERDATA = 'userdata';
+/** エンジンデータ root 内の音声モデルのサブディレクトリ名。 */
+export const VOICE_ENGINE_MODELS_SUBDIR = 'Models';
+/** エンジンデータ root 内の BERT キャッシュのサブディレクトリ名。 */
+export const VOICE_ENGINE_BERT_SUBDIR = 'BertModelCaches';
+/** エンジン子プロセスに渡す「死んだローカル proxy」。全 outbound を端末内で connection refused にする。 */
+export const VOICE_ENGINE_DEAD_PROXY = 'http://127.0.0.1:9';
 
 // --- ウィンドウ(設計書 §8.1) ---
 // task_13: 全身立ち絵(比≈0.65)を中央帯に置き、上=吹き出し余白/下=入力欄余白を確保する縦長窓。

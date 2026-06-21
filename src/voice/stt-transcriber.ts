@@ -9,15 +9,16 @@ function sttModelDir(): string {
   return process.env[STT_MODEL_DIR_ENV] || STT_MODEL_DIR;
 }
 
-// ローカル音声認識(whisper-small・ONNX・task_17 Phase B / N-LAT-6)。
+// ローカル音声認識(kotoba-whisper-v2.2・ONNX・task_17 Phase B / N-LAT-6)。
 //
-// モデル既定は whisper-small(2026-06-09 計測で turbo→small・stt ~3000ms→~800ms・精度ほぼ同等)。
-// 高精度が要るときは ENE_STT_MODEL_DIR=whisper-large-v3-turbo で差し替え可(sttModelDir())。
+// モデル既定は kotoba-whisper-v2.2(2026-06-17 ユーザ決定・日本語 CER 最良で聞き間違いを最小化)。
+// stt ~1.8s(small の ~800ms より +約1秒/ターン)だが精度優先。q8 量子化を配置=自動で q8。
+// レイテンシ優先なら ENE_STT_MODEL_DIR=whisper-small で軽量モデルへ差し替え可(sttModelDir())。
 //
 // 重要(§7.1 厳守): アプリ実行時に外部へモデルを取りに行かない。embedder.ts と同方針。
 //   - env.allowRemoteModels = false でローカル限定。
 //   - モデルは別ダウンロード(scripts/download-stt-model.mjs)で
-//     data/models/<dir> に配置(既定 whisper-small)。
+//     data/models/<dir> に配置(既定 kotoba-whisper-v2.2)。
 //   - 未配置/ロード失敗時は例外 → 呼び出し側(ipc)がキャラ口調でフォールバック。
 //
 // 実行は main プロセス(onnxruntime-node・CPU)。dtype は配置ファイルから自動判定(下記 loadPipeline)。

@@ -1,6 +1,6 @@
-appId: com.example.ene-desktop
+appId: io.github.haneruazuki.project-ene
 # 製品/表示名(Start メニュー・インストーラ・exe プロパティ)。キャラ名に統一(B-10)。
-# userData は app.setName('ene-desktop') で別途固定するため、ここを変えても API キー保存先は動かない。
+# userData は app.setName('project-ene') で別途固定するため、ここを変えても API キー保存先は動かない。
 productName: 魚川トリミ
 directories:
   output: dist
@@ -49,14 +49,24 @@ artifactName: Torimi-${version}.${ext}
 # transformers.js / AivisSpeech エンジンは実体ファイルを直接読むため asar には入れられない。
 # 同梱先は dev と同じ相対パス(data/models・data/voice/engine)=getModelsDir/getVoiceEngineDir は無改修。
 # ⚠️ 同梱元(下記 from)は配置済みであること(npm run download:model / download:stt-model / setup:voice-engine)。
-# ⚠️ AivisSpeech のモデル登録(torimi.aivmx)が data/voice/engine 内に永続しているか要確認(別所保存なら初回登録実装が必要)。
+# 声モデル(torimi)＋BERT はエンジンが %APPDATA%\AivisSpeech-Engine へ保存する(変更不可)ため、それらを
+# data/voice/userdata に同梱し、起動時に %APPDATA% へ**ジャンクションで一時借用**する(N-17-13・engine-userdata.ts)。
+# 同梱元は npm run setup:engine-userdata で配置。終了時に借用を外すので %APPDATA% に痕跡を残さない。
 extraFiles:
-  - from: data/models/whisper-small
-    to: data/models/whisper-small
+  # 第三者ライセンス表記(配布物の分かりやすい場所=exe 隣に置く。LGPL/MIT/Apache の表示義務＋つくよみクレジット)
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+  # STT は kotoba-whisper-v2.2 を既定とする(2026-06-17・日本語精度優先・constants.ts STT_MODEL_DIR と一致)
+  - from: data/models/kotoba-whisper-v2.2
+    to: data/models/kotoba-whisper-v2.2
   - from: data/models/ruri-v3-310m
     to: data/models/ruri-v3-310m
   - from: data/voice/engine
     to: data/voice/engine
+  # エンジンのユーザデータ root(torimi モデル＋BERT)。起動時に %APPDATA%\AivisSpeech-Engine へ
+  # ジャンクションして一時借用する(N-17-13)。npm run setup:engine-userdata で配置。
+  - from: data/voice/userdata
+    to: data/voice/userdata
 # 配布サイズ削減: 同梱するロケールを絞る(NF-SIZE-01)
 electronLanguages:
   - ja

@@ -99,6 +99,7 @@ export function validateVoiceConfig(raw: unknown): VoiceConfig | null {
     engine: o.engine,
     baseUrl: o.baseUrl,
     model: typeof o.model === 'string' ? o.model : undefined,
+    uuid: typeof o.uuid === 'string' ? o.uuid : undefined,
     credit: typeof o.credit === 'string' ? o.credit : undefined,
     styles,
     ...(eq ? { eq } : {}),

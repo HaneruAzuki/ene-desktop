@@ -1,9 +1,10 @@
-# 05. アーキテクチャ対応表 — 体(フォルダ)と魂(docs)
+# 05. アーキテクチャ — 体(フォルダ)・魂(docs)・プロセス境界
 
-> **位置づけ**:コードのトップレベル構成(=体)と、哲学が定める「四つのあり方」(=魂)の
-> 対応を一枚で示す案内図。ディレクトリ構成の SSOT は `03_design.md` §2、思想の正本は
-> `00_philosophy.md`(§1.3 四つのあり方＋関係)。
-> 本書は両者の**橋**であり、新しい正解を定義しない(矛盾したら §2 と哲学が優先)。
+> **位置づけ**:コードのトップレベル構成(=体)と、哲学が定める「四つのあり方」(=魂)、
+> そしてプロセスの配置(=器)を一枚で示す案内図。**C4 でいう Context / Container 相当の地図**で、
+> 詳細設計(Component/Code)は持たない。
+> ディレクトリ構成の SSOT は `03_design.md` §2、思想の正本は `00_philosophy.md`(§1.3 四つのあり方＋関係)。
+> 本書は橋であり、**新しい正解を定義しない**(矛盾したら §2=設計 と哲学が優先)。
 
 ---
 
@@ -14,17 +15,19 @@
   `engine` / `shell` / `core` のようなフレームワーク語をトップに置かない。
 - **思想の軸(あり方)はフォルダにしない**。あり方とフォルダの対応は本書(docs)が持つ。
   軸でフォルダを切ると、同じ器官(例:memory)が複数の軸に跨って断裂するため。
+- **フォルダ名に序数(`01_` 等)を付けない**。文書と実装は**順序ではなく名前**で繋ぐ
+  (`03 §3.5 voice` ↔ `src/voice/` ↔ §1 表の行=同じドメイン名詞)。順序を持つのは読む文書だけ。
 - **関係(目的)はどのフォルダにも無い**(§2)。
 
-## 1. 対応表 — あり方 × 目玉機能 × ソース
+## 1. 対応表 — あり方 × 目玉機能 × ソース(C4 Component=フォルダ地図)
 
 | あり方(魂) | 担う質 | 目玉機能 | ソース(体) | キャラ資産(`ene/`) |
 |---|---|---|---|---|
 | **① 来歴・状態・個性を持つ** | 個性 | 人格システムプロンプト・誕生日・最小状態・人生記憶 canon のロード | `src/character/` | identity / background / fewshot / life-memory / current-state .json |
 | **② 限られた知識を持つ** | 有限さ | Knowledge Router=役の外は「知らない」(完全ローカル判別・0往復) | `src/knowledge/` | knowledge_domains.json |
-| **③ 人間のように記憶する** | 有限さ(忘却・心) | 想起(語彙+entity+ベクトル RRF)・非破壊更新・忘却(§11.6)・**心=記憶から導出する想起バイアス** | `src/memory/` | (ユーザ記憶は `data/memory/{id}/`・canon は ene/life-memory.json) |
+| **③ 人間のように記憶する** | 有限さ(心) | 想起(語彙+entity+ベクトル RRF)・非破壊更新・**心=記憶から導出する想起バイアス** | `src/memory/` | (ユーザ記憶は `data/memory/{id}/`・canon は ene/life-memory.json) |
 | **④ その人の声と語り口で話す** | 個性の発露 | 言葉=Claude 会話(4層防御・few-shot)/ 声=TTS・STT・VAD・相槌・思考フィラー・うなずき | `src/conversation/`・`src/voice/` | voice.json・backchannels.json |
-| (土台) | — | デスクトップに棲む器(Electron 配線・UI・OS統合)/ 共有基盤(型・ユーティリティ) | `src/app/`・`src/shared/` | スプライト・animation.json・vrm.json・torimi.vrm |
+| (土台) | — | デスクトップに棲む器(Electron 配線・透過 UI・永続化・ライフサイクル)/ 共有基盤(型・暗号化・ユーティリティ) | `src/app/`・`src/shared/` | スプライト・animation.json・vrm.json・torimi.vrm |
 
 注:
 - **忘却と心は ③(有限さ)に属する**。`04_positioning.md` §3「内面の三点支持」
@@ -33,6 +36,7 @@
   **キャラ依存値は必ず `ene/*.json` に外出し**する(CLAUDE.md §4.5。コードに個性を埋めない)。
 - キャラ資産のロード機構は各ドメインに属する(例:voice.json → `src/voice/voice-loader.ts`、
   vrm.json / animation.json → `src/character/`)。
+- **設計書 `03 §3` の節は、この表の行=`src/` 直下と1:1で対応する**(同形)。
 
 ## 2. 関係(目的)はフォルダに無い
 
@@ -41,14 +45,33 @@
 関係はレバー(調整つまみ)ではなく、保存される好感度・感情スカラーも持たない(CLAUDE.md §5.3)。
 設計が手を入れてよいのは①〜④と記憶の質まで——関係そのものは時間が立ち上げる。
 
-## 3. 1ターンの流れ図 — 体の中を魂が通る道
+## 3. プロセス/コンテナ境界(C4 Container)
+
+体(フォルダ)が**実行時にどう配置されるか**の地図。要点は一つ——**この端末を越える線は1本だけ**。
+
+![ENE のプロセス/コンテナ境界図。ENE アプリ(Renderer / preload / Main の3プロセス)と、ローカルのモデル(STT/埋め込み/VAD)・AivisSpeech サイドカー・ファイルシステムがすべて端末内にあり、外部へ出るのは Main から Claude API への「会話テキストのみ」の1本だけであることを示す。](architecture-container.svg)
+
+- **3 プロセス(Electron)**:`app/renderer`(Chromium=UI・立ち絵/VRM・マイク取得・吹き出し・ControlBar)/
+  `app/preload`(contextBridge=最小の橋)/ `app/main`(Node=オーケストレーション。ドメイン①〜④の配線・永続化・起動ゲート)。
+- **ローカル計算(端末内・緑)**:STT(whisper)・埋め込み(ruri)・Silero VAD は **main の `onnxruntime-node`** で動く。
+  TTS は **AivisSpeech**(別プロセスのサイドカー・`127.0.0.1:10101` のローカル HTTP)。音声は端末外へ出さない。
+- **ローカルデータ(端末内・橙)**:`data/`(memory・config・logs・models)と `{id}/` キャラ資産。
+  暗号化するのは `data/app/api-key.enc` **だけ**(DPAPI)。残りは平文 JSON(可読性・可搬性)。
+- **唯一の外部送信(赤)**:`app/main` → **Claude API** への**会話テキストのみ**。
+  録音音声・記憶ファイル・ログ・プロンプト全文は端末外に出ない(テレメトリも無い)。
+  この一本がプライバシー方針(`02 §3.4`・ビジョン§4.2)を**図で証明**する。
+
+> この図は要件 `02 §3.4`(プライバシー)・`02 §4.2`(ポータブルなデータ配置)の根拠でもある。
+> 送信先の URL は固定(`ANTHROPIC_BASE_URL`)。
+
+## 4. 1ターンの流れ図 — 体の中を魂が通る道
 
 ```
 ユーザ入力(テキスト / 声)
   │ 声の場合: app/renderer(マイク) → app/main(vad-runtime)
   │           → voice/vad-segmenter(区間検出・barge-in) → voice/stt-transcriber(STT)
   ▼
-app/main ipc.ts(オーケストレーション・土台)
+app/main turn-engine(オーケストレーション・土台)
   ├─ memory/     : 想起(retriever・recall-pool)＋心の色づけ(mood)   … あり方③
   ├─ knowledge/  : ローカル判別 classifyTopicLocal(役の境界)         … あり方②
   └─ character/  : CharacterContext(人格・few-shot・誕生日)          … あり方①
@@ -64,7 +87,7 @@ memory/       : 会話から記憶抽出(extractor・scheduler)→ episodic へ�
                  =関係(目的)が創発する土壌
 ```
 
-## 4. 依存の向き(疎結合・CLAUDE.md §4.4)
+## 5. 依存の向き(疎結合・CLAUDE.md §4.4)
 
 - **ドメイン(character / knowledge / memory / conversation / voice)は `app/` に依存しない**。
   組み立て(配線)は `app/main` が一方向に行う。
@@ -82,7 +105,7 @@ memory/       : 会話から記憶抽出(extractor・scheduler)→ episodic へ�
   - `no-shared-to-upper` … `shared/` → app/ドメイン層 を禁止(error)。
   - `no-cross-domain` … ドメイン間の直接依存を禁止(error・N-ARCH-5)。型契約・DI(`LlmComplete` 等)は
     `shared/types` を介し、配線は `app/main` が行う。例外は `memory → character/active-character` のみ。
-  - `no-index-impl-outside-memory` / `no-episodic-store-outside-memory` … memory の索引・ストア実装を層外から隠す(error・§4.4)。
+  - `no-index-impl-outside-memory` / `no-episodic-store-outside-memory` … memory の索引・ストア実装を層外から隠す(error)。
   - `no-circular` … 循環依存を禁止(error)。
 - `npm run lint`(**ESLint** `no-restricted-syntax`):ドメイン＋shared 層の**文字列リテラル**に
   キャラ固有名・性格(例:魚川トリミ/ツンデレ)を埋め込むことを禁止(CLAUDE.md §5.1。値は `{id}/*.json` へ)。

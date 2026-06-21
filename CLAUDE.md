@@ -380,6 +380,7 @@
 | 最適化・ブラッシュアップ項目 | `docs/optimization-backlog.md` |
 | 実装過程の判断ログ(N-xx) | `docs/implementation-notes.md` |
 | 人生記憶 canon の内容計画 | `docs/character-life-memory-canon-plan.md` |
+| 画面の外の暮らし(off-screen-life)の設計・配信・フォールバック | `docs/off-screen-life-plan.md` |
 | 過去の経緯(マージ済み改訂・草案) | `docs/archive/`(現行ではない・対応表は archive/README) |
 | プロダクトの本質・判断基準 | `docs/01_vision.md` |
 | プロダクトの思想・なぜこの形か(四つのあり方＋関係) | `docs/00_philosophy.md` |

@@ -85,7 +85,7 @@ export const SettingsPanel = forwardRef<HTMLDivElement, Props>(function Settings
       </div>
 
       <div className="settings-panel__section">
-        <div className="settings-panel__label">呼び方(この子があなたを呼ぶ名前)</div>
+        <div className="settings-panel__label">あなたの呼び方</div>
         <input
           className="settings-input"
           type="text"

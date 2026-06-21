@@ -1,10 +1,10 @@
 {
-  "name": "ene-desktop",
-  "version": "0.1.0",
-  "description": "Desktop Character Agent (コードネーム: ENE) — 一生付き合える、人格を持ったデスクトップの相棒",
+  "name": "project-ene",
+  "version": "1.0.0",
+  "description": "Project_ENE — 一生そばにいる、人格を持ったデスクトップの存在(デスクトップキャラクターエージェント)",
   "private": true,
   "main": "out/main/index.js",
-  "author": "ENE Project",
+  "author": "Azuki Haneru",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "electron-vite dev",
@@ -20,6 +20,7 @@
     "download:stt-model": "node scripts/download-stt-model.mjs",
     "download:vad-model": "node scripts/download-vad-model.mjs",
     "setup:voice-engine": "node scripts/setup-voice-engine.mjs",
+    "setup:engine-userdata": "node scripts/setup-engine-userdata.mjs",
     "seed:recall": "node scripts/seed-recall-fixtures.mjs",
     "voice:smoke": "node scripts/voice-smoke.mjs",
     "stt:smoke": "node scripts/stt-smoke.mjs",

@@ -14,7 +14,7 @@ import type { AppRuntime } from './app-runtime';
 // userData(既定は %APPDATA%/<app名>)を安定した ASCII 識別子に固定する(§6.3)。
 // app.getName() は packaged 版で productName(=「魚川トリミ」)を使うため、固定しないと
 // 既定の userData が日本語パスへ動く。表示名と保存先識別子を分離するための明示設定。
-app.setName('ene-desktop');
+app.setName('project-ene');
 
 // ポータブル運用(§3.6/§6.3): Electron の状態(userData=Local Storage/Network/api-key.enc・
 // キャッシュ・ログ・クラッシュダンプ)を、exe の隣(dev はプロジェクトルート)の data/ 配下へ向け直す。

@@ -1,15 +1,16 @@
 // STT モデル(ONNX)をローカルへダウンロードするセットアップ用スクリプト(task_17 Phase B)。
-// 既定モデルは whisper-small(2026-06-09 計測で turbo→small へ・N-LAT-6)。
+// 既定モデルは kotoba-whisper-v2.2(2026-06-17 ユーザ決定・日本語 CER 最良で聞き間違いを最小化)。
+// エンコーダは q8 量子化(645MB)を取得する(fp32 は ~2.5GB と巨大なため)。
 //
 // 位置づけ(download-model.mjs と同じ):
 //   - 「開発・セットアップ時に手動実行」するツール。配布物(exe)には含めない。
 //   - アプリ本体は実行時に外部へモデルを取りに行かない(§7.1)。モデルはこのスクリプトで
-//     事前にローカル配置し、アプリは data/models/whisper-small/ から読むだけ。
+//     事前にローカル配置し、アプリは data/models/kotoba-whisper-v2.2/ から読むだけ。
 //
-// 使い方:  node scripts/download-stt-model.mjs   (既定=whisper-small)
+// 使い方:  node scripts/download-stt-model.mjs   (既定=kotoba-whisper-v2.2・q8 エンコーダ)
 //   環境変数 ENE_STT_REPO で取得元リポジトリを、ENE_STT_DIR で配置先ディレクトリ名を変更可。
-//   例(高精度モデルも併せて取得):
-//     ENE_STT_REPO=onnx-community/whisper-large-v3-turbo ENE_STT_DIR=whisper-large-v3-turbo node scripts/download-stt-model.mjs
+//   例(軽量・低レイテンシの whisper-small も併せて取得):
+//     ENE_STT_REPO=onnx-community/whisper-small ENE_STT_DIR=whisper-small ENE_STT_ENCODER=onnx/encoder_model.onnx node scripts/download-stt-model.mjs
 //   アプリ側は ENE_STT_MODEL_DIR=<dir> で読み先を切替える。
 
 import { createWriteStream } from 'node:fs';
@@ -18,15 +19,15 @@ import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-const REPO = process.env.ENE_STT_REPO ?? 'onnx-community/whisper-small';
-// 配置先ディレクトリ名。未指定ならリポジトリ名の末尾(basename)を使う。
-const DIR = process.env.ENE_STT_DIR ?? REPO.split('/').pop();
+const REPO = process.env.ENE_STT_REPO ?? 'onnx-community/kotoba-whisper-v2.2-ONNX';
+// 配置先ディレクトリ名。既定はアプリの STT_MODEL_DIR(constants.ts)と一致させる必要がある
+// (リポジトリ名の末尾は "...-ONNX" になるため、basename ではなく明示既定を使う)。
+const DIR = process.env.ENE_STT_DIR ?? 'kotoba-whisper-v2.2';
 const DEST_ROOT = join(process.cwd(), 'data', 'models', DIR);
 
-// 精度優先: encoder は fp32(whisper-small は小さい)。decoder は量子化(q8=_quantized)で十分。
-//   ただし kotoba-whisper 等は fp32 エンコーダが巨大(~2.5GB・外部データ)なので、
-//   ENE_STT_ENCODER=onnx/encoder_model_quantized.onnx で q8 エンコーダ(645MB)を取得する。
-const ENCODER = process.env.ENE_STT_ENCODER ?? 'onnx/encoder_model.onnx';
+// kotoba-whisper は fp32 エンコーダが巨大(~2.5GB・外部データ)なので、既定で q8 エンコーダ(645MB)を取得する。
+//   軽量モデル(whisper-small 等)で精度優先の fp32 を取りたいときは ENE_STT_ENCODER=onnx/encoder_model.onnx を指定。
+const ENCODER = process.env.ENE_STT_ENCODER ?? 'onnx/encoder_model_quantized.onnx';
 const DECODER_PREFERRED = 'onnx/decoder_model_merged_quantized.onnx'; // q8
 const DECODER_FALLBACK = 'onnx/decoder_model_merged.onnx'; // fp32
 
@@ -95,7 +96,7 @@ async function main() {
   }
 
   console.log(`\n完了。data/models/${DIR}/ にモデルを配置しました。`);
-  console.log('既定(whisper-large-v3-turbo)以外を試すときは ENE_STT_MODEL_DIR=' + DIR + ' でアプリを起動。');
+  console.log('既定(kotoba-whisper-v2.2)以外を試すときは ENE_STT_MODEL_DIR=' + DIR + ' でアプリを起動。');
 }
 
 main().catch((e) => {

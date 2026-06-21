@@ -1,7 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { log } from '../../shared/logger';
-import { getVoiceEngineDir, getVoiceEngineExePath } from '../../shared/node/paths';
+import {
+  getVoiceEngineDir,
+  getVoiceEngineExePath,
+  getActiveCharacterId,
+} from '../../shared/node/paths';
 import {
   VOICE_ENGINE_BASE_URL,
   VOICE_ENGINE_HOST,
@@ -10,15 +14,27 @@ import {
   VOICE_ENGINE_HEALTH_INTERVAL_MS,
   VOICE_ENGINE_STOP_GRACE_MS,
 } from '../../shared/constants';
+import { loadVoiceConfig } from '../../voice/voice-loader';
+import {
+  prepareEngineUserData,
+  cleanupEngineUserData,
+  engineOfflineEnv,
+  type EngineUserDataHandle,
+} from '../../shared/node/engine-userdata';
 
-// AivisSpeech サイドカーのライフサイクル管理(task_17 / N-17-6・N-17-12)。
+// AivisSpeech サイドカーのライフサイクル管理(task_17 / N-17-6・N-17-12・N-17-13)。
 //
 // これは voice-provisioner.ts(純粋な進行ロジック)が委ねる「副作用アダプタ」の実体。
 // 起動時に run.exe を spawn(shell:false・固定パス・引数配列=§7.2準拠)→ /version でヘルス確認、
 // 終了時に kill(自分が起動した場合のみ・外部起動エンジンは殺さない)。
 //
 // エンジン本体は配布物(exe)に同梱せず data/voice/engine/ に別配置する(コア<100MB維持・§4.3)。
-// 既定モデルと BERT はエンジン自身が初回起動時に取得するため、ここでは「起動して待つ」だけでよい。
+//
+// ポータブル化＋完全オフライン化(N-17-13・実機 spike 検証済):
+//  - spawn 前に engine-userdata で %APPDATA%\AivisSpeech-Engine を data/voice/userdata へ「一時借用」
+//    (ジャンクション/共存時はハードリンク)。終了時に外す=正常終了で %APPDATA% に痕跡ゼロ。
+//  - spawn に `--disable_sentry`＋死んだ proxy/offline 環境(engineOfflineEnv)を渡し、エンジンの
+//    AivisHub/HuggingFace への外向き通信を端末内で失敗させる(外部送信は Claude のみ=§4.2/§7.1)。
 //
 // 設計方針(疎結合・テスト容易性): 判断ロジック(decideEngineAction)と待機(waitHealthy)を
 // 純粋関数として分離し、副作用(spawn/fetch)から切り離して単体テスト対象にする。
@@ -83,6 +99,8 @@ let engineChild: ChildProcess | null = null;
 let ownsEngine = false;
 /** 終了処理が走ったか。背景起動(ensureVoiceEngine)中の quit で spawn が遅れて孤児になるのを防ぐ。 */
 let stopping = false;
+/** データ root 一時借用の解除情報(prepare が返し、stop で外す)。 */
+let engineUserDataHandle: EngineUserDataHandle | null = null;
 
 export type EnsureEngineResult = 'running' | 'started' | 'absent' | 'failed';
 
@@ -96,6 +114,12 @@ export type EnsureEngineResult = 'running' | 'started' | 'absent' | 'failed';
 export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
   const baseUrl = VOICE_ENGINE_BASE_URL;
   const exePath = getVoiceEngineExePath();
+
+  // spawn 前にエンジンのデータ root を用意(一時借用 or 共存配置)。共存時のみ UUID が要る。
+  // best-effort(prepare 内で握りつぶす)。skip 経路でも prepare 済み=cleanup は stop で必ず行う。
+  const voiceConfig = await loadVoiceConfig(getActiveCharacterId()).catch(() => null);
+  engineUserDataHandle = await prepareEngineUserData(voiceConfig?.uuid ?? null);
+
   const reachable = await probeVersion(baseUrl);
   const present = existsSync(exePath);
   const action = decideEngineAction(reachable, present);
@@ -116,11 +140,19 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
   if (stopping) return 'failed';
 
   // spawn(shell:false・固定パス・引数配列・コンソール窓を出さない)。
+  // `--disable_sentry`＋死んだ proxy/offline 環境で完全オフライン化(N-17-13)。
   try {
     const child = spawn(
       exePath,
-      ['--host', VOICE_ENGINE_HOST, '--port', String(VOICE_ENGINE_PORT)],
-      { cwd: getVoiceEngineDir(), shell: false, windowsHide: true, stdio: 'ignore', detached: false },
+      ['--host', VOICE_ENGINE_HOST, '--port', String(VOICE_ENGINE_PORT), '--disable_sentry'],
+      {
+        cwd: getVoiceEngineDir(),
+        env: engineOfflineEnv(),
+        shell: false,
+        windowsHide: true,
+        stdio: 'ignore',
+        detached: false,
+      },
     );
     engineChild = child;
     ownsEngine = true;
@@ -158,18 +190,38 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
 }
 
 /**
- * 自分が起動したエンジンを停止する(冪等)。外部起動のエンジンは止めない。
- * child.kill() 後、猶予内に終了しなければ Windows は taskkill でプロセスツリーを強制終了する。
+ * 自分が起動したエンジンを停止し、データ root の一時借用を解除する(冪等)。
+ * 外部起動のエンジンは止めない。借用解除(cleanup)は spawn の有無に関わらず必ず行う
+ * (skip 経路でも prepare 済みのため・正常終了で %APPDATA% に痕跡を残さない・N-17-13)。
  */
 export async function stopVoiceEngine(): Promise<void> {
   stopping = true;
   const child = engineChild;
   engineChild = null;
-  if (!child || !ownsEngine) {
+  if (child && ownsEngine) {
     ownsEngine = false;
-    return;
+    await killEngineProcess(child);
+  } else {
+    ownsEngine = false;
   }
-  ownsEngine = false;
+
+  // 一時借用(ジャンクション/ハードリンク)の解除。冪等。
+  if (engineUserDataHandle) {
+    const handle = engineUserDataHandle;
+    engineUserDataHandle = null;
+    try {
+      await cleanupEngineUserData(handle);
+    } catch (e) {
+      log.warn('engine userdata cleanup failed', { name: (e as Error).name });
+    }
+  }
+}
+
+/**
+ * 自分が起動したエンジンプロセスを停止する(kill→猶予内に終了しなければ taskkill でツリー強制終了)。
+ * PyInstaller の子プロセスも確実に止める。
+ */
+async function killEngineProcess(child: ChildProcess): Promise<void> {
   const pid = child.pid;
   try {
     child.kill();

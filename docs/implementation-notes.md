@@ -1137,6 +1137,31 @@
 
 ---
 
+### N-17-13 🟡 音声エンジンのポータブル化:AivisSpeech の %APPDATA% 流出を「一時借用」で解消(2026-06-19・設計確定/実装前)
+- **タスク/契機**: ポータブル配布(フォルダ削除＝完全アンインストール・%APPDATA% 痕跡ゼロ・[[release-portable-2026-06]])のアップデート運用を検討中、AivisSpeech エンジンの保存先が制御不能と判明。本項は**設計確定の記録**(実装はこの後)。
+- **該当箇所**: 03_design §2(`data/voice` ツリー・line 437「.aivmx/BERT は %APPDATA%…変更不可」)・§3.6(部分暗号化/ポータブル)・§4.2/§7.1(外部送信は Claude のみ)・§11.8(更新運用)。`src/app/main/voice-engine.ts`・`src/shared/node/paths.ts`・`ene/voice.json`・`electron-builder.yml`。
+- **判明した実態(実機確認)**:
+  1. エンジンは保存先を `get_save_dir()=platformdirs.user_data_dir("AivisSpeech-Engine", roaming=True)` で決定。**CLI フラグ無し・設定ファイル無し・環境変数を読まない**(ソース確認＋`run.exe --help`)。
+  2. **`APPDATA` を子プロセスで上書きしても無効**(実測:platformdirs は Windows API で解決し env を見ない)。
+  3. `%APPDATA%\AivisSpeech-Engine` は **実測 約1.6GB**(BERT `BertModelCaches` 624MB＝HuggingFace から実行時DL／`Models` 966MB／`aivm_infos_cache.json` 28MB 他)。「フォルダ削除＝痕跡ゼロ」の唯一の穴。
+  4. 外部通信の棚卸し:**自前コードはクリーン**(STT/embedder は `env.allowRemoteModels=false`・宛先は `api.anthropic.com` 固定＋ローカルエンジンのみ・CDN/解析/WebSocket 無し)。エンジン側は **BERT を HF から実行時DL**＋`--disable_sentry` フラグ存在(Sentry 既定挙動)。`manage_library:false`(モデルカタログDL無し)・`update_infos` はローカルファイル(ネット確認でない)。
+- **採用した判断(設計確定・実装前)**:
+  - **案A=「%APPDATA% の一時借用」**: 起動時に `%APPDATA%\AivisSpeech-Engine` を**ポータブル側 `data/voice/userdata` へのジャンクション**にし、**終了時に外す**(リンクのみ削除・**再帰削除は厳禁**=実体消失の地雷)。クラッシュ残骸は次回起動で自己修復。正常終了で痕跡ゼロ。
+  - **BERT 同梱**＋子プロセスに **`HF_HUB_OFFLINE=1`(+`--disable_sentry`)** で外部通信を断つ(§4.2 をエンジン込みで成立)。
+  - **AIVM は最新維持**=古い標準版エンジン互換は考えない。**相手の起動中エンジンは再利用せず自前を起動**(共存時は別ポート)。
+  - **共存対応(標準版 AivisSpeech が既存)=想定すべき主要ケース**(VOICEVOX/COEIROINK は別ディレクトリで非衝突。衝突するのは AivisSpeech 本体所持者のみ): 全体ジャンクション不可ゆえ、torimi を **ハードリンク**で `Models\<UUID>.aivmx` に置き**終了時に外す**(同一ボリューム=管理者不要・コピー無し／別ドライブはコピー)。BERT は相手のを再利用 or サブディレクトリ junction。presets/設定は `--preset_file`/`--setting_file` で**ポータブル側へ隔離**(相手のファイルは無改変)。**正常終了後に残るのは `aivm_infos_cache.json` の改変(相手が次回起動で自己修復)＋些末ログのみ**。
+  - **アンインストーラは作らない**(ユーザ決定)。唯一の残留リスク=共存時に「クラッシュ直後にフォルダ削除」で torimi ハードリンクが相手 `Models` に残る → **自前の次回起動時クリーンアップ**でほぼ回収。
+  - **UUID/モデル名はハードコードしない**(§4.5/§5.1): キャラ依存値ゆえ `ene/voice.json` に AIVM UUID を持たせる。
+- **更新運用の方向(本セッションの帰結・別途詳細設計)**: ポータブル維持のため自動更新は採らず、**起動時に GitHub の version を確認→ダイアログ→公式リリースを既定ブラウザで開く(固定URL・`shell.openExternal`)→ユーザが新フォルダを展開**。記憶等は**初回起動の「引き継ぎますか?」で旧 `data/` から選択コピー**(賢い探索＋フォルダ選択フォールバック)。**更新zipはコア軽量版＋初回に旧フォルダからモデル/エンジンも移植**して 1.6GB 再DLを回避。junction で声データもポータブル側に在るため移行に自然に含まれる。
+- **設計書へどう反映すべきか(承認後)**: §2 に `data/voice/userdata/`(エンジンデータ root=ジャンクション先・派生/staging)を追記し line 437 を改訂。§3.6/§4.2/§7.1 に「エンジンの %APPDATA% 一時借用＋offline/sentry 封じ=外部送信は Claude のみを維持」を明記。§11.8 をポータブル前提(GitHub 手動DL＋`data/` 移行)へ全面改訂。`ene/voice.json` スキーマに AIVM UUID を追加。
+- **🔴 spike で判明した追加の外部通信(2026-06-20・実機 spike `scripts/spike-engine-userdata.mjs`)**: spike (a) 直接配置モデルのロード=**OK・複製も作らない**/spike (b) BERT サブdir junction＋**オフライン合成=OK**(200・98KB WAV)。**ただし新発見**: フレッシュな user dir で起動すると、エンジンが **既定モデル「まお」(a59cb814)を `https://api.aivis-project.com`(AivisHub)から自動DL**する(`HF_HUB_OFFLINE` では止まらない第3の宛先)。さらに run.py に `AivisHubClient`(起動時イベント送信=テレメトリの疑い)。README にこれらを無効化する設定は**無い**(確認済)。
+  - **対処方針(internals 非依存)**: 子プロセスに **`HTTP_PROXY`/`HTTPS_PROXY`=死んだローカル(例 127.0.0.1:9)＋`NO_PROXY=127.0.0.1,localhost`** を渡し、エンジンの全 outbound を**端末内で失敗**させる(=外部に出ない・§4.2 を機械的に担保・管理者不要)。ローカル合成(127.0.0.1:10101)は無影響。＋既存 `HF_HUB_OFFLINE=1`/`--disable_sentry`。既定モデルDLは失敗→3回リトライ後に継続(torimi は配置済み)。
+  - **✅ 検証完了(2026-06-20 spike #2・本番ネットワーク遮断構成)**: 死んだ HTTP_PROXY で **全 AivisHub 通信が ConnectError で失敗**することを実証。AivisHub への接続は4種(`fetch_model_detail`／**`fetch_forced_removal_rules`=遠隔強制削除ルール**／`fetch_default_models`／既定モデル本体DL)＋`AivisHubClient` 起動イベント。**毎起動接続を試みる(初回限定でない)**。遮断下でも **engine healthy＋オフライン合成 200/90KB** で継続。
+  - **不変条件(根幹)**: AivisHub 遮断は "load-bearing"。①proxy 遮断は常時必須 ②エンジン更新のたびにネットワーク挙動を再監査 ③「エンジンの外向き成功=ゼロ」を smoke で機械検証。`forced_removal_rules` 遮断は「声を遠隔で消されない」=永続性(§5.2)の保護でもある。
+  - **起動速度**: 遮断時は既定DLの3リトライで起動 ~34s。**cache 同梱(pre-seed)で既定モデル install を起こさせない**ことで短縮(正しさは proxy で担保済・速度最適化)。
+
+---
+
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
 
 MVP 完成後に改善する項目(Router タイムアウト・記憶抽出のレイテンシ/頻度・

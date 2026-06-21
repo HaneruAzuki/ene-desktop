@@ -5,6 +5,8 @@ import {
   VAD_MODEL_FILE,
   VOICE_ENGINE_DIR,
   VOICE_ENGINE_EXE,
+  VOICE_ENGINE_USERDATA_DIRNAME,
+  VOICE_ENGINE_PORTABLE_USERDATA,
   DEFAULT_CHARACTER_ID,
 } from '../constants';
 
@@ -90,6 +92,21 @@ export function getVoiceEngineDir(): string {
 /** data/voice/engine/run.exe(spawn 対象の実行ファイル)。 */
 export function getVoiceEngineExePath(): string {
   return path.join(getVoiceEngineDir(), VOICE_ENGINE_EXE);
+}
+
+/**
+ * エンジンが固定で使うデータ root(= %APPDATA%\AivisSpeech-Engine)。
+ * エンジンは保存先を platformdirs(roaming)で決め打ち、変更不可(N-17-13)。index.ts は userData 等を
+ * data/ へ向け直すが **appData は OS 実体(Roaming)のまま**=エンジンの実使用先と一致する。
+ * 起動時にここをポータブル側へジャンクションして「一時借用」する(app.ready 後に呼ぶこと)。
+ */
+export function getEngineUserDataDir(): string {
+  return path.join(app.getPath('appData'), VOICE_ENGINE_USERDATA_DIRNAME);
+}
+
+/** ポータブル側のエンジンデータ root(data/voice/userdata・同梱 torimi＋BERT・一時ジャンクションの向き先)。 */
+export function getPortableEngineUserDataDir(): string {
+  return path.join(getVoiceDir(), VOICE_ENGINE_PORTABLE_USERDATA);
 }
 
 /** data/config/active-character.json(active キャラに依存しない固定パス)。 */
@@ -228,7 +245,7 @@ export function getVadModelPath(): string {
 /**
  * Electron の userData ディレクトリ(app.getPath('userData'))。
  * ポータブル運用では index.ts が起動時に data/app/ へ向け直すため、ここもフォルダ内を指す
- * (リダイレクト前の既定は %APPDATA%/ene-desktop)。
+ * (リダイレクト前の既定は %APPDATA%/project-ene)。
  */
 export function getMachineDataDir(): string {
   return app.getPath('userData');
