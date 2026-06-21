@@ -1,29 +1,33 @@
 import {
   DEFAULT_RETRIEVAL_LIMIT,
   RRF_K,
-  RECALL_BIAS_LAMBDA,
   RECALL_SOFTMAX_TEMP,
   RECALL_CANDIDATE_POOL,
+  INTEREST_AFFINITY_WEIGHT,
+  CHEERUP_WEIGHT,
+  USER_DOWN_THRESHOLD,
 } from '../shared/constants';
 import { log } from '../shared/logger';
 import { loadRecallPool } from './recall-pool';
 import { queryInverted } from './index-inverted';
 import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../shared/node/embedder';
 import { searchVectors, syncVectorIndex } from './index-vector';
-import { clampMood } from './mood';
 import type { EpisodicMemory, EpisodicRecord, RetrievalQuery } from '../shared/types/memory';
 
-// 想起エンジン(task_15 RRF ＋ task_16 心・開示ゲーティング)。
+// 想起エンジン(task_15 RRF ＋ 想起の個性化・開示ゲーティング)。
 // ユーザー発言を引き金に**想起プール(user episodic ＋ canon)**を全件横断で引く(Router 非依存)。
-//  - 開示ゲーティング(task_16):familiarityStage 以下の記憶のみ候補(RRF の手前でハードフィルタ)。
-//  - 心(task_16):RRF スコアに λ·clampedMood·valence を加算＋softmax サンプリング(揺らぎ)。
-//  - **後方互換**:deps 未指定なら従来の決定論的挙動(mood=0・全開示・argmax)。
+//  - 開示ゲーティング:familiarityStage 以下の記憶のみ候補(RRF の手前でハードフィルタ)。
+//  - 個性バイアス(2026-06-21):RRF に「関心アフィニティ＋元気づけ」を加算(旧 mood 機構を置換)。
+//  - 上位 RECALL_CANDIDATE_POOL に絞って softmax サンプリング(揺らぎ・関連の裾を除外)。
+//  - **後方互換**:deps 未指定なら従来挙動(関心/元気づけなし・全開示・argmax)。
 
 export interface RetrieverDeps {
   /** テスト用に埋め込み実装を差し替える。未指定なら既定(ruri)。 */
   embedder?: Embedder;
-  /** 心情(-2..+2 目安)。未指定=0(バイアスなし)。 */
-  mood?: number;
+  /** 相手のトーン(-2..+2 目安・recentUserTone)。負=落ち込み気味→元気づけ発火。未指定=0(発火しない)。 */
+  recentUserTone?: number;
+  /** トリミの関心キーワード(関心アフィニティ用)。未指定=[](関心ブーストなし)。 */
+  interests?: string[];
   /** 親しさ段階(1..5)。未指定=5(全開示=従来挙動)。 */
   familiarityStage?: number;
   /** softmax サンプリング用 RNG(0..1)。未指定=決定論(スコア降順)。 */
@@ -139,6 +143,36 @@ async function tryVectorRanking(
   }
 }
 
+/** interest 群が memory の topic/tags/entities と緩く一致するか(関心アフィニティの素・部分一致は割り切り)。 */
+export function matchesInterest(memory: EpisodicMemory, interests: string[]): boolean {
+  if (interests.length === 0) return false;
+  const haystacks = [memory.topic, ...(memory.tags ?? []), ...(memory.entities ?? [])].filter(
+    (s) => s.length > 0,
+  );
+  return interests.some((raw) => {
+    const term = raw.trim();
+    if (term.length === 0) return false;
+    return haystacks.some((h) => h.includes(term) || term.includes(h));
+  });
+}
+
+/** 関心アフィニティの加点(トリミの関心に触れる記憶へ・"自分の関心事に飛びつく")。 */
+export function interestBoost(memory: EpisodicMemory, interests: string[]): number {
+  return matchesInterest(memory, interests) ? INTEREST_AFFINITY_WEIGHT : 0;
+}
+
+/**
+ * 元気づけの加点("相手の波長"・recentUserTone)。companion 向きに mood"逆"で効かせる。
+ * 相手が落ち込み気味(tone < 閾値)のときだけ、相手が楽しそうに語った(user・正valence)記憶を引き上げる。
+ * canon(自分の人生)・負/中立 valence には加点しない(片方向)。
+ */
+export function cheerupBoost(memory: EpisodicMemory, recentUserTone: number): number {
+  if (recentUserTone >= USER_DOWN_THRESHOLD) return 0; // 落ち込んでいない→何もしない
+  if (memory.provenance === 'self') return 0; // 自分の人生(canon)は元気づけに使わない
+  const v = memory.valence ?? 0;
+  return v > 0 ? CHEERUP_WEIGHT * v : 0; // 正valence(=相手が楽しそうに語った)だけ
+}
+
 export async function retrieveRecords(
   query: RetrievalQuery,
   deps: RetrieverDeps = {},
@@ -173,13 +207,15 @@ export async function retrieveRecords(
   const rankings = vectorRanked.length > 0 ? [lexicalRanked, vectorRanked] : [lexicalRanked];
   const fused = rrfFuse(rankings, RRF_K);
 
-  // 3) 心バイアス:finalScore = RRF + λ·clampedMood·valence(task_16)
-  const clamped = clampMood(deps.mood ?? 0);
+  // 3) 個性バイアス:finalScore = RRF + 関心アフィニティ + 元気づけ(2026-06-21・旧 mood 機構を置換)
+  const recentTone = deps.recentUserTone ?? 0;
+  const interests = deps.interests ?? [];
   const scored = [...fused.entries()]
     .filter(([id]) => byId.has(id))
     .map(([id, rrf]) => {
-      const valence = byId.get(id)?.memory.valence ?? 0;
-      return { id, score: rrf + RECALL_BIAS_LAMBDA * clamped * valence };
+      const memory = byId.get(id)?.memory;
+      const bias = memory ? interestBoost(memory, interests) + cheerupBoost(memory, recentTone) : 0;
+      return { id, score: rrf + bias };
     });
 
   // 4) 上位選択。まずスコア上位 RECALL_CANDIDATE_POOL 件へ絞り(無関係な裾を除外=precision)、

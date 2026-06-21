@@ -63,7 +63,12 @@ export async function generateResponse(
   const t0 = performance.now();
   // 記憶コンテキスト構築(全件横断想起・心/開示バイアス)＋ローカル判別(B-15・ネットワーク0往復)。
   //   query 埋め込みは直後の判別と共有(B-14a)。失敗は medium に倒し会話を止めない。
-  const memoryContext = await buildConversationMemory({ text, limit: 5 });
+  // トリミの関心(想起の個性化=関心アフィニティ用)。知識ドメイン high ＋ 趣味から導出(§4.5・JSON外出し)。
+  const interests = [
+    ...charContext.knowledgeDomains.domains.high.topics,
+    ...charContext.background.hobbies,
+  ];
+  const memoryContext = await buildConversationMemory({ text, limit: 5 }, { interests });
   const routerResult = await classifyTopicLocal(text, charContext.knowledgeDomains);
   const tMem1 = performance.now();
 

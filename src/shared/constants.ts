@@ -320,24 +320,29 @@ export const TURN_NOD_STRENGTH_SHORT = 0.4;
 /** 長い発話のうなずきの深さ(基準 1.0=従来のうなずき幅 比)。やや深め(実機で半分に・2026-06-12 ユーザー)。 */
 export const TURN_NOD_STRENGTH_LONG = 0.8;
 
-// --- 心・開示ゲーティング(task_16 / design-revision-character-heart §6) ---
+// --- 想起の個性化(関心アフィニティ＋元気づけ)・開示ゲーティング(2026-06-21 改訂) ---
+// 旧「心(mood)」機構(非対称τ・暗転床・心情"一致"バイアス)は撤去。recall は2つの"見える"規則で個性を出す:
+//   ①関心アフィニティ=トリミの関心に触れる記憶を優先想起(自分の関心事に飛びつく)、
+//   ②元気づけ=相手が落ち込み気味のとき、相手が楽しそうに語った(正valence・user)記憶を引き上げる(companion 向き)。
+// 「相手の波長」recentUserTone は user記憶 valence の recency 平均(想起時に導出・貯めない=§5.3 適合)。
 
-/** 心情導出の時定数(日)。負は速く減衰=復元力(非対称)。 */
-export const MOOD_TAU_POS_DAYS = 14;
-export const MOOD_TAU_NEG_DAYS = 7;
-
-/** clampedMood の下限(“デレの床”・暗転ロック回避・倫理の一線)。 */
-export const MOOD_FLOOR = -1.5;
+/** recentUserTone 導出の時定数(日)。単一(旧:正負非対称τを撤去・簡素化)。 */
+export const USER_TONE_TAU_DAYS = 7;
 
 /**
- * 中立プライアの重み。mood を 0 へ向けて縮約する仮想的な“中立の記憶”。
- * これにより (a) 沈黙(記憶が古い)で mood が自然に 0 へ戻る(§3.2)、
- * (b) 数件の直近記憶では mood が小さい(微細)、という性質が出る。
+ * 中立プライアの重み。recentUserTone を 0 へ縮約する仮想的な“中立の記憶”。
+ * 記憶が少ない/古いとトーンは 0(=落ち込み扱いしない)へ寄る。
  */
-export const MOOD_PRIOR_WEIGHT = 1;
+export const USER_TONE_PRIOR_WEIGHT = 1;
 
-/** 想起バイアス係数。RRF スコアと同オーダーで「微細」(拮抗時のみ順位が動く・調律可)。 */
-export const RECALL_BIAS_LAMBDA = 0.01;
+/** これを下回ったら「相手は落ち込み気味」と判定し、元気づけ想起を発火する閾値(片方向)。 */
+export const USER_DOWN_THRESHOLD = -0.5;
+
+/** 元気づけの加点係数(×正valence)。RRF と同オーダーで効かせる(調律可)。 */
+export const CHEERUP_WEIGHT = 0.01;
+
+/** 関心アフィニティの加点(トリミの関心に触れる記憶へ)。RRF と同オーダー(調律可)。 */
+export const INTEREST_AFFINITY_WEIGHT = 0.01;
 
 /**
  * 想起の softmax サンプリング温度(小さいほど関連度の高い記憶へ集中・調律可)。

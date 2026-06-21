@@ -3,7 +3,7 @@ import { getShortTerm } from './short-term';
 import { loadAllEpisodicFiles } from './episodic';
 import { loadLifeMemory } from './life-memory';
 import { retrieve, type RetrieverDeps } from './retriever';
-import { deriveMood } from './mood';
+import { recentUserTone } from './mood';
 import { deriveFamiliarityStage } from './familiarity';
 import {
   selectOpenLoops,
@@ -52,7 +52,7 @@ export async function buildMemoryContext(
  * 会話経路の記憶コンテキストを構築する(task_16 ＋ B-14a)。
  *
  * episodic(user)と canon を**1回だけ**ロードし、
- *  - 心(mood):直近の user episodic から導出(canon は含めない)、
+ *  - 相手の波長(recentUserTone):直近の user episodic から導出(canon は含めない・元気づけ用)、
  *  - 開示(familiarityStage):active-character の関係の事実から導出、
  *  - 想起プール(recallPool):user ＋ canon を retriever へ直接渡す(再ロードさせない)、
  * の3つで使い回す。これにより従来 buildHeartDeps と retrieve(loadRecallPool)で
@@ -64,7 +64,10 @@ export async function buildMemoryContext(
 // 投機生成(コアレッシング)で多少過大計上しうるが、疲労は曖昧シグナルなので許容(N-PRES-7)。
 let sessionTurnCount = 0;
 
-export async function buildConversationMemory(query: RetrievalQuery): Promise<MemoryContext> {
+export async function buildConversationMemory(
+  query: RetrievalQuery,
+  opts: { interests?: string[] } = {}, // トリミの関心キーワード(関心アフィニティ用・呼出側が charContext から渡す)
+): Promise<MemoryContext> {
   const now = Date.now();
   sessionTurnCount += 1;
   const [userRecords, canon, active] = await Promise.all([
@@ -74,7 +77,8 @@ export async function buildConversationMemory(query: RetrievalQuery): Promise<Me
   ]);
   const stage = deriveFamiliarityStage(active.relationship, now);
   const deps: RetrieverDeps = {
-    mood: deriveMood(userRecords, now),
+    recentUserTone: recentUserTone(userRecords, now), // 相手の波長(元気づけ用)
+    interests: opts.interests ?? [], // 関心アフィニティ
     familiarityStage: stage,
     rng: Math.random,
     recallPool: [...userRecords, ...canon],
