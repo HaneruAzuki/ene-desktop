@@ -16,6 +16,7 @@ import {
 } from '../../shared/constants';
 import { loadVoiceConfig } from '../../voice/voice-loader';
 import { prepareEngineUserData, engineOfflineEnv } from '../../shared/node/engine-userdata';
+import { writeEngineLock, clearEngineLock, reconcileOrphanedEngine } from './voice-engine-orphan';
 
 // AivisSpeech サイドカーのライフサイクル管理(task_17 / N-17-6・N-17-12・N-17-13)。
 //
@@ -108,6 +109,10 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
   const baseUrl = VOICE_ENGINE_BASE_URL;
   const exePath = getVoiceEngineExePath();
 
+  // 前回が異常終了(ロック残存)なら、自分のエンジンの孤児をパス一致で掃除してから進める(標準版/無関係 PID は巻き込まない)。
+  // prepareEngineUserData の前に置く=孤児が %APPDATA% のエンジンデータを掴んだまま配置に入らないようにする。
+  await reconcileOrphanedEngine();
+
   // spawn 前に同梱 torimi＋BERT を %APPDATA% のエンジン dir へ直接配置(共存=UUID選択・N-REL-2)。
   // best-effort(prepare 内で握りつぶす)。配置は永続=アンインストール時に installer.nsh が除去する。
   const voiceConfig = await loadVoiceConfig(getActiveCharacterId()).catch(() => null);
@@ -149,6 +154,7 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
     );
     engineChild = child;
     ownsEngine = true;
+    writeEngineLock(child.pid); // クラッシュ時にこのロックが残り、次回起動の reconcile が孤児を掃除する
     // spawn 直後に終了処理が走っていたら即停止(spawn と stop の競合を解消)。
     if (stopping) {
       await stopVoiceEngine();
@@ -159,6 +165,7 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
       if (engineChild === child) {
         engineChild = null;
         ownsEngine = false;
+        clearEngineLock(); // 自分が起動したエンジンが自然終了=孤児なし
       }
     });
     child.on('error', (e) => {
@@ -196,6 +203,7 @@ export async function stopVoiceEngine(): Promise<void> {
   } else {
     ownsEngine = false;
   }
+  clearEngineLock(); // 正常終了=孤児なし(次回起動で reconcile を走らせない)
 }
 
 /**
