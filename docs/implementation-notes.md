@@ -1186,6 +1186,20 @@
 - **検証**: typecheck/lint/build/516テスト 緑。**API 挙動(effort/thinking が実際に効くか・Haiku キャッシュ)は実機 live でユーザー確認**。
 - **波及/SSOT**: 03_design §1.2(0.30→0.105)・§3.4(トークン計測=撤去/caching=GA)・N-14 行。`npm audit` が 9 件(既存依存由来含む)を報告するが `audit fix --force` は破壊的なので未実施(別途判断)。
 
+### N-REL-4 🟡 音声エンジンの孤児プロセス対策(クラッシュ後の次回起動でパス一致掃除・2026-06-22)
+- **課題**: Windows は親(Electron)がクラッシュ/強制終了で死んでも子(run.exe)を道連れにしない(detached:false でも Job Object 不使用)。正常終了は before-quit/will-quit→stopVoiceEngine で確実に kill するが、異常終了だと AivisSpeech が孤児として 10101 に常駐し、アプリを閉じても残る(本番でも発生・「痕跡を残さない」方針に反する)。さらに従来は次回起動で「到達可能なら reuse(ownsEngine=false)」=孤児を再利用するが所有しない=永久に掃除されない経路だった。
+- **対策(新規依存なし・voice-engine-orphan.ts に分離)**: spawn 時に userData へロック(.ene-engine.lock=pid+exePath)を書き、正常終了/自然終了で消す。次回起動の ensureVoiceEngine 冒頭(prepareEngineUserData の前)で reconcileOrphanedEngine() を呼び、ロックが残っていれば前回は異常終了=孤児の可能性 → **自分のエンジン実体パスに一致するプロセスだけ**を PowerShell(Get-CimInstance Win32_Process でパス判定)+ taskkill /T /F でツリー強制終了。パス一致が肝: ユーザーが別途入れた標準 AivisSpeech(別パスの同名 exe)や PID 再利用を巻き込まない(§7.2: spawn・shell:false・固定引数・パスはアプリ管理値)。
+- **限界**: 「親死=子死」の即時掃除には Windows Job Object が要る(新規依存=§2.4 承認事項のため未導入)。本対策は孤児を「次回起動まで」に限定する代替。完全版(Job Object 採否)はユーザー承認の上で。
+- **検証**: typecheck/lint/lint:deps/517テスト 緑。実機での孤児掃除はユーザー検証。
+
+### N-REL-5 🟡 STT を utilityProcess へ分離(既定 off・ENE_STT_WORKER=1・2026-06-22)
+- **課題(freeze/もっさりの根本)**: STT(kotoba ~1.8s + transformers の JS 前後処理=mel 抽出/デコードループ)が main プロセスで走り、発話直後に main を占有してイベントループを塞ぐ→クリックもっさり・OS「応答なし」。`VAD overloaded: dropped frames` も同根(VAD が main で STT と競合)。**経緯**: onnxruntime-node はネイティブ(.node)でレンダラ(サンドボックス)では動かず、GPU(WebGPU/DirectML)は重い/別バンドル→ MVP は main で in-process 実行と決めていた(意図的だが「重い同期処理を main に置かない」観点の検討は無かった)。
+- **対策(クリーン設計)**: STT を Electron utilityProcess へ逃がす。`stt-pipeline.ts`=パイプラインの純粋コア(Electron 非依存・in-process と worker が共用=重複なし)/`stt-worker.ts`=utilityProcess エントリ(parentPort で init/warm/transcribe)/`stt-worker-client.ts`=main 側(fork+init・要求/応答 id・**失敗/タイムアウト/worker 終了は必ず in-process フォールバック**=退行しない上限保証)。VAD(defaultVadDeps)/PTT(TRANSCRIBE_AUDIO)/warm(lifecycle)/shutdown を worker 経由へ配線。build に out/main/stt-worker.js を 2nd エントリ追加。
+- **既定 off**: 実機未検証の経路(utilityProcess fork パス・transformers in utilityProcess・Float32Array IPC)を default-on にしない。`ENE_STT_WORKER=1` で有効化→実機検証→良ければ既定化。worker 無効時は client が内部で in-process へ委譲(挙動は従来と完全一致)。
+- **perf**: STT の推論時間自体は不変(同モデル/CPU)。効くのは**応答性**——STT 中も main が空く=発話直後の UI もっさり/「応答なし」が消え、VAD のフレーム落ちも解消方向。STT を「速くする」のは別レバー(GPU/モデル小型化=B-16b 等)。
+- **据え置き**: VAD(silero)は per-frame で軽く、worker 化は IPC 往復オーバーヘッド(~31/s)が勝つので main 据え置き。embedder も今回対象外(occasional)。
+- **検証**: typecheck/lint/lint:deps/build(stt-worker.js バンドル確認)/518テスト 緑。worker 実経路は実機(ENE_STT_WORKER=1)でユーザー検証。
+
 ---
 
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
