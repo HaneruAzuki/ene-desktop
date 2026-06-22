@@ -9,7 +9,11 @@ export default defineConfig({
     build: {
       outDir: 'out/main',
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/app/main/index.ts') },
+        input: {
+          index: resolve(__dirname, 'src/app/main/index.ts'),
+          // STT を main から逃がす utilityProcess エントリ(out/main/stt-worker.js・N-REL-5)。
+          'stt-worker': resolve(__dirname, 'src/app/main/stt-worker.ts'),
+        },
         // 埋め込みランタイムは ESM＋ネイティブ依存(onnxruntime-node の .node)を含むため
         // バンドルせず外部化する。実行時に node_modules から解決し、native は asarUnpack で同梱する
         // (electron-builder.yml)。Phase B(task_15)。

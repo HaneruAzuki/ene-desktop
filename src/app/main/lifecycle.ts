@@ -15,7 +15,7 @@ import { getUnextractedEntries, clearShortTerm } from '../../memory/short-term';
 import { extractFromShortTerm } from '../../memory/extraction-trigger';
 import { isForgettingEnabled, requestForgetting } from '../../memory/forgetting';
 import { warmEmbedder } from '../../shared/node/embedder';
-import { warmStt } from '../../voice/stt-transcriber';
+import { warmSttWorker } from './stt-worker-client';
 import { warmLocalRouter } from '../../knowledge/local-classifier';
 import { makeLlmComplete } from '../../conversation/client';
 import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
@@ -203,7 +203,7 @@ export async function runStartupSequence(
   void Promise.all([voiceEngineReady, embedderReady])
     .then(() =>
       Promise.all([
-        warmStt().catch(() => undefined),
+        warmSttWorker().catch(() => undefined),
         warmLocalRouter(charContext.knowledgeDomains).catch(() => undefined),
         // 耳(VAD)も事前ロード=「ちょっと待って」完了＝口/耳/記憶/判別器の全部 ready(哲学整合)。
         // registerIpcHandlers が runtime.warmVad を注入済み(VadRuntime.warm・best-effort)。

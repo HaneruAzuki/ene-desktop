@@ -3,6 +3,7 @@ import { flushExtraction } from '../../memory/extraction-scheduler';
 import { clearShortTerm } from '../../memory/short-term';
 import { makeLlmComplete } from '../../conversation/client';
 import { stopVoiceEngine } from './voice-engine';
+import { killSttWorker } from './stt-worker-client';
 import type { AppRuntime } from './app-runtime';
 
 // 終了シーケンス(設計書 §7.2)。
@@ -19,6 +20,9 @@ export async function runShutdownSequence(runtime: AppRuntime): Promise<void> {
   } catch (e) {
     log.warn('failed to stop voice engine', { name: (e as Error).name });
   }
+
+  // STT worker(ENE_STT_WORKER 有効時)も止める(孤児にしない・N-REL-5)。
+  killSttWorker();
 
   if (runtime.apiKey) {
     try {

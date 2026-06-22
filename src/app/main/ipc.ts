@@ -22,7 +22,8 @@ import { showCharacterContextMenu } from './character-context-menu';
 import { VadRuntime, type CoalesceHooks } from './vad-runtime';
 import { VoiceTurnCoordinator } from './voice-turn-coordinator';
 import { BackchannelController } from './backchannel-controller';
-import { transcribe, isSttModelAvailable } from '../../voice/stt-transcriber';
+import { isSttModelAvailable } from '../../voice/stt-transcriber';
+import { transcribeViaWorker } from './stt-worker-client';
 import { generateResponse, commitTurn, handleSendMessage } from './turn-engine';
 import { speakResponse } from './voice-runtime';
 import type { ConversationResponse } from '../../shared/types/conversation';
@@ -370,7 +371,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
         }
         // IPC 越しに渡るのは Float32Array(構造化複製)。念のため型を正規化する。
         const pcm = samples instanceof Float32Array ? samples : new Float32Array(samples);
-        const text = await transcribe(pcm);
+        const text = await transcribeViaWorker(pcm);
         if (!text) {
           return { ok: false, message: '…ん? うまく聞き取れなかった。もう一回言ってみて?' };
         }

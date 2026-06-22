@@ -5,7 +5,8 @@ import { performance } from 'node:perf_hooks';
 import { log } from '../../shared/logger';
 import { SileroVad } from '../../voice/silero-vad';
 import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../../voice/vad-segmenter';
-import { transcribe, isSttModelAvailable } from '../../voice/stt-transcriber';
+import { isSttModelAvailable } from '../../voice/stt-transcriber';
+import { transcribeViaWorker } from './stt-worker-client';
 import { turnNodStrength } from '../../voice/turn-nod';
 import type { BackchannelController } from './backchannel-controller';
 import {
@@ -66,7 +67,12 @@ export interface VadRuntimeDeps {
   isSttModelAvailable: () => Promise<boolean>;
 }
 
-const defaultVadDeps: VadRuntimeDeps = { createVad: () => new SileroVad(), transcribe, isSttModelAvailable };
+// 既定の文字起こしは worker 経由(N-REL-5・既定 off なら内部で in-process へ委譲)。テストは deps を注入して差し替える。
+const defaultVadDeps: VadRuntimeDeps = {
+  createVad: () => new SileroVad(),
+  transcribe: transcribeViaWorker,
+  isSttModelAvailable,
+};
 
 export class VadRuntime {
   private vad: VadModel;
