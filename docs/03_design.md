@@ -30,7 +30,7 @@
 | 項目 | 採用技術 | バージョン | 選定理由 |
 |------|---------|-----------|---------|
 | UIフレームワーク | React | `^18.x` | 将来拡張性・コンポーネント化 |
-| Claude API | @anthropic-ai/sdk | `^0.30.x` | Anthropic公式SDK |
+| Claude API | @anthropic-ai/sdk | `^0.105.x` | Anthropic公式SDK(N-REL-3 で 0.30→0.105 へ更新) |
 | ロギング | electron-log | `^5.x` | Electron標準的なロガー |
 | APIキー暗号化 | Electron `safeStorage` | (built-in) | OS標準暗号化機構 |
 | ローカル埋め込み | @huggingface/transformers | `^4.x` | 記憶の意味検索(task_15 Phase B)。ruri-v3-310m(ONNX)をローカル実行。**native ランタイム `onnxruntime-node` を推移的に同梱**(配布は win-x64・CPU推論のみ=GPU用 DirectML/他OS/`onnxruntime-web` は除外しサイズ抑制)。承認済み 2026-06・N-15-9 |
@@ -335,8 +335,7 @@ ene-desktop/
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
 │   │   ├── greeting.ts            ← 起動挨拶生成(firstLaunch/forgotten/normal)
 │   │   ├── idle-talk.ts           ← 自発発話の文面生成(話しかけ・存在感P)
-│   │   ├── model-selector.ts      ← 二段生成のモデル選択(雑談=Haiku/難題=Sonnet・B-15b・既定オフ)
-│   │   └── token-counter.ts       ← 入力トークンのローカル見積もり(N-05-3)
+│   │   └── model-selector.ts      ← 二段生成のモデル選択(雑談=Haiku/難題=Sonnet・B-15b・既定オフ)
 │   │
 │   ├── voice/                     ← あり方④:語り口=声(TTS/STT/VAD・task_17/18)
 │   │   ├── voice-loader.ts        ← voice.json ロード・emotion→スタイル解決(task_17)
@@ -1154,44 +1153,18 @@ Claude Sonnet のコンテキストウィンドウは大きいが、入力トー
 | Short-term Memory | 直近20件・合計5K トークン以下を目安 |
 | Few-shot | 該当ドメインから1〜3例(増やしすぎない) |
 
-#### トークン数計測の実装方針
+#### トークン数計測(撤去済み・N-REL-3)
 
-リクエスト前にトークン数を計測し、上限超過時にログ・警告を出す。
+旧 MVP は SDK 0.30.x に `messages.countTokens` が無いため、`token-counter.ts` の
+ローカル簡易見積もり(`CHARS_PER_TOKEN=2.5`)で上限ガード(NF-PERF-08)を実装していた(旧 N-05-3)。
+2026-06 にこのガードは**撤去**した:
 
-> 📌 **N-05-3(確定:ローカル見積もり方式)**:固定中の `@anthropic-ai/sdk@^0.30.x` には
-> `messages.countTokens` が存在しない(後発版で追加)。SDK の更新はバージョン規約
-> (CLAUDE §2.4)上ユーザ承認が要るため、MVP では **ローカルの簡易見積もり**
-> (`CHARS_PER_TOKEN = 2.5`)でガードレールを実装する。厳密計測が必要になった時点で
-> SDK 更新を承認のうえ countTokens 方式へ差し替える(ユーザ判断済み:当面ローカル見積もり)。
+- ストリーミング主経路(`streamVoiceChat`)はガードを通らず、ガードは非ストリーミング fallback でしか
+  走らない＝ライブ会話では事実上デッドだった。
+- 入力は有界(固定 few-shot＋short-term≤40＋想起≤5)で暴走しないため、ガード自体が冗長。
+- 残量は Claude コンソールで確認する運用とする。
 
-```typescript
-// src/conversation/token-counter.ts(実装方針)
-
-const TOKEN_TARGET = 20_000;
-const TOKEN_WARN_LIMIT = 25_000;
-const TOKEN_HARD_LIMIT = 50_000;
-const CHARS_PER_TOKEN = 2.5;   // 日本語混在の保守的な見積もり係数
-
-// BuiltPrompt(system + messages)の文字数からローカルにトークン数を見積もる。
-export function countAndCheck(
-  prompt: BuiltPrompt
-): { ok: boolean; tokens: number; reason?: "warn" | "hard_limit" } {
-  const chars = prompt.system.length + prompt.messages.reduce((n, m) => n + m.content.length, 0);
-  const tokens = Math.ceil(chars / CHARS_PER_TOKEN);
-
-  if (tokens > TOKEN_HARD_LIMIT) {
-    return { ok: false, tokens, reason: "hard_limit" };
-  }
-  if (tokens > TOKEN_WARN_LIMIT) {
-    log.warn(`Input tokens (${tokens}) exceed warning limit`);
-    return { ok: true, tokens, reason: "warn" };
-  }
-  return { ok: true, tokens };
-}
-```
-
-絶対上限(50K)を超えた場合は、Episodic Memory の検索結果を段階的に
-削減してリトライする(将来拡張・MVPでは超過時にエラー応答)。
+SDK は 0.105 へ更新済みで `messages.countTokens` は利用可能だが、上記理由によりガードは復活させない。
 
 #### JSON出力強制の実装方針(system 指示 + 履歴 JSON 化 + ロバストパーサ)
 
@@ -1248,7 +1221,7 @@ export function buildPrompt(
 - **N-05-5**:出力形式(JSON 仕様)は buildSystemPrompt(キャラ層)ではなく **prompt-builder が system へ付与**する(疎結合・N-02-2)。
 - **N-05-6**:`birthdayHint === 'forgotten'` の場合も forgotten 用 few-shot を1例注入する(today は祝福 few-shot + system 注記)。
 - **N-07-3(task_15 で改訂)**:会話時の Episodic 想起は Router の `matchedTopic` 依存をやめ、`buildMemoryContext({ text: userText, limit: 5 })` で **`MemoryRetriever` による全件横断想起**(語彙＋entity＋ベクトルRRF)に切替。Router は知識ドメイン判定のみに限定(想起の引き金に流用しない)。旧:`{ tags: matchedTopic }` の簡易タグ一致。
-- **N-14(task_14 Tier 再構成＋プロンプトキャッシュ)**:`BuiltPrompt.system` を文字列→`SystemBlock[]` に。安定度で並べ、`@anthropic-ai/sdk` の **`client.beta.promptCaching.messages.create`** で `cache_control:{type:'ephemeral'}` を付与しキャッシュする(SDK 0.30.1 ではベータ名前空間)。実測で入力の約8割をキャッシュ読込に転換。詳細は implementation-notes N-14-1〜6。
+- **N-14(task_14 Tier 再構成＋プロンプトキャッシュ)**:`BuiltPrompt.system` を文字列→`SystemBlock[]` に。安定度で並べ、`@anthropic-ai/sdk` の `messages.create` で `cache_control:{type:'ephemeral'}` を付与しキャッシュする(SDK 0.105 で GA・旧 0.30.1 ではベータ名前空間=N-REL-3 で移行)。実測で入力の約8割をキャッシュ読込に転換。詳細は implementation-notes N-14-1〜6 / N-REL-3。
 
 System Prompt / メッセージの Tier 構造(task_14):
 ```

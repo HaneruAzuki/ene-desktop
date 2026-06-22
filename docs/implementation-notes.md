@@ -1176,6 +1176,16 @@
 - **検証の制約**: パッケージ/インストール/更新/アンインストールは**実機検証必須**(コンテナの %APPDATA% 仮想化＋winCodeSign 制約・N-12-3)。コードは typecheck/lint/test で担保、実機確認はユーザー。
 - **覆る既存方針(⑦で要 SSOT 改訂)**: [[release-portable-2026-06]] 完全ポータブル/痕跡ゼロ・CLAUDE.md §6.3(api-key=data/app)・§12(data/ 以外書込禁止)・03_design §2/§3.6/§11.8・N-17-13 の一部(junction)。
 
+### N-REL-3 🟡 @anthropic-ai/sdk 0.30.1→0.105.0＋会話の effort/thinking 調整＋GA caching 移行(2026-06-22・ユーザー承認のうえ実施)
+- **契機**: 会話レイテンシの「生成側」削減として ★1(Sonnet に effort:medium＋両モデルで thinking 無効)を入れたい。だが固定中の SDK 0.30.1 には `output_config`/`effort`・`messages` の `thinking`・GA caching の型が無く、`any`/生POST 無しでは表現できない(§8.1)。
+- **経緯(なぜ古い SDK だったか)**: 0.30.1 は task_00(`ce5bf87`)の setup 時の版が再現性規約(§2.4・lockfile/`latest` 禁止)で凍結されたもの。以後、新機能が要るたびに**回避策**で凌いできた — N-05-3(countTokens 不在→ローカル見積もり=`token-counter.ts`)、N-14-3(caching を `beta.promptCaching` 名前空間で=承認回避)。今回は**クリーンな回避策が無く**、先送りしてきたバンプの期限が来た。
+- **判断**: §2.4(メジャー級更新は承認必須)に従いユーザー承認を得て **0.30.1→0.105.0** へ更新。同時に過去の回避策を清算 — `token-counter.ts` は既に撤去済(別コミット・入力有界ゆえガード不要)、`beta.promptCaching.messages.create` は **GA `messages.create` + `cache_control`** へ移行。
+- **★1 の中身**: `tuningFor(model)` で両モデルに `thinking:{type:'disabled'}`、Sonnet にのみ `output_config.effort='medium'`。**Haiku 4.5 は effort 非対応(指定すると 400)** ゆえ付けない。`temperature` は Sonnet/Haiku では有効なので 0.7 据置(Fable5/Opus4.7+ では 400 になる別事項)。
+- **3(b)**: ストリーミング経路(`makeStreamCall`)で `message_start` の `usage` から `cache usage(stream): write/read/input` をログ(トークン数のみ・PII禁止・§6.2)。従来は非ストリーミングのみログしていた非対称を解消。
+- **3(c) Haiku キャッシュ(要実機観測)**: Haiku 4.5 の最小キャッシュ可能プレフィックスは 4096 トークン(Sonnet 4.6 は 2048)。Tier0＋固定 few-shot が 4096 に届かないと Haiku 雑談ターンでキャッシュ不発になりうる。**3(b) のログ `read=0` が続けば不発**=その場合は few-shot 側の境界をプレフィックスが 4096 を超える位置に置く。現状は実機ログで観測して判断(本 env では live 不可)。
+- **検証**: typecheck/lint/build/516テスト 緑。**API 挙動(effort/thinking が実際に効くか・Haiku キャッシュ)は実機 live でユーザー確認**。
+- **波及/SSOT**: 03_design §1.2(0.30→0.105)・§3.4(トークン計測=撤去/caching=GA)・N-14 行。`npm audit` が 9 件(既存依存由来含む)を報告するが `audit fix --force` は破壊的なので未実施(別途判断)。
+
 ---
 
 ## 🔧 最適化・ブラッシュアップ項目 → `docs/optimization-backlog.md` へ移動
