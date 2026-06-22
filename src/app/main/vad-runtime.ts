@@ -294,12 +294,7 @@ export class VadRuntime {
     //   この前に必ず VAD_MIN_SILENCE_MS の無音待ちが入る(喋り終わってから死に時間=無音 + stt)。
     const t = performance.now();
     try {
-      let text = await this.deps.transcribe(audio);
-      // 実発話(=VAD がターンと判定)なのに空認識は取りこぼし。一過性の空を拾うため1回だけ再試行する(空の時だけのコスト)。
-      if (!text && this.active) {
-        log.warn('vad transcript empty after speech; retrying once');
-        text = await this.deps.transcribe(audio);
-      }
+      const text = await this.deps.transcribe(audio);
       if (text && this.active) {
         // §6.2: 本文は出さない(文字数と ms のみ)。
         const silenceMs = this.coalesce?.minSilenceMs ?? VAD_MIN_SILENCE_MS;
@@ -315,8 +310,9 @@ export class VadRuntime {
         if (this.coalesce) this.coalesce.onProvisionalEnd(text);
         else this.send(IPC.VOICE_TRANSCRIPT, text);
       } else if (this.active) {
-        // 再試行しても空=実発話を無音で握り潰さない。キャラ口調で聞き返す(信頼性保証=「話したのに無反応」を根絶)。
-        log.warn('vad transcript still empty after retry; re-asking');
+        // 実発話(=VAD がターンと判定)なのに空認識=無音で放置しない。キャラ口調で聞き返す(信頼性保証)。
+        // 再試行は入れない: STT は重く、空のたびに2回走らせると main の処理時間が倍化し体感悪化につながるため。
+        log.warn('vad transcript empty after speech; re-asking');
         this.onUnintelligible?.();
         this.sendState('listening');
       } else {

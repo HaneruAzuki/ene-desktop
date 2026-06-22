@@ -146,32 +146,17 @@ describe('VadRuntime — 発話→文字起こし', () => {
     expect(sent.some((s) => s.ch === IPC.TURN_NOD)).toBe(true);
   });
 
-  it('実発話なのに空認識なら STT を1回だけ再試行し、拾えたら送る', async () => {
+  it('空認識なら onUnintelligible を呼ぶ(無音で放置しない・聞き返し・STT は1回のみ)', async () => {
     const { win, sent } = fakeWin();
     const { model } = fakeVad((i) => (i < 30 ? 0.9 : 0.0));
-    let n = 0;
-    const transcribe = vi.fn(async () => (++n === 1 ? '' : 'やり直し')); // 1回目=空、再試行で拾える
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model, { transcribe }));
-    await vad.start();
-    for (let i = 0; i < 120; i++) await vad.pushFrame(new Float32Array(VAD_FRAME_SIZE));
-
-    expect(transcribe).toHaveBeenCalledTimes(2); // 再試行した
-    const transcripts = sent.filter((s) => s.ch === IPC.VOICE_TRANSCRIPT);
-    expect(transcripts).toHaveLength(1);
-    expect(transcripts[0]?.payload).toBe('やり直し');
-  });
-
-  it('再試行しても空なら onUnintelligible を呼ぶ(無音で放置しない・聞き返し)', async () => {
-    const { win, sent } = fakeWin();
-    const { model } = fakeVad((i) => (i < 30 ? 0.9 : 0.0));
-    const transcribe = vi.fn(async () => ''); // 常に空
+    const transcribe = vi.fn(async () => ''); // 空認識
     const onUnintelligible = vi.fn();
     const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model, { transcribe }));
     vad.onUnintelligible = onUnintelligible;
     await vad.start();
     for (let i = 0; i < 120; i++) await vad.pushFrame(new Float32Array(VAD_FRAME_SIZE));
 
-    expect(transcribe).toHaveBeenCalledTimes(2); // 1回目＋再試行
+    expect(transcribe).toHaveBeenCalledTimes(1); // 再試行しない(main を倍ブロックしない)
     expect(onUnintelligible).toHaveBeenCalledTimes(1);
     expect(sent.filter((s) => s.ch === IPC.VOICE_TRANSCRIPT)).toHaveLength(0); // 送らない
   });
