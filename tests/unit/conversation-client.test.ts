@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { chat } from '../../src/conversation/client';
 import { fallbackResponse } from '../../src/conversation/fallback';
 import { makeCharContext, makeMemoryContext, makeRouterResult } from './fixtures';
@@ -39,16 +39,6 @@ describe('chat — 4層防御の統合フロー (設計書 §3.4)', () => {
     };
     const r = await chat('x', cc, mc, rr, 'key', { callModel });
     expect(n).toBe(2);
-    expect(r).toEqual(fallbackResponse());
-  });
-
-  it('hard_limit 超過なら model を呼ばず fallback', async () => {
-    const callModel = vi.fn(async () => '{"type":"chat","message":"x"}');
-    const r = await chat('x', cc, mc, rr, 'key', {
-      callModel,
-      checkTokens: async () => ({ ok: false, tokens: 99_999, reason: 'hard_limit' }),
-    });
-    expect(callModel).not.toHaveBeenCalled();
     expect(r).toEqual(fallbackResponse());
   });
 

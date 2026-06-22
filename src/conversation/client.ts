@@ -5,7 +5,6 @@ import { parseConversationResponse } from './response-parser';
 import { detectAiSelfReference } from '../shared/ai-self-check';
 import { enhancePromptForRegeneration } from './prompt-enhancer';
 import { fallbackResponse } from './fallback';
-import { countAndCheck, type TokenCheck } from './token-counter';
 import type { CharacterContext } from '../shared/types/character';
 import type { MemoryContext, SemanticMemory } from '../shared/types/memory';
 import type { RouterResult } from '../shared/types/router';
@@ -37,14 +36,11 @@ function createClient(apiKey: string): Anthropic {
 
 /** Sonnet を1回呼び、応答の生テキスト(完全な JSON 文字列)を返す。 */
 export type ModelCall = (prompt: BuiltPrompt) => Promise<string>;
-/** プロンプトのトークン数を判定する。 */
-export type TokenChecker = (prompt: BuiltPrompt) => Promise<TokenCheck>;
 /** Sonnet をストリーミング呼び出しし、テキストデルタを順次 yield する(C1・B-06)。 */
 export type ModelStreamCall = (prompt: BuiltPrompt) => AsyncIterable<string>;
 
 export interface ChatDeps {
   callModel: ModelCall;
-  checkTokens: TokenChecker;
   /** 401/402/429 等の認証系エラーを検知した時に呼ばれる(main 側でダイアログ再表示に使う)。 */
   onAuthError?: (error: unknown) => void;
 }
@@ -102,8 +98,6 @@ function makeDefaultDeps(
       // Prefill は使わないので、応答テキストをそのまま返す(パーサが JSON を抽出する)。
       return resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
     },
-    // トークン計測は SDK の countTokens が固定版に無いため、ローカル見積もりで判定する。
-    checkTokens: async (prompt) => countAndCheck(prompt),
   };
 }
 
@@ -190,19 +184,15 @@ export async function warmPromptCache(
   }
 }
 
-const skipTokenCheck: TokenChecker = async () => ({ ok: true, tokens: 0 });
-
 function resolveDeps(
   apiKey: string,
   deps?: Partial<ChatDeps>,
   model: string = CONVERSATION_MODEL,
   signal?: AbortSignal,
 ): ChatDeps {
-  const hasCustomModel = Boolean(deps?.callModel);
-  const base = hasCustomModel ? null : makeDefaultDeps(apiKey, model, signal);
+  const base = deps?.callModel ? null : makeDefaultDeps(apiKey, model, signal);
   return {
     callModel: deps?.callModel ?? (base as ChatDeps).callModel,
-    checkTokens: deps?.checkTokens ?? (hasCustomModel ? skipTokenCheck : (base as ChatDeps).checkTokens),
     onAuthError: deps?.onAuthError,
   };
 }
@@ -217,18 +207,11 @@ export async function chat(
   model: string = CONVERSATION_MODEL, // 二段生成(B-15b)。既定=Sonnet。
   signal?: AbortSignal, // 中断(barge-in / supersede)。fallback の非ストリーミング呼び出しでも HTTP を打ち切る。
 ): Promise<ConversationResponse> {
-  const { callModel, checkTokens, onAuthError } = resolveDeps(apiKey, deps, model, signal);
+  const { callModel, onAuthError } = resolveDeps(apiKey, deps, model, signal);
   const neverCallsSelf = charContext.identity.selfRecognition.neverCallsSelf;
 
   // 第1防御: プロンプトに neverCallsSelf を明示(buildPrompt 内)
   const prompt = buildPrompt(charContext, memoryContext, routerResult, userText);
-
-  // トークン上限チェック(NF-PERF-08: hard_limit は拒否)
-  const tokenCheck = await checkTokens(prompt);
-  if (!tokenCheck.ok && tokenCheck.reason === 'hard_limit') {
-    log.warn(`token hard limit exceeded (${tokenCheck.tokens}); rejecting request`);
-    return fallbackResponse();
-  }
 
   // 通常リクエスト
   let raw: string;
