@@ -21,6 +21,8 @@ export const MODEL_HAIKU = 'claude-haiku-4-5';
 const CONVERSATION_MODEL = MODEL_SONNET;
 const MAX_TOKENS = 1024;
 const TEMPERATURE = 0.7; // キャラの自然さと JSON 安定性のバランス(設計書 §3.4)
+/** Sonnet の思考深さ/トークン量(effort・GA)。雑談主体ゆえ既定 high より medium で体感を縮める(★1)。 */
+const CONVERSATION_EFFORT = 'medium' as const;
 
 /**
  * Claude API の送信先を公式エンドポイントに固定する(セキュリティ・§4.2/§7.1)。
@@ -54,7 +56,7 @@ function isAuthLikeError(error: unknown): boolean {
 const EPHEMERAL = { type: 'ephemeral' as const };
 
 /** SystemBlock[] を SDK の system パラメータへ(cacheable ブロックに cache_control を付与・task_14)。 */
-function toSystemParam(system: BuiltPrompt['system']): Anthropic.Beta.PromptCaching.PromptCachingBetaTextBlockParam[] {
+function toSystemParam(system: BuiltPrompt['system']): Anthropic.TextBlockParam[] {
   return system.map((b) =>
     b.cacheable
       ? { type: 'text', text: b.text, cache_control: EPHEMERAL }
@@ -63,12 +65,22 @@ function toSystemParam(system: BuiltPrompt['system']): Anthropic.Beta.PromptCach
 }
 
 /** PromptMessage[] を SDK の messages へ(cacheable メッセージは content をブロック化し境界に・task_14)。 */
-function toMessagesParam(messages: BuiltPrompt['messages']): Anthropic.Beta.PromptCaching.PromptCachingBetaMessageParam[] {
+function toMessagesParam(messages: BuiltPrompt['messages']): Anthropic.MessageParam[] {
   return messages.map((m) =>
     m.cacheable
       ? { role: m.role, content: [{ type: 'text', text: m.content, cache_control: EPHEMERAL }] }
       : { role: m.role, content: m.content },
   );
+}
+
+/**
+ * モデル別のレイテンシ調整(★1)。本会話は思考不要なので両モデルで thinking を無効化し、
+ * Sonnet には effort:medium を付ける(既定 high より体感が縮む)。
+ * Haiku 4.5 は effort 非対応(指定すると 400)なので付けない。
+ */
+function tuningFor(model: string): { thinking: Anthropic.ThinkingConfigParam; output_config?: Anthropic.OutputConfig } {
+  const thinking: Anthropic.ThinkingConfigParam = { type: 'disabled' };
+  return model === MODEL_HAIKU ? { thinking } : { thinking, output_config: { effort: CONVERSATION_EFFORT } };
 }
 
 function makeDefaultDeps(
@@ -79,12 +91,13 @@ function makeDefaultDeps(
   const client = createClient(apiKey);
   return {
     callModel: async ({ system, messages }) => {
-      // 0.30.1 のプロンプトキャッシュはベータ名前空間(N-14)。Tier0 を固定プレフィックスとして使い回す。
-      const resp = await client.beta.promptCaching.messages.create(
+      // プロンプトキャッシュは GA(N-REL-3 で 0.30.1→0.105 へ更新しベータ名前空間を撤去)。Tier0 を固定プレフィックスとして使い回す。
+      const resp = await client.messages.create(
         {
           model, // 二段生成(B-15b): Haiku/Sonnet をターンごとに切替可。既定=Sonnet。
           max_tokens: MAX_TOKENS,
           temperature: TEMPERATURE,
+          ...tuningFor(model), // ★1: thinking 無効 ＋ Sonnet は effort:medium(レイテンシ削減)
           system: toSystemParam(system),
           messages: toMessagesParam(messages),
         },
@@ -130,11 +143,12 @@ export function makeStreamCall(
 ): ModelStreamCall {
   const client = createClient(apiKey);
   return async function* stream({ system, messages }): AsyncGenerator<string> {
-    const events = await client.beta.promptCaching.messages.create(
+    const events = await client.messages.create(
       {
         model, // 二段生成(B-15b)。既定=Sonnet。
         max_tokens: MAX_TOKENS,
         temperature: TEMPERATURE,
+        ...tuningFor(model), // ★1: thinking 無効 ＋ Sonnet は effort:medium(レイテンシ削減)
         system: toSystemParam(system),
         messages: toMessagesParam(messages),
         stream: true,
@@ -142,7 +156,13 @@ export function makeStreamCall(
       signal ? { signal } : undefined,
     );
     for await (const event of events) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      // 3(b): ストリームでも message_start の usage でキャッシュ命中が分かる(トークン数のみ・PII禁止・§6.2)。
+      if (event.type === 'message_start') {
+        const u = event.message.usage;
+        log.info(
+          `cache usage(stream): write=${u.cache_creation_input_tokens ?? 0} read=${u.cache_read_input_tokens ?? 0} input=${u.input_tokens}`,
+        );
+      } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         yield event.delta.text;
       }
     }
@@ -173,9 +193,10 @@ export async function warmPromptCache(
     const client = createClient(apiKey);
     // 本会話と同じ buildPrompt を使い、キャッシュ可能プレフィックスをバイト同一で再現する。
     const prompt = buildPrompt(charContext, { semantic, shortTerm: [], relevantEpisodic: [] }, WARM_ROUTER, 'warm');
-    await client.beta.promptCaching.messages.create({
+    await client.messages.create({
       model: CONVERSATION_MODEL,
       max_tokens: 1,
+      thinking: { type: 'disabled' }, // 本送信と messages 層キャッシュを一致させる(effort はキャッシュ非依存)
       system: toSystemParam(prompt.system),
       messages: toMessagesParam(prompt.messages),
     });
