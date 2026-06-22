@@ -543,3 +543,8 @@ export const IDLE_TALK_MIN_INTERVAL_MS = 90 * 60_000;
 export const IDLE_TALK_QUIET_HOURS = { from: 23, to: 8 } as const;
 /** 1セッションのやりとりがこの回数を超えたら「長く話して少し疲れた」トーンを許可する(有限性・発言内容のみ)。 */
 export const FATIGUE_TURN_THRESHOLD = 60;
+/**
+ * 夜の有限性ヒント(「もう遅い」)を出すターン間隔。毎ターン注入すると寝かしつけを連発して
+ * ツンデレが崩れる(P7・⑥と同種)。この間隔ごとに一度だけ“ほんの少し夜更けの雰囲気”を許す。小さいほど頻繁。
+ */
+export const NIGHT_FINITENESS_CADENCE_TURNS = 12;

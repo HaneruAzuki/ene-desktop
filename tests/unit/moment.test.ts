@@ -46,9 +46,19 @@ describe('elapsedDays / describeElapsed (P1)', () => {
 });
 
 describe('finitenessHint (P7・発言内容のみ)', () => {
-  it('深夜帯は眠そうなトーンを許可する', () => {
-    expect(finitenessHint(23, 0)).toContain('夜遅い');
-    expect(finitenessHint(2, 0)).toContain('夜遅い');
+  it('深夜帯は cadence のターンだけ夜更けの雰囲気を許可(毎ターンではない=寝かしつけ連発を防ぐ)', () => {
+    // cadence 先頭(turnsThisSession % N === 1)では出る。
+    expect(finitenessHint(23, 1)).toContain('夜遅い');
+    expect(finitenessHint(2, 1)).toContain('夜遅い');
+  });
+  it('夜の文言は寝かしつけを焚きつけず、相手の意思・話題を尊重する(文言を弱めた)', () => {
+    const hint = finitenessHint(23, 1) ?? '';
+    expect(hint).toContain('促し続けない'); // 「早く休むよう促す」ライセンスを撤去
+    expect(hint).toContain('尊重');
+  });
+  it('深夜でも cadence 外のターンでは出さない(連発しない)', () => {
+    expect(finitenessHint(23, 2)).toBeUndefined();
+    expect(finitenessHint(23, 5)).toBeUndefined();
   });
   it('日中の長時間会話は疲れたトーンを許可する', () => {
     expect(finitenessHint(14, FATIGUE_TURN_THRESHOLD)).toContain('長く話している');

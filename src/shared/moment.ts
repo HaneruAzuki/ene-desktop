@@ -5,6 +5,7 @@ import {
   LONG_ABSENCE_DAYS,
   FATIGUE_TURN_THRESHOLD,
   IDLE_TALK_QUIET_HOURS,
+  NIGHT_FINITENESS_CADENCE_TURNS,
 } from './constants';
 
 // 「いま」の存在文脈を組み立てる純粋関数(P1/P7・N-PRES-1 / N-PRES-7)。
@@ -53,13 +54,15 @@ export function describeElapsed(lastDate: string | undefined, today: string): st
 /**
  * 有限性のトーン指示(P7・**発言内容のみ**。声のパラメータは変えない)。
  * 状態は一切保存しない=現在時刻とセッション内ターン数からその場で導出する(§5.3 適合)。
- *  - 深夜帯(IDLE_TALK_QUIET_HOURS): 眠そうな素振り・相手に休息を促す言い方を許可。
+ *  - 深夜帯(IDLE_TALK_QUIET_HOURS): NIGHT_FINITENESS_CADENCE_TURNS ごとに一度だけ、ほんの少し夜更けの雰囲気を許可。
+ *    毎ターン注入していた頃の「寝かしつけ連発(ツンデレ崩れ・深刻な話題の遮断)」を防ぐ(1+2)。促し続けず相手の意思を尊重。
  *  - 長時間会話(FATIGUE_TURN_THRESHOLD 超): 少し疲れた素振りを許可(会話は切り上げない)。
  */
 export function finitenessHint(hour: number, turnsThisSession: number): string | undefined {
   const inQuiet = hour >= IDLE_TALK_QUIET_HOURS.from || hour < IDLE_TALK_QUIET_HOURS.to;
-  if (inQuiet) {
-    return '(いまは夜遅い時間。少し眠そうな素振りや、相手にも早く休むよう促す言い方をしてよい。声ではなく言葉で。)';
+  // 夜は毎ターンではなく cadence で間引く＋文言も「促し続けない・相手の意思と話題を最優先で尊重」に弱める。
+  if (inQuiet && turnsThisSession % NIGHT_FINITENESS_CADENCE_TURNS === 1) {
+    return '(いまは夜遅い時間。ほんの少し眠そうな雰囲気がにじんでもよい。ただし相手に寝るよう促し続けないこと——相手が起きていたい・話したい・大事な話をしているなら、その気持ちと話題を最優先で尊重する。)';
   }
   if (turnsThisSession >= FATIGUE_TURN_THRESHOLD) {
     return '(ずいぶん長く話している。少し疲れた素振りを見せてよい。ただし会話を切り上げる必要はない。)';
