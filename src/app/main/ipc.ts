@@ -141,6 +141,24 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
   const vad = new VadRuntime(mainWindow, backchannel, listenOnly, coalesce);
   // barge-in 判定窓を main の応答ターンで駆動する(構造的修正)。第一声(コミット)で true、barge-in/次ターンで false。
   runtime.setResponseActive = (active: boolean): void => vad.setResponseActive(active);
+  // 実発話があったのに STT が空(取りこぼし)=ユーザを無音で放置しない。キャラ口調で聞き返す(信頼性保証)。
+  // 自発発話/挨拶と同じ経路(吹き出し PROACTIVE_MESSAGE ＋ speakResponse)。文言は identity.json から(§5.1)。
+  // 短期記憶には残さない(会話内容ではなく「聞き返し」の合図)。
+  vad.onUnintelligible = (): void => {
+    const prompts = runtime.charContext?.identity.unintelligiblePrompts;
+    if (!prompts || prompts.length === 0) return; // 文が無ければ何もしない(後方互換)
+    const message = prompts[Math.floor(Math.random() * prompts.length)];
+    if (!message) return;
+    const response: ConversationResponse = { type: 'chat', message };
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.PROACTIVE_MESSAGE, response);
+    const voice = resolveVoice(runtime.tts, runtime.voiceConfig);
+    if (!voice) return; // 音声無効=吹き出しのみ(従来挙動)
+    runtime.selfSpeech?.abort();
+    const ctrl = new AbortController();
+    runtime.selfSpeech = ctrl;
+    runtime.setResponseActive?.(true); // 聞き返しも barge-in で止められる(自発発話と同じ)
+    void speakResponse(message, 'neutral', voice.tts, voice.voiceConfig, mainWindow, ctrl.signal);
+  };
   // 起動ゲートで耳(VAD)も事前ロードさせる=「ちょっと待って」完了時点で耳まで ready(初回マイクに遅延を出さない)。
   runtime.warmVad = (): Promise<void> => vad.warm();
   // 適応(段階②): coordinator が算出した無音窓を segmenter へ反映(§6.2: ms のみ・本文なし)。

@@ -83,6 +83,8 @@ export class VadRuntime {
   private lastSpeechEndAt = 0; // 直近の speech-end の時刻(案①: barge-in の早い/遅い分類=無音開始からの経過)
   private recorded: Float32Array[] = [];
   private ring: Float32Array[] = []; // 直近フレーム(先読みパディング用)
+  /** 実発話があったのに STT が空(取りこぼし)の時に呼ぶ。main がキャラ口調で聞き返す(ipc 配線で注入・任意)。 */
+  onUnintelligible: (() => void) | null = null;
 
   // 相槌(task_18 Phase B・任意)。ユーザ発話中の言いよどみで相槌を打つ。
   // listenOnly: 相槌テスト用(env ENE_LISTEN_ONLY=1)。ターン終了時に文字起こし・応答(Claude/記憶)を
@@ -292,7 +294,12 @@ export class VadRuntime {
     //   この前に必ず VAD_MIN_SILENCE_MS の無音待ちが入る(喋り終わってから死に時間=無音 + stt)。
     const t = performance.now();
     try {
-      const text = await this.deps.transcribe(audio);
+      let text = await this.deps.transcribe(audio);
+      // 実発話(=VAD がターンと判定)なのに空認識は取りこぼし。一過性の空を拾うため1回だけ再試行する(空の時だけのコスト)。
+      if (!text && this.active) {
+        log.warn('vad transcript empty after speech; retrying once');
+        text = await this.deps.transcribe(audio);
+      }
       if (text && this.active) {
         // §6.2: 本文は出さない(文字数と ms のみ)。
         const silenceMs = this.coalesce?.minSilenceMs ?? VAD_MIN_SILENCE_MS;
@@ -307,8 +314,15 @@ export class VadRuntime {
         // 既定(非コアレッシング)は従来どおり renderer へ送り、renderer が sendMessage に流す。
         if (this.coalesce) this.coalesce.onProvisionalEnd(text);
         else this.send(IPC.VOICE_TRANSCRIPT, text);
+      } else if (this.active) {
+        // 再試行しても空=実発話を無音で握り潰さない。キャラ口調で聞き返す(信頼性保証=「話したのに無反応」を根絶)。
+        log.warn('vad transcript still empty after retry; re-asking');
+        this.onUnintelligible?.();
+        this.sendState('listening');
       } else {
-        this.sendState('listening'); // 空認識 → 聞き取りに戻る
+        // セッションが非アクティブ(マイクOFF/stop 後)=破棄。従来は完全に無言だったので理由を残す(可視化)。
+        log.info('vad transcript dropped: runtime inactive');
+        this.sendState('listening');
       }
     } catch (e) {
       log.warn(`vad transcribe failed: ${(e as Error).name}`);

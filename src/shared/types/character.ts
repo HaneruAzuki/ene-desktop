@@ -27,6 +27,11 @@ export interface CharacterIdentity {
     neverCallsSelf: string[];
     aiQuestionHandling: string;
   };
+  /**
+   * 実発話を聞き取れなかった時にキャラ口調で聞き返す文(任意・後方互換)。
+   * 複数あればランダムに1つ使う(同じ文の連発を避ける)。コードに直書きしない(§5.1)。
+   */
+  unintelligiblePrompts?: string[];
 }
 
 /** background.json: 背景設定 */
