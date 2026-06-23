@@ -35,7 +35,8 @@ export function buildOffscreenLifePrompt(input: {
   elapsedLabel?: string;
   timeOfDay: string;
   todayBeat?: string;
-  recentLife: string[];
+  selfLife: string[]; // あなた自身の最近の暮らし(provenance:self)
+  userLife: string[]; // 相手について最近知ったこと(provenance:user)
   openLoops: string[];
 }): OffscreenLifePrompt {
   const system = [
@@ -51,8 +52,12 @@ export function buildOffscreenLifePrompt(input: {
   const ctx: string[] = [`今は${input.timeOfDay}。`];
   if (input.elapsedLabel) ctx.push(`相手とは${input.elapsedLabel}。`);
   if (input.todayBeat) ctx.push(`あなたが最近していたこと: ${input.todayBeat}`);
-  if (input.recentLife.length > 0) {
-    ctx.push('最近の暮らし:', ...input.recentLife.map((l) => `- ${l}`));
+  // あなた自身の暮らしと「相手のこと」を明確に分ける(取り違え=相手の出来事を自分の挨拶ネタにしない・N-RECALL-1 と同方針)。
+  if (input.selfLife.length > 0) {
+    ctx.push('あなた自身の最近の暮らし(あなたが経験したこと):', ...input.selfLife.map((l) => `- ${l}`));
+  }
+  if (input.userLife.length > 0) {
+    ctx.push('相手について最近知っていること(相手の出来事・あなたの経験ではない):', ...input.userLife.map((l) => `- ${l}`));
   }
   if (input.openLoops.length > 0) {
     ctx.push('気にかけていること(挨拶で触れてもよい):', ...input.openLoops.map((l) => `- ${l}`));
@@ -109,8 +114,15 @@ export async function generateOffscreenLife(
     }
 
     // 挨拶で見せる「最近の暮らし」は開示ゲートで濾す(深い記憶を初対面に出さない・§1.5)。
-    const recentLife = dailyLife
-      .filter((r) => (r.memory.disclosureLevel ?? 1) <= stage)
+    // provenance で「あなた自身の暮らし(self)」と「相手について知ったこと(user)」を分け、挨拶で取り違えない
+    // (相手の試験を自分の暮らしとして/自分の試験を相手のものとして話す事故を防ぐ・N-RECALL-1 と同方針)。
+    const gated = dailyLife.filter((r) => (r.memory.disclosureLevel ?? 1) <= stage);
+    const selfLife = gated
+      .filter((r) => r.memory.provenance === 'self')
+      .slice(0, 3)
+      .map((r) => r.memory.summary);
+    const userLife = gated
+      .filter((r) => r.memory.provenance !== 'self')
       .slice(0, 3)
       .map((r) => r.memory.summary);
 
@@ -119,7 +131,8 @@ export async function generateOffscreenLife(
       elapsedLabel,
       timeOfDay,
       todayBeat,
-      recentLife,
+      selfLife,
+      userLife,
       openLoops: loopSel.notes,
     });
 

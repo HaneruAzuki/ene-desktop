@@ -185,6 +185,28 @@ export function buildNameMishearHint(callsSelf: string, aliases: string[]): stri
 type CompleteFn = (req: { system: string; user: string; maxTokens?: number }) => Promise<string>;
 
 /**
+ * STT が固有名「callsSelf」を同音異字(aliases)へ誤変換した分を、**呼びかけ位置(文全体/文頭/文末)に限って**
+ * 決定論的に名前へ戻す。LLM の読み替えヒント(buildNameMishearHint)を補完し、Haiku 等で hint が効かず
+ * 「鳥見?誰それ」になる取りこぼしを潰す。「鳥見に行く(野鳥観察)」のような文中の自然語は、境界(句読点/空白/終端)に
+ * 隣接する呼びかけだけ戻すことで誤補正しない。
+ */
+export function correctVocativeName(text: string, callsSelf: string, aliases: string[]): string {
+  const list = aliases.filter(Boolean);
+  if (!callsSelf || list.length === 0) return text;
+  const t = text.trim();
+  if (!t) return text;
+  const isBoundary = (c: string): boolean => c === '' || /[\s、。，．,.!?！？]/.test(c);
+  for (const a of list) {
+    if (t === a) return callsSelf; // 全体が誤変換名=呼びかけ
+    if (t.startsWith(a) && isBoundary(t[a.length] ?? '')) return callsSelf + t.slice(a.length); // 文頭の呼びかけ
+    if (t.endsWith(a) && isBoundary(t[t.length - a.length - 1] ?? '')) {
+      return t.slice(0, t.length - a.length) + callsSelf; // 文末の呼びかけ
+    }
+  }
+  return text;
+}
+
+/**
  * 記憶サマリ(抽出/期間要約)の LLM 呼び出しに、同音異字の読み替え指示を system へ前置きして包む。
  * short-term 以外の記憶(episodic/サマリ)に「取り身」等が焼き付かないようにする。hint が空なら素通し。
  */
@@ -324,9 +346,15 @@ export function buildPrompt(
     });
   }
 
+  // STT の同音異字(鳥見等)を呼びかけ位置に限って決定論的に名前へ戻す(LLM ヒントの取りこぼし保険)。
+  const userSaid = correctVocativeName(
+    userText,
+    charContext.identity.selfRecognition.callsSelf,
+    charContext.identity.sttAliases ?? [],
+  );
   // 揮発物は現在のユーザーターン本文へ合流(system/前段キャッシュを汚さない)。
   const volatile = buildVolatileContext(charContext, memoryContext, routerResult);
-  raw.push({ role: 'user', content: `${volatile}\n\n---\n${userText}` });
+  raw.push({ role: 'user', content: `${volatile}\n\n---\n${userSaid}` });
 
   // 交互列に正規化(末尾は必ず user)。
   const messages = normalizeAlternation(raw);

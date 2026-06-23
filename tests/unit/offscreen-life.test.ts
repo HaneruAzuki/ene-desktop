@@ -10,7 +10,8 @@ describe('buildOffscreenLifePrompt (P3)', () => {
       elapsedLabel: '3日ぶり',
       timeOfDay: '夜',
       todayBeat: '弾幕ゲーのバグと格闘していた',
-      recentLife: ['昨日は雨で一日中コードを書いた'],
+      selfLife: ['昨日は雨で一日中コードを書いた'],
+      userLife: ['相手は中間試験が終わったらしい'],
       openLoops: ['面接の結果待ち'],
     });
     expect(p.system).toContain('第一声');
@@ -19,13 +20,18 @@ describe('buildOffscreenLifePrompt (P3)', () => {
     expect(p.user).toContain('弾幕ゲーのバグと格闘していた');
     expect(p.user).toContain('昨日は雨で一日中コードを書いた');
     expect(p.user).toContain('面接の結果待ち');
+    // self/user を取り違えないラベル分け(N-RECALL-1 と同方針)。
+    expect(p.user).toContain('あなた自身の最近の暮らし');
+    expect(p.user).toContain('相手について最近知っていること');
+    expect(p.user).toContain('相手は中間試験が終わったらしい');
   });
 
   it('材料が無ければ時間帯だけの簡素なプロンプト', () => {
     const p = buildOffscreenLifePrompt({
       systemPrompt: 'あなたはトリミ。',
       timeOfDay: '昼',
-      recentLife: [],
+      selfLife: [],
+      userLife: [],
       openLoops: [],
     });
     expect(p.user).toContain('昼');
