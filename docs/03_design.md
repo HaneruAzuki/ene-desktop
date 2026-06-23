@@ -337,7 +337,6 @@ ene-desktop/
 │   │   ├── client.ts              ← Claude APIクライアント(chat / makeLlmComplete)
 │   │   ├── prompt-builder.ts      ← 統合プロンプト構築(出力形式付与・交互列正規化)
 │   │   ├── response-parser.ts     ← JSON応答の三段構えパース
-│   │   ├── prompt-enhancer.ts     ← 再生成時の強化プロンプト(4層防御 第3層)
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
 │   │   ├── greeting.ts            ← 起動挨拶生成(firstLaunch/forgotten/normal)
 │   │   ├── idle-talk.ts           ← 自発発話の文面生成(話しかけ・存在感P)
@@ -347,7 +346,7 @@ ene-desktop/
 │   │   ├── voice-loader.ts        ← voice.json ロード・emotion→スタイル解決(task_17)
 │   │   ├── aivisspeech-tts.ts     ← AivisSpeech HTTPクライアント(TtsEngine 実装・task_17)
 │   │   ├── voice-provisioner.ts   ← 声設定の整合(/speakers で実 styleId 解決・task_17)
-│   │   ├── voice-chat.ts          ← 文単位の合成・C2ゲート(speakText / 将来のストリーミングC1=runVoiceChat・task_17)
+│   │   ├── voice-chat.ts          ← 音声合成の唯一の消費器 speakChunks(文単位 C2ゲート・ストリーム/確定文 共通・task_17/2026-06-23)
 │   │   ├── json-stream-parser.ts  ← JSON応答のストリーミング解釈(C1・B-06)
 │   │   ├── sentence-splitter.ts   ← 日本語の文単位分割(純粋ロジック・task_17)
 │   │   ├── stt-transcriber.ts     ← Whisper STT の in-process 実装/フォールバック(task_17・N-REL-5)
@@ -383,7 +382,7 @@ ene-desktop/
 │       ├── llm-parse.ts           ← LLM応答パースの共有ヘルパ(JSON抽出・emotion正規化等の集約)
 │       ├── vector-math.ts         ← コサイン類似度等のベクトル計算(router/ベクトル想起の共有)
 │       ├── api-key-error-messages.ts ← エラー種別→ユーザ表示文言(§3.7)
-│       ├── ai-self-check.ts     ← AI自称検知(4層防御 第2層・純粋・旧 conversation/・N-ARCH-5)
+│       ├── ai-self-check.ts     ← AI自称検知(3層防御 第2層・純粋・旧 conversation/・N-ARCH-5)
 │       ├── ruby.ts              ← 青空文庫式ルビの解決(純粋・旧 voice/・N-ARCH-5)
 │       └── node/                  ← Node(main プロセス)専用の基盤
 │           ├── paths.ts           ← パス管理(characterId キャッシュ)
@@ -1105,20 +1104,16 @@ export type ConversationResponse = {
 };
 ```
 
-> 📌 **応答の音声化(task_17・既定=非ストリーミング)**:音声有効時は、`chat()` が返した
-> **確定応答**を文単位で合成し、文ごとに WAV を renderer へ送って逐次再生する
-> (`voice-runtime.speakResponse` → `voice-chat.speakText`)。吹き出しは即時表示、音声は後追い。
-> 自称検知は完成メッセージに対する既存の4層防御(§3.4 末尾)で担保済みのため、この経路の
-> 文単位ゲートはノーオペで通す。
+> 📌 **応答の音声化(task_17・統合パイプライン・2026-06-23)**:音声有効時は**既定でストリーミング**(B-06)。
+> Claude を**ストリーミング**で呼び、JSON 応答を `voice/json-stream-parser.ts` でインクリメンタル解釈し、
+> 文ができた端から「自称検知(C2)→ ルビ解決 → 合成 → 逐次送出」して第一声を早める。
+> 非ストリーミング(音声無し/`ENE_VOICE_STREAMING=0`/ストリーミング失敗時のフォールバック)は
+> `chat()` の確定応答を文単位で合成する。**両経路は共通の消費器 `voice-chat.speakChunks` に集約**し、
+> 違いは「文をどう得るか(ストリーム vs 確定文の一括)」だけ(ソース生成は各呼び出し元 `streamVoiceChat`/`speakResponse` に inline)。
+> - 自称検知は**3層防御**(§3.4)。発話済みは取り消せないため、検知時は**喋らず打ち切りフォールバック文へ差し替え**る
+>   (再生成はしない=非ストリーミングと統一)。stream/TTS 失敗時は ipc が catch して非ストリーミングへフォールバック。
 > - **`reading` がある場合は `reading` を合成**し、無ければ `message` を合成する(誤読対策)。
-> - **C1 ストリーミング(B-06・`ENE_VOICE_STREAMING=1` でオプトイン)**:`voice-runtime.streamVoiceChat`
->   が Claude を**ストリーミング**で呼び、JSON 応答を `voice/json-stream-parser.ts` でインクリメンタル
->   解釈し、文ができた端から「自称検知(C2)→ ルビ解決 → 合成 → 逐次送出」して第一声を早める
->   (`voice-chat.runVoiceChat`)。既に発話した文は取り消せないため、自称検知時は**喋らずに打ち切り**
->   フォールバック文へ差し替える(第3層の再生成は使えない)。stream/TTS 失敗時は ipc が catch して
->   非ストリーミング経路へフォールバックする。
->   ※設計改訂(`docs/archive/design-revision-voice.md` §2)時代の sentinel 方式パーサ(旧
->   `stream-parser.ts`)は JSON 方式(`json-stream-parser.ts`)へ置換し削除済み(2026-06-12)。
+>   ※設計改訂時代の sentinel 方式パーサ(旧 `stream-parser.ts`)は JSON 方式へ置換し削除済み(2026-06-12)。
 
 #### Claude APIの使用方針
 
@@ -1131,7 +1126,7 @@ export type ConversationResponse = {
   (末尾を assistant にすると 400 エラー)。JSON 安定化は system の強い指示 +
   履歴 assistant ターンの JSON 化(N-09-8)+ ロバストパーサで担保する
 - **DI**(N-05-2):Sonnet 呼び出し・トークンチェックは `chat()` の任意 `deps` で差し替え可能
-  (実 API なしで4層防御フローを単体テスト)
+  (実 API なしで3層防御フローを単体テスト)
 
 #### 入力トークンの上限管理
 
@@ -1299,7 +1294,7 @@ function isValidResponse(obj: unknown): obj is ConversationResponse {
 | 3段目:JSON 範囲抽出 | 前後にテキスト混入したケース |
 | 失敗時:フォールバック | 完全に崩れた場合のキャラ口調エラー応答 |
 
-#### AI自称防止の4層防御(ビジョン§3 柱2 / 成功基準8 を担保)
+#### AI自称防止の3層防御(ビジョン§3 柱2 / 成功基準8 を担保)
 
 ビジョンの中核「AIっぽくない」を技術的に担保する仕組み。
 キャラが「私はAIなので」「アシスタントとして」のような自称をすると、
@@ -1323,15 +1318,15 @@ JSON パース(三段構え)
    ├─ 検知パターン:「私はAI」「自分はアシスタント」「AIとして」等
    └─ クリーン → ユーザに表示
    ↓ (検知された場合)
-[第3防御] 再生成1回
-   ├─ システム指示を強化して再リクエスト
-   ├─ 「前回の応答に NG ワードが含まれていました。ENEとして応答し直して」
-   └─ 再パース → 再検知 → クリーンならユーザに表示
-   ↓ (再生成でもNGの場合)
-[第4防御] フォールバック応答
+[第3防御] フォールバック応答(再生成はしない)
    └─ キャラ口調の安全な応答に置換
        例:「えっと…うまく言葉が出ないみたい。もう一回聞いてくれる?」
+   ※ ストリーミング経路は文単位で検知し、自称文を発話せず打ち切る(C2)=同じ「再生成なし」防御で統一
 ```
+
+> **2026-06-23 改訂(4層→3層)**:旧・第3層「強化プロンプトで再生成1回」を撤去した。発話済みを取り消せない
+> ストリーミング経路では再生成が構造的に不可能で、非ストリーミングだけ効く非対称な防御は無意味かつ複雑
+> (「なぜストリーミングの時だけ危ないのか」という認知負荷)。検知=即フォールバックに統一した。
 
 ##### 検知ロジックの実装方針
 
@@ -1393,25 +1388,9 @@ async function chat(userText: string): Promise<ConversationResponse> {
     );
 
     if (check.detected) {
+      // 第3防御:フォールバック(再生成はしない=ストリーミングの文単位 C2 と防御を統一・2026-06-23)
       log.warn(`AI self-reference detected: ${check.matchedPattern}`);
-
-      // 第3防御:再生成1回
-      const strengthened = addRegenerationHint(prompt, check);
-      response = await callClaudeAndParse(strengthened);
-
-      // 再検知
-      if (response.type === "chat") {
-        const recheck = detectAiSelfReference(
-          response.message,
-          charContext.identity.selfRecognition.neverCallsSelf
-        );
-
-        if (recheck.detected) {
-          // 第4防御:フォールバック
-          log.error("AI self-reference still detected after regeneration");
-          return fallbackResponse();
-        }
-      }
+      return fallbackResponse();
     }
   }
 
@@ -1424,9 +1403,8 @@ async function chat(userText: string): Promise<ConversationResponse> {
 | 層 | 目的 | 想定捕捉率 | コスト |
 |----|------|----------|------|
 | 第1防御(プロンプト) | 最初から出させない | 99% | ゼロ |
-| 第2防御(検知) | 漏れたものを発見 | 99% を 99.99% に | ほぼゼロ |
-| 第3防御(再生成) | 修正の機会を与える | 99.99% を 99.999% に | API呼出1回追加 |
-| 第4防御(フォールバック) | 最終安全網 | 残り全部 | ゼロ |
+| 第2防御(検知) | 漏れたものを発見(非ストリーミング=メッセージ単位 / ストリーミング=文単位 C2) | 99% を 99.99% に | ほぼゼロ |
+| 第3防御(フォールバック) | 最終安全網(検知=即フォールバック・再生成はしない) | 残り全部 | ゼロ |
 
 ##### 設計上の注意
 

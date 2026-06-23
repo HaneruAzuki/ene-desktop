@@ -1,157 +1,81 @@
-import { createJsonStreamParser, type VoiceStreamParser } from './json-stream-parser';
-import { splitSentences } from './sentence-splitter';
 import { detectAiSelfReference } from '../shared/ai-self-check';
 import { stripRuby, rubyToReading } from '../shared/ruby';
 import { resolveStyle } from './voice-loader';
 import type { EmotionLabel } from '../shared/types/animation';
 import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
 
-// 音声会話のストリーミング統合(task_17 C1/C2 / design-revision-voice §2,§3)。
+// 音声合成の唯一の消費器(task_17 C1/C2 / design-revision-voice §2,§3)。
 //
-// Claude のストリーム → json-stream-parser → C2 文単位ゲート → TtsEngine.speak → 再生。
-// モデルストリーム・TTS・再生・表情反映は DI(実 API/実エンジンなしで検証可・§4.4)。
+// 文チャンク列を消費し、文単位で「自称検知(C2) → ルビ読み下し → 合成 → 送出」する。
+// 「文をどう得るか(ソース)」だけが経路で異なるので、ソース生成は呼出側(voice-runtime)が用意して渡す:
+//   - ストリーミング = Claude のデルタを json-stream-parser で逐次パースして文を yield。
+//   - 確定発話       = 確定済みテキストを sentence-splitter で割り、1チャンクとして yield。
+// 合成本体はここに1本化(分岐ごとの挙動ズレを防ぐ)。TTS・再生・表情反映は DI(実エンジン無しで検証可・§4.4)。
 
-/** モデルのテキストデルタを順次 yield するストリーム(実装は Claude streaming を注入)。 */
-export type ModelStream = AsyncIterable<string>;
-
-/** 中断(投機キャンセル)を表す例外を投げる。呼び出し側(coordinator)は signal.aborted で破棄と判断する。 */
-function throwAborted(): never {
-  const e = new Error('aborted');
-  e.name = 'AbortError';
-  throw e;
+/** 発話ソースが出す1チャンク: emotion(最初の確定時のみ)＋その時点で完成した文の配列。 */
+export interface SpeakChunk {
+  emotion?: EmotionLabel;
+  sentences: string[];
 }
 
 export interface VoiceChatDeps {
   tts: TtsEngine;
   voiceConfig: VoiceConfig;
-  /** identity.json の neverCallsSelf(自称検知語・ハードコード禁止・§5.4)。 */
+  /** identity.json の neverCallsSelf(自称検知語・ハードコード禁止・§5.4)。空なら検知しない。 */
   neverCallsSelf: string[];
-  /** 合成済み音声を再生キューへ(renderer 連携は呼び出し側)。text=この文の表示テキスト(再生同期の吹き出し用)。 */
+  /** 合成済み音声を再生キューへ(renderer 連携は呼出側)。text=この文の表示テキスト(再生同期の吹き出し用・呼出側は無視可)。 */
   onAudio: (wav: ArrayBuffer, text: string) => void;
   /** emotion 確定時に表情/スタイルへ反映(任意)。 */
   onEmotion?: (emotion: EmotionLabel) => void;
-  /** ストリーム書式パーサの生成(既定=JSON 形式 createJsonStreamParser)。 */
-  makeParser?: () => VoiceStreamParser;
-  /** 中断シグナル(コアレッシングの投機キャンセル)。abort されたら**それ以上音声を出さず**打ち切る。 */
+  /** 中断シグナル(投機キャンセル/supersede/barge-in)。abort されたら**それ以上音声を出さず**打ち切る。 */
   signal?: AbortSignal;
 }
 
 export interface VoiceChatResult {
   spokenText: string; // 実際に発話したテキスト(吹き出し表示にも使う)
   emotion: EmotionLabel;
-  enterListening?: boolean; // 傾聴入室(listening-mode・明示宣言時のみ)
   blockedBySelfCheck: boolean; // C2 で自称検知し打ち切ったか
+  aborted: boolean; // 中断(投機キャンセル/supersede)で打ち切ったか
 }
 
 /**
- * モデルストリームを消費し、文単位で「自称検知 → 合成 → 再生」する。
- * 自称を検知した文は**発話せず**そこで打ち切る(発話済みは取り消せない=C2 の割り切り)。
+ * 文チャンク列を消費し、文単位で「自称検知(C2) → ルビ読み下し → 合成 → 送出」する。
+ * 自称を検知した文は発話せず打ち切る(発話済みは取り消せない=C2 の割り切り)。
+ * 中断は throw せず aborted=true で返す。呼出側がストリーミングなら破棄(throw)、確定発話なら無言で終える。
  */
-export async function runVoiceChat(
-  stream: ModelStream,
+export async function speakChunks(
+  source: AsyncIterable<SpeakChunk>,
   deps: VoiceChatDeps,
 ): Promise<VoiceChatResult> {
-  const parser = (deps.makeParser ?? createJsonStreamParser)();
   let emotion: EmotionLabel = 'neutral';
   let emotionEmitted = false;
   const spoken: string[] = [];
-  let blocked = false;
-
-  /**
-   * 1文を発話する。自称検知したら false(=打ち切り)。
-   * ルビ(漢字《よみ》)は **表示用は除去**(自称検知・記録も除去後で行う)、**音声は読み下し**で合成する。
-   */
-  const speakSentence = async (s: string): Promise<boolean> => {
-    const display = stripRuby(s);
-    if (detectAiSelfReference(display, deps.neverCallsSelf).detected) {
-      blocked = true;
-      return false;
-    }
-    // 中断(投機キャンセル)済みなら、この文は合成も発話もしない(音声を漏らさない)。
-    if (deps.signal?.aborted) throwAborted();
-    // signal を合成HTTPへ渡す=中断時に進行中の合成も即打ち切り(孤児リクエストを残さない=詰まり防止)。
-    const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion), deps.signal);
-    if (deps.signal?.aborted) throwAborted(); // 合成中に中断されたら発話しない
-    deps.onAudio(wav, display); // display=ルビ除去済の表示テキスト(再生同期で吹き出しに出す)
-    spoken.push(display);
-    return true;
-  };
-
-  /** チャンク(emotion＋文配列)を処理。打ち切りなら false。 */
-  const handleChunk = async (em: EmotionLabel | undefined, sentences: string[]): Promise<boolean> => {
-    if (em !== undefined && !emotionEmitted) {
-      emotion = em;
-      emotionEmitted = true;
-      deps.onEmotion?.(em);
-    }
-    for (const s of sentences) {
-      if (!(await speakSentence(s))) return false;
-    }
-    return true;
-  };
-
-  for await (const delta of stream) {
-    const { emotion: em, sentences } = parser.push(delta);
-    if (!(await handleChunk(em, sentences))) {
-      return { spokenText: spoken.join(''), emotion, blockedBySelfCheck: true };
-    }
-  }
-
-  const final = parser.flush();
-  if (!(await handleChunk(undefined, final.sentences))) {
-    return { spokenText: spoken.join(''), emotion, blockedBySelfCheck: true };
-  }
-
-  return {
+  const done = (over: Partial<VoiceChatResult>): VoiceChatResult => ({
     spokenText: spoken.join(''),
     emotion,
-    enterListening: final.enterListening,
-    blockedBySelfCheck: blocked,
-  };
-}
+    blockedBySelfCheck: false,
+    aborted: false,
+    ...over,
+  });
 
-export interface SpeakTextDeps {
-  tts: TtsEngine;
-  voiceConfig: VoiceConfig;
-  neverCallsSelf: string[];
-  onAudio: (wav: ArrayBuffer) => void;
-  /** 中断(ターンの supersede / barge-in)。abort されたら以降の文を合成せず、進行中の合成も打ち切る。 */
-  signal?: AbortSignal;
-}
-
-export interface SpeakTextResult {
-  spokenText: string;
-  blockedBySelfCheck: boolean;
-}
-
-/**
- * 既に確定したメッセージ(非ストリーミング応答)を文単位で合成・再生する。
- * 最初の「声が出る」用途=ストリーミング C1 を待たずに音声化できる最小経路(Phase A)。
- * 自称を検知した文は発話せず打ち切る(C2 と同方針)。
- */
-export async function speakText(
-  text: string,
-  emotion: EmotionLabel,
-  deps: SpeakTextDeps,
-): Promise<SpeakTextResult> {
-  const opts = resolveStyle(deps.voiceConfig, emotion);
-  const { complete, remainder } = splitSentences(text);
-  const tail = remainder.trim();
-  const sentences = tail ? [...complete, tail] : complete;
-
-  const spoken: string[] = [];
-  for (const s of sentences) {
-    if (deps.signal?.aborted) break; // 中断(supersede / barge-in)されたら以降の文を合成しない
-    // ルビ(漢字《よみ》)は **自称検知・記録は除去後**、**音声は読み下し**で扱う(runVoiceChat と同方針)。
-    // 揃えないと、reading 無しの経路(起動挨拶/自発発話/ストリーミング失敗フォールバック)で
-    // TTS が《》や読み仮名をそのまま読み上げ/誤読し、自称検知の入力もストリーミング経路とズレる。
-    const display = stripRuby(s);
-    if (detectAiSelfReference(display, deps.neverCallsSelf).detected) {
-      return { spokenText: spoken.join(''), blockedBySelfCheck: true };
+  for await (const chunk of source) {
+    if (chunk.emotion !== undefined && !emotionEmitted) {
+      emotion = chunk.emotion;
+      emotionEmitted = true;
+      deps.onEmotion?.(emotion);
     }
-    const wav = await deps.tts.speak(rubyToReading(s), opts, deps.signal);
-    deps.onAudio(wav);
-    spoken.push(display);
+    for (const s of chunk.sentences) {
+      // ルビ(漢字《よみ》)は **表示・自称検知・記録は除去後**、**音声は読み下し**で扱う。
+      const display = stripRuby(s);
+      if (detectAiSelfReference(display, deps.neverCallsSelf).detected) return done({ blockedBySelfCheck: true });
+      // 中断(投機キャンセル)済みなら、この文は合成も発話もしない(音声を漏らさない)。
+      if (deps.signal?.aborted) return done({ aborted: true });
+      // signal を合成HTTPへ渡す=中断時に進行中の合成も即打ち切り(孤児リクエストを残さない=詰まり防止)。
+      const wav = await deps.tts.speak(rubyToReading(s), resolveStyle(deps.voiceConfig, emotion), deps.signal);
+      if (deps.signal?.aborted) return done({ aborted: true }); // 合成中に中断されたら発話しない
+      deps.onAudio(wav, display); // display=ルビ除去済の表示テキスト(再生同期で吹き出しに出す)
+      spoken.push(display);
+    }
   }
-  return { spokenText: spoken.join(''), blockedBySelfCheck: false };
+  return done({});
 }

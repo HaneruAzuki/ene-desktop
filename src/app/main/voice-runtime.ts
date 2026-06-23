@@ -4,8 +4,9 @@ import { log } from '../../shared/logger';
 import { loadVoiceConfig } from '../../voice/voice-loader';
 import { AivisSpeechTtsEngine } from '../../voice/aivisspeech-tts';
 import { reconcileVoiceConfig } from '../../voice/voice-provisioner';
-import { speakText, runVoiceChat } from '../../voice/voice-chat';
+import { speakChunks, type SpeakChunk } from '../../voice/voice-chat';
 import { createJsonStreamParser } from '../../voice/json-stream-parser';
+import { splitSentences } from '../../voice/sentence-splitter';
 import { buildPrompt } from '../../conversation/prompt-builder';
 import { makeStreamCall } from '../../conversation/client';
 import { fallbackResponse } from '../../conversation/fallback';
@@ -77,11 +78,24 @@ export async function streamVoiceChat(
   const tStart = performance.now();
   let firstChunkLogged = false;
   let sentenceIndex = 0; // 応答内の文の通し番号(先頭文 index=0 で吹き出しをリセットさせる)
-  const result = await runVoiceChat(streamCall(prompt), {
+
+  // ソース: Claude のデルタを JSON ストリームパーサで逐次パースし、完成した文を流す(speakChunks へ)。
+  const parser = createJsonStreamParser();
+  let enterListening = false;
+  async function* source(): AsyncGenerator<SpeakChunk> {
+    for await (const delta of streamCall(prompt)) {
+      const { emotion, sentences } = parser.push(delta);
+      yield { emotion, sentences };
+    }
+    const final = parser.flush();
+    enterListening = final.enterListening ?? false;
+    yield { sentences: final.sentences };
+  }
+
+  const result = await speakChunks(source(), {
     tts,
     voiceConfig,
     neverCallsSelf: charContext.identity.selfRecognition.neverCallsSelf,
-    makeParser: createJsonStreamParser,
     signal,
     onAudio: (wav, text) => {
       if (!firstChunkLogged) {
@@ -95,6 +109,12 @@ export async function streamVoiceChat(
     },
   });
 
+  // 中断(投機キャンセル/supersede)は例外で上位(turn-engine→coordinator)へ伝え、遅れて返った音声を使わせない。
+  if (result.aborted) {
+    const e = new Error('aborted');
+    e.name = 'AbortError';
+    throw e;
+  }
   // C2 で自称検知し打ち切った場合はフォールバック文を吹き出しに出す(音声は既に途中で止まっている)。
   if (result.blockedBySelfCheck) {
     log.warn('AI self-reference detected mid-stream; truncated (C2)');
@@ -104,7 +124,7 @@ export async function streamVoiceChat(
     type: 'chat',
     message: result.spokenText,
     emotion: result.emotion,
-    ...(result.enterListening ? { enterListening: true } : {}),
+    ...(enterListening ? { enterListening: true } : {}),
   };
 }
 
@@ -121,7 +141,15 @@ export async function speakResponse(
   signal?: AbortSignal, // 中断(ターンの supersede / barge-in)。abort で合成を打ち切り、孤児を残さない。
 ): Promise<void> {
   try {
-    await speakText(spokenText, emotion, {
+    // ソース: 確定済みテキストを文に割り、1チャンクとして流す(speakChunks へ)。
+    const { complete, remainder } = splitSentences(spokenText);
+    const tail = remainder.trim();
+    const sentences = tail ? [...complete, tail] : complete;
+    const source = async function* (): AsyncGenerator<SpeakChunk> {
+      yield { emotion, sentences };
+    };
+    // 自称検知は本会話の3層防御で済んでいるため空。中断は speakChunks が aborted で返す(ここは無言で終える)。
+    await speakChunks(source(), {
       tts,
       voiceConfig,
       neverCallsSelf: [],

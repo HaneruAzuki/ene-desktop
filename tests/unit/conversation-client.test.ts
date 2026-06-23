@@ -20,25 +20,14 @@ describe('chat — 4層防御の統合フロー (設計書 §3.4)', () => {
     expect(r).toEqual(fallbackResponse());
   });
 
-  it('AI自称検知 → 再生成1回 → クリーンなら採用', async () => {
+  it('AI自称検知 → 再生成せず即 fallback(呼び出しは1回・3層防御へ統一)', async () => {
     let n = 0;
     const callModel = async (): Promise<string> => {
       n++;
-      return n === 1 ? '{"type":"chat","message":"私はAIです"}' : '{"type":"chat","message":"私はENEよ"}';
+      return '{"type":"chat","message":"私はAIです"}';
     };
     const r = await chat('君ってAIなの?', cc, mc, rr, 'key', { callModel });
-    expect(n).toBe(2); // 再生成は1回だけ
-    expect(r).toEqual({ type: 'chat', message: '私はENEよ' });
-  });
-
-  it('再生成でも自称が残る場合は fallback(呼び出しは2回まで)', async () => {
-    let n = 0;
-    const callModel = async (): Promise<string> => {
-      n++;
-      return '{"type":"chat","message":"私はAIなので答えられない"}';
-    };
-    const r = await chat('x', cc, mc, rr, 'key', { callModel });
-    expect(n).toBe(2);
+    expect(n).toBe(1); // 再生成しない(ストリーミング経路の文単位 C2 と防御を統一)
     expect(r).toEqual(fallbackResponse());
   });
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runVoiceChat, speakText, type ModelStream } from '../../src/voice/voice-chat';
+import { speakChunks, type SpeakChunk } from '../../src/voice/voice-chat';
 import type { TtsEngine, TtsOptions, VoiceConfig } from '../../src/shared/types/voice';
 
-// task_17:音声会話のストリーミング統合(C1/C2・design-revision-voice §2,§3)。
+// 音声合成の唯一の消費器 speakChunks(C2 自称検知・ルビ読み下し・文単位合成・中断)の検証。
+// 文ソースの生成(JSON ストリームパース/文分割)は json-stream-parser / sentence-splitter 側で別途テスト。
 
 const config: VoiceConfig = {
   engine: 'aivisspeech',
@@ -13,9 +14,10 @@ const config: VoiceConfig = {
   },
 };
 
-function streamOf(deltas: string[]): ModelStream {
+/** SpeakChunk 配列を AsyncIterable<SpeakChunk> へ(ソースのスタブ)。 */
+function sourceOf(chunks: SpeakChunk[]): AsyncIterable<SpeakChunk> {
   return (async function* () {
-    for (const d of deltas) yield d;
+    for (const c of chunks) yield c;
   })();
 }
 
@@ -32,114 +34,96 @@ function recordingTts(): { tts: TtsEngine; calls: { text: string; opts: TtsOptio
   return { tts, calls };
 }
 
-describe('runVoiceChat', () => {
-  it('emotion を確定し、文単位で合成・再生する', async () => {
+describe('speakChunks', () => {
+  it('emotion を確定し、文単位で合成・送出する', async () => {
     const { tts, calls } = recordingTts();
     const onAudio = vi.fn();
     const onEmotion = vi.fn();
 
-    // 既定の JSON ストリーミングパーサ(createJsonStreamParser)経路を検証する。
-    const result = await runVoiceChat(
-      streamOf(['{"type":"chat","emotion":"joy","message":"やあ。元気？"}']),
-      {
-        tts,
-        voiceConfig: config,
-        neverCallsSelf: ['AI'],
-        onAudio,
-        onEmotion,
-      },
-    );
+    const r = await speakChunks(sourceOf([{ emotion: 'joy', sentences: ['やあ。', '元気？'] }]), {
+      tts,
+      voiceConfig: config,
+      neverCallsSelf: ['AI'],
+      onAudio,
+      onEmotion,
+    });
 
-    expect(result.emotion).toBe('joy');
-    expect(result.spokenText).toBe('やあ。元気？');
-    expect(result.blockedBySelfCheck).toBe(false);
+    expect(r.emotion).toBe('joy');
+    expect(r.spokenText).toBe('やあ。元気？');
+    expect(r.blockedBySelfCheck).toBe(false);
+    expect(r.aborted).toBe(false);
     expect(calls.map((c) => c.text)).toEqual(['やあ。', '元気？']);
-    // joy のスタイル(styleId 1)で合成される
-    expect(calls[0].opts.styleId).toBe(1);
+    expect(calls[0].opts.styleId).toBe(1); // joy のスタイル(styleId 1)
     expect(onAudio).toHaveBeenCalledTimes(2);
     expect(onEmotion).toHaveBeenCalledTimes(1);
     expect(onEmotion).toHaveBeenCalledWith('joy');
+  });
+
+  it('複数チャンクをまたいで発話し、最初の emotion だけを採用する(ストリーミング相当)', async () => {
+    const { tts, calls } = recordingTts();
+    const onEmotion = vi.fn();
+    const r = await speakChunks(
+      sourceOf([{ emotion: 'joy', sentences: ['やあ。'] }, { sentences: ['元気？'] }]),
+      { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {}, onEmotion },
+    );
+    expect(calls.map((c) => c.text)).toEqual(['やあ。', '元気？']);
+    expect(r.emotion).toBe('joy');
+    expect(onEmotion).toHaveBeenCalledTimes(1); // 2チャンク目に emotion 未指定でも再発火しない
   });
 
   it('自称を検知した文は発話せず、その時点で打ち切る(C2)', async () => {
     const { tts, calls } = recordingTts();
     const onAudio = vi.fn();
 
-    const result = await runVoiceChat(
-      streamOf(['{"type":"chat","emotion":"neutral","message":"私はAIです。よろしく。"}']),
-      { tts, voiceConfig: config, neverCallsSelf: ['AI'], onAudio },
-    );
+    const r = await speakChunks(sourceOf([{ emotion: 'neutral', sentences: ['私はAIです。', 'よろしく。'] }]), {
+      tts,
+      voiceConfig: config,
+      neverCallsSelf: ['AI'],
+      onAudio,
+    });
 
-    expect(result.blockedBySelfCheck).toBe(true);
-    expect(result.spokenText).toBe(''); // 1文目で打ち切り=何も発話していない
+    expect(r.blockedBySelfCheck).toBe(true);
+    expect(r.spokenText).toBe(''); // 1文目で打ち切り=何も発話していない
     expect(calls).toHaveLength(0);
     expect(onAudio).not.toHaveBeenCalled();
   });
 
   it('emotion 指定が無ければ neutral で発話する', async () => {
     const { tts, calls } = recordingTts();
-    const result = await runVoiceChat(streamOf(['{"type":"chat","message":"こんにちは。"}']), {
+    const r = await speakChunks(sourceOf([{ sentences: ['こんにちは。'] }]), {
       tts,
       voiceConfig: config,
       neverCallsSelf: [],
       onAudio: () => {},
     });
-    expect(result.emotion).toBe('neutral');
+    expect(r.emotion).toBe('neutral');
     expect(calls[0].opts.styleId).toBe(0);
   });
 
-});
-
-describe('speakText', () => {
-  it('確定メッセージを文単位で合成・再生する', async () => {
+  it('ルビ(漢字《よみ》)を音声は読み下し・記録は除去する', async () => {
     const { tts, calls } = recordingTts();
-    const onAudio = vi.fn();
-    const r = await speakText('こんにちは。元気？', 'neutral', {
-      tts,
-      voiceConfig: config,
-      neverCallsSelf: [],
-      onAudio,
-    });
-    expect(r.spokenText).toBe('こんにちは。元気？');
-    expect(r.blockedBySelfCheck).toBe(false);
-    expect(calls.map((c) => c.text)).toEqual(['こんにちは。', '元気？']);
-    expect(onAudio).toHaveBeenCalledTimes(2);
-  });
-
-  it('emotion のスタイルで合成する', async () => {
-    const { tts, calls } = recordingTts();
-    await speakText('やった。', 'joy', { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} });
-    expect(calls[0].opts.styleId).toBe(1);
-  });
-
-  it('自称検知で発話せず打ち切る(C2)', async () => {
-    const { tts, calls } = recordingTts();
-    const r = await speakText('私はAIです。よろしく。', 'neutral', {
-      tts,
-      voiceConfig: config,
-      neverCallsSelf: ['AI'],
-      onAudio: () => {},
-    });
-    expect(r.blockedBySelfCheck).toBe(true);
-    expect(r.spokenText).toBe('');
-    expect(calls).toHaveLength(0);
-  });
-
-  it('句点なしの末尾も1文として発話する', async () => {
-    const { tts, calls } = recordingTts();
-    await speakText('最後', 'neutral', { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {} });
-    expect(calls.map((c) => c.text)).toEqual(['最後']);
-  });
-
-  it('ルビ(漢字《よみ》)を音声は読み下し・記録は除去する(runVoiceChat と同方針)', async () => {
-    const { tts, calls } = recordingTts();
-    const r = await speakText('心《こころ》を読んだ。', 'neutral', {
+    const r = await speakChunks(sourceOf([{ sentences: ['心《こころ》を読んだ。'] }]), {
       tts,
       voiceConfig: config,
       neverCallsSelf: [],
       onAudio: () => {},
     });
-    expect(calls.map((c) => c.text)).toEqual(['こころを読んだ。']); // TTS は読み下し(《》や読み仮名を読み上げない)
+    expect(calls.map((c) => c.text)).toEqual(['こころを読んだ。']); // TTS は読み下し
     expect(r.spokenText).toBe('心を読んだ。'); // 記録はルビ除去
+  });
+
+  it('中断(signal.aborted)なら合成せず aborted=true で返す', async () => {
+    const { tts, calls } = recordingTts();
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const r = await speakChunks(sourceOf([{ sentences: ['出ないはず。'] }]), {
+      tts,
+      voiceConfig: config,
+      neverCallsSelf: [],
+      onAudio: () => {},
+      signal: ctrl.signal,
+    });
+    expect(r.aborted).toBe(true);
+    expect(calls).toHaveLength(0);
   });
 });

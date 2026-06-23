@@ -3,7 +3,6 @@ import { log } from '../shared/logger';
 import { buildPrompt } from './prompt-builder';
 import { parseConversationResponse } from './response-parser';
 import { detectAiSelfReference } from '../shared/ai-self-check';
-import { enhancePromptForRegeneration } from './prompt-enhancer';
 import { fallbackResponse } from './fallback';
 import type { CharacterContext } from '../shared/types/character';
 import type { MemoryContext, SemanticMemory } from '../shared/types/memory';
@@ -12,7 +11,9 @@ import type { BuiltPrompt, ConversationResponse } from '../shared/types/conversa
 import type { LlmComplete } from '../shared/types/llm';
 
 // 本会話処理(設計書 §3.4「Conversation Layer の統合フロー」)。
-// AI自称防止の4層防御を統合する。Sonnet 呼び出し・トークン計測は DI 可能(テスト容易化)。
+// AI自称防止の3層防御を統合する(①プロンプト ②自称検知 ③フォールバック)。Sonnet 呼び出しは DI 可能(テスト容易化)。
+// 旧・第3層「強化プロンプトで再生成1回」は撤去(2026-06-23):発話済みを取り消せないストリーミングでは
+// 構造的に不可能で、非ストリーミングだけ効く非対称な防御は無意味かつ複雑だったため(ストリーミングと統一)。
 
 /** 生成モデル(B-15b 二段生成)。既定=Sonnet(品質・一貫性=成功基準8)。雑談は Haiku に振り分け可。 */
 export const MODEL_SONNET = 'claude-sonnet-4-6';
@@ -249,37 +250,12 @@ export async function chat(
     return fallbackResponse(); // パース失敗 → fallback
   }
 
-  // 第2防御: AI自称検知
+  // 第2防御: AI自称検知 → 検知時は第3防御=フォールバック(再生成はしない)。
+  // 発話済みを取り消せないストリーミング経路(文単位 C2)と防御を統一する(非対称な再生成を撤去・2026-06-23)。
   const check = detectAiSelfReference(parsed.message, neverCallsSelf);
-  if (!check.detected) {
-    return parsed;
-  }
-  log.warn(`AI self-reference detected: pattern=${check.matchedPattern ?? ''}`);
-
-  // 第3防御: 強化プロンプトで再生成(1回だけ)
-  const enhanced: BuiltPrompt = {
-    system: enhancePromptForRegeneration(prompt.system, check.matchedWord ?? ''),
-    messages: prompt.messages,
-  };
-  let raw2: string;
-  try {
-    raw2 = await callModel(enhanced);
-  } catch (e) {
-    log.error('conversation regeneration call failed', { name: (e as Error).name });
-    if (isAuthLikeError(e)) onAuthError?.(e);
+  if (check.detected) {
+    log.warn(`AI self-reference detected: pattern=${check.matchedPattern ?? ''}`);
     return fallbackResponse();
   }
-
-  const parsed2 = parseConversationResponse(raw2);
-  if (!parsed2) {
-    return fallbackResponse();
-  }
-
-  const recheck = detectAiSelfReference(parsed2.message, neverCallsSelf);
-  if (recheck.detected) {
-    // 第4防御: フォールバック
-    log.error('AI self-reference still detected after regeneration');
-    return fallbackResponse();
-  }
-  return parsed2;
+  return parsed;
 }
