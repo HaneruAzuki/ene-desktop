@@ -81,5 +81,18 @@ if (!acquireSingleInstanceLock()) {
     void stopVoiceEngine();
   });
 
+  // セキュリティ多層防御(Electron 公式推奨): どの web contents も
+  //  - 新規ウィンドウ生成は一律拒否(外部リンクは shell.openExternal=本物のブラウザで開く)。
+  //  - 自分のローカル画面(本番=file:// / 開発=dev サーバ URL)以外への遷移を拒否
+  //    = 万一スクリプトが紛れても窓を外部ページへ乗っ取られない(CSP/sandbox に重ねる最後の一枚)。
+  app.on('web-contents-created', (_event, contents) => {
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    contents.on('will-navigate', (event, url) => {
+      const devUrl = process.env['ELECTRON_RENDERER_URL'];
+      const allowed = url.startsWith('file://') || (devUrl ? url.startsWith(devUrl) : false);
+      if (!allowed) event.preventDefault();
+    });
+  });
+
   void start();
 }
