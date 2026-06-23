@@ -75,8 +75,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   // ハンズフリー VAD(task_17 Phase C)。renderer から連続フレームを受け、発話区間を
   // 文字起こしして確定テキストを renderer へ返す(renderer はそれを send-message に流す)。
-  // ENE_LISTEN_ONLY=1: 相槌テスト用に応答(Claude/記憶=レイテンシ源)を止め、VAD＋相槌だけ動かす(task_18)。
-  const listenOnly = process.env['ENE_LISTEN_ONLY'] === '1';
 
   // コアレッシング(段階①): 投機生成＋連結。**既定ON**(ENE_COALESCE=0 で無効化=従来の renderer 駆動経路)。
   //   暫定ターン終了(短い無音)で generateResponse を投機実行し、発話再開で静かにキャンセル＋連結。
@@ -139,7 +137,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     : undefined;
   if (coalesceOn) log.info('coalescing ON (speculative generation; provisional turn-end)');
 
-  const vad = new VadRuntime(mainWindow, backchannel, listenOnly, coalesce);
+  const vad = new VadRuntime(mainWindow, backchannel, coalesce);
   // barge-in 判定窓を main の応答ターンで駆動する(構造的修正)。第一声(コミット)で true、barge-in/次ターンで false。
   runtime.setResponseActive = (active: boolean): void => vad.setResponseActive(active);
   // 実発話があったのに STT が空(取りこぼし)=ユーザを無音で放置しない。キャラ口調で聞き返す(信頼性保証)。

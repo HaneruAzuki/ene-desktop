@@ -14,7 +14,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { runForgetting, isForgettingEnabled } from '../../src/memory/forgetting';
+import { runForgetting } from '../../src/memory/forgetting';
 import { saveEpisodic, loadEpisodicById, loadAllEpisodicFiles } from '../../src/memory/episodic';
 import { getConsolidationState } from '../../src/memory/consolidation-state';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
@@ -90,11 +90,4 @@ describe('forgetting orchestrator (§11.6)', () => {
     expect(all.find((r) => r.memory.extra?.['summaryTier'])).toBeUndefined();
   });
 
-  it('忘却は既定オン・ENE_FORGETTING=0 で無効化できる', () => {
-    delete process.env['ENE_FORGETTING'];
-    expect(isForgettingEnabled()).toBe(true);
-    process.env['ENE_FORGETTING'] = '0';
-    expect(isForgettingEnabled()).toBe(false);
-    delete process.env['ENE_FORGETTING']; // 後始末(他テストへ影響させない)
-  });
 });

@@ -3,7 +3,7 @@ import { log } from '../../shared/logger';
 import { nowLocalIso } from '../../shared/datetime';
 import { timeOfDayLabel } from '../../shared/moment';
 import { normalizeEmotion } from '../../shared/llm-parse';
-import { IDLE_TALK_CHECK_INTERVAL_MS, IDLE_TALK_ENABLED_ENV } from '../../shared/constants';
+import { IDLE_TALK_CHECK_INTERVAL_MS } from '../../shared/constants';
 import {
   shouldSpeakIdle,
   buildIdleTalkPrompt,
@@ -84,9 +84,8 @@ export class IdleTalkManager {
       if (this.runtime.away) return; // 離席中は自分から話しかけない(UI改修 段階5)
 
       const settings = await loadAppSettings();
-      // 設定 off か env で明示無効なら黙る。既定は on(有効)。旧 low/normal は !== 'off' で on 相当。
-      const enabled =
-        (settings.idleTalk ?? 'on') !== 'off' && process.env[IDLE_TALK_ENABLED_ENV] !== '0';
+      // 設定が off なら黙る。既定は on(有効)。旧 low/normal は !== 'off' で on 相当。設定UI(settings.idleTalk)が唯一の制御。
+      const enabled = (settings.idleTalk ?? 'on') !== 'off';
 
       const now = Date.now();
       const d = new Date();

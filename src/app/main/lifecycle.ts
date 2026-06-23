@@ -13,7 +13,7 @@ import { buildCharacterContext } from '../../character/character-context';
 import { checkBirthday } from '../../character/birthday-checker';
 import { getUnextractedEntries, clearShortTerm } from '../../memory/short-term';
 import { extractFromShortTerm } from '../../memory/extraction-trigger';
-import { isForgettingEnabled, requestForgetting } from '../../memory/forgetting';
+import { requestForgetting } from '../../memory/forgetting';
 import { warmEmbedder } from '../../shared/node/embedder';
 import { warmSttWorker } from './stt-worker-client';
 import { warmLocalRouter } from '../../knowledge/local-classifier';
@@ -152,13 +152,11 @@ export async function runStartupSequence(
   // (ローカル判別器 B-15 と STT のウォームは、下の二段ゲートでこの完了後に実行する。)
   const embedderReady = warmEmbedder().catch(() => undefined);
 
-  // Step 8.5: 忘却機構(B-13 / §11.6)。**既定オン**(2026-06-13 ユーザ決定・実機検証済 N-FORGET-1。
-  // `ENE_FORGETTING=0` で無効化できる安全弁)。起動時に未処理の月次/年次サマリ(低重要度の物理削除を含む)を
-  // 背景で実行する(await しない=起動/会話を妨げない)。「人間らしい忘却」=製品の柱(§11.6)。
-  if (isForgettingEnabled()) {
-    log.info('forgetting mechanism enabled; running consolidation in background');
-    void requestForgetting(withNameMishearHint(makeLlmComplete(apiKey), nameHint));
-  }
+  // Step 8.5: 忘却機構(B-13 / §11.6)。**常時オン**(2026-06-13 ユーザ決定・実機検証済 N-FORGET-1)。
+  // 「人間らしい忘却」=製品の柱なのでトグルで切らない(2026-06-24 設定棚卸し)。起動時に未処理の
+  // 月次/年次サマリ(低重要度の物理削除を含む)を背景で実行する(await しない=起動/会話を妨げない)。
+  log.info('running memory consolidation (forgetting) in background');
+  void requestForgetting(withNameMishearHint(makeLlmComplete(apiKey), nameHint));
 
   // Step 9: 誕生日判定
   const today = todayLocalYmd();

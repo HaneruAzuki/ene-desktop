@@ -1095,7 +1095,7 @@
   `idle-talk-manager.ts`(powerMonitor 在席検知・タイマー・best-effort)。**音声あり**=吹き出し＋通常応答と同じ
   `speakResponse`→voice-chunk 経路で喋る(push-to-talk はマイク押下中のみ=自声を拾わず安全/ハンズフリーは
   相槌で実証済みのエコーガードを継承)。有限性は moment.finitenessHint=**発言内容のみ**(声は変えない・状態は
-  保存しない=§5.3 適合)。設定 `idleTalk`(既定 low・env ENE_IDLE_TALK=0 で無効)。
+  保存しない=§5.3 適合)。設定 `idleTalk`(既定 low・設定UIが唯一の制御=env ゲートは 2026-06-24 撤去・N-CLEANUP-1)。
   ✅ **実機 smoke 合格(2026-06-13・ユーザー)**: dev 右クリック「（開発）自発発話を今すぐ」で吹き出し＋音声を確認。
   ハンズフリーでも自発発話の声を**自己トリガしない**(相槌のエコーガードを継承)。`idle talk emitted` ＋ 合成WAV生成で確認。
   (※ 同セッションで判明した「音声が全く出ない」は P7 と無関係の声モデル未登録=[[voice-model-build-torimi-2026]] 参照)。
@@ -1118,6 +1118,18 @@
   当月＋直近月は「昨日/最近 何してた?」の連続性のため残す。canon(life-memory.json)は forgetting の入力に入らないので不変。
 - **「忘れて」明示削除コマンド=不要決定(ユーザ)**: 人間らしい忘却は自動が本筋。特定削除は平文ファイル削除(§6.4)で代替。
 - 検証: consolidation-policy / forgetting テスト追加(daily-life 縮退・既定オン)・497テスト緑・typecheck/lint/lint:deps クリーン。
+
+---
+
+### N-CLEANUP-1 🟢 設定(env トグル)棚卸し — テスト専用/冗長/同一性否定トグルの撤去(2026-06-24)
+- **方針(ユーザ)**: v1.0 はクリーンな土台。env を「将来役立つ能力」「診断」「純テスト/冗長」に分け、後者を撤去する。
+- **撤去**:
+  - `ENE_LISTEN_ONLY`(相槌テスト用に会話/記憶をスキップする dev 専用モード)= 純テスト → 削除(`ipc.ts`/`vad-runtime.ts` の `listenOnly` 引数・分岐ごと)。
+  - `ENE_IDLE_TALK`(自発発話の env ゲート)= 設定UI `settings.idleTalk` と二重 → env 側を削除(ユーザー設定が唯一の制御)。
+  - `ENE_FORGETTING`(忘却の無効化トグル)= 切れると「忘れない不自然な存在」化し製品同一性(柱1 人間らしい忘却)を否定 → 撤去し**常時オン**固定。`isForgettingEnabled()` も削除。
+- **残す(撤去しない)**: `ENE_TWO_TIER`(one-tier=Haiku のみ運用に必要な能力スイッチ)・`ENE_VOICE_STREAMING`(ストリーム非対応 LLM への差し替え互換)・`ENE_STT_MODEL_DIR`(STT モデル差し替え)・`ENE_DEBUG_RECALL`/`ENE_DEBUG_STT`(opt-in 診断・既定オフ)。
+- **要判断(保留)**: `ENE_COALESCE`/`ENE_LISTENING`(機能ロールバック・能力ではない)/`ENE_STT_WORKER`(既定OFFの半端=採用 or 削除は実機検証後)。
+- 検証: typecheck/lint/lint:deps(164)/build 緑・**全542テスト緑**(forgetting トグルテスト・vad listenOnly テストを削除)。
 
 ---
 

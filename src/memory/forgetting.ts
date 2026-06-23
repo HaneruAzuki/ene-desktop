@@ -4,7 +4,6 @@ import {
   FORGET_MONTHLY_SUMMARY_DAY,
   FORGET_MONTHLY_SUMMARY_IMPORTANCE,
   FORGET_YEARLY_SUMMARY_IMPORTANCE,
-  FORGETTING_ENABLED_ENV,
 } from '../shared/constants';
 import { log } from '../shared/logger';
 import { localIsoFromParts, nowLocalIso, todayLocalYmd } from '../shared/datetime';
@@ -23,14 +22,9 @@ import type { EpisodicMemory } from '../shared/types/memory';
 // 安全設計:
 //  - **要約に失敗した期間は削除しない**(サマリ無しで記憶を失わない)。
 //  - 直列化ロック(inFlight)で多重実行を防ぐ。
-//  - **既定オン**(2026-06-13 ユーザ決定・ENE_FORGETTING=0 で無効化・実機検証済 N-FORGET-1)。
+//  - **常時オン**(2026-06-13 ユーザ決定・実機検証済 N-FORGET-1)。忘却は製品同一性なのでトグルで切らない(2026-06-24)。
 //  - 物理削除(§6.4)。派生索引(inverted/vector)は削除後に再生成/掃除(真実の源は episodic 本体)。
 //  - 暮らしの断片(daily-life・provenance:'self')は user サマリに混ぜず、十分古い低importanceを直接削除(B-18)。
-
-/** 忘却機構が有効か。**既定オン**(2026-06-13 ユーザ決定)。`ENE_FORGETTING=0` で明示無効化できる(安全弁)。 */
-export function isForgettingEnabled(): boolean {
-  return process.env[FORGETTING_ENABLED_ENV] !== '0';
-}
 
 /** サマリの EpisodicMemory を組み立てる(専用カテゴリ・合成日アンカー・相手のトーンを動かさない valence=0)。 */
 function buildSummaryMemory(
@@ -159,7 +153,7 @@ let inFlight: Promise<ForgettingResult> | null = null;
 
 /**
  * 忘却機構をバックグラウンドで1回走らせる(fire-and-forget・多重実行は直列化ロックで防止)。
- * 呼出側(lifecycle)が isForgettingEnabled() を確認してから呼ぶ。返り値はテスト用に await 可能。
+ * 忘却は常時オン(製品同一性=トグルで切らない・2026-06-24)。lifecycle が起動時に無条件で呼ぶ。返り値はテスト用に await 可能。
  */
 export function requestForgetting(complete: LlmComplete): Promise<ForgettingResult> {
   if (!inFlight) {

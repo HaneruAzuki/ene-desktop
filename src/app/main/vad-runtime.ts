@@ -93,12 +93,9 @@ export class VadRuntime {
   onUnintelligible: (() => void) | null = null;
 
   // 相槌(task_18 Phase B・任意)。ユーザ発話中の言いよどみで相槌を打つ。
-  // listenOnly: 相槌テスト用(env ENE_LISTEN_ONLY=1)。ターン終了時に文字起こし・応答(Claude/記憶)を
-  //   スキップし、VAD＋相槌だけを動かす。レイテンシ問題と無関係に相槌の体感を検証できる。
   constructor(
     private readonly win: BrowserWindow,
     private readonly backchannel?: BackchannelController,
-    private readonly listenOnly = false,
     // コアレッシング(段階①・ENE_COALESCE)。指定時は話終わりを暫定扱いにして coordinator を駆動する。
     private readonly coalesce?: CoalesceHooks,
     // 外部依存(既定は実装・テストで差し替え)。
@@ -128,9 +125,7 @@ export class VadRuntime {
 
   /** VAD セッション開始。モデル未配置なら false(呼び出し側は push-to-talk のまま)。 */
   async start(): Promise<boolean> {
-    // listenOnly(相槌テスト)は Whisper を使わないので STT モデル無しでも開始できる。
-    if (!this.listenOnly && !(await this.deps.isSttModelAvailable())) return false;
-    if (this.listenOnly) log.warn('VAD listen-only mode: responses disabled (backchannel test)');
+    if (!(await this.deps.isSttModelAvailable())) return false;
     this.seg.reset();
     this.vad.reset();
     this.recording = false;
@@ -277,18 +272,12 @@ export class VadRuntime {
     this.coalesce?.onSpeechEnd();
     // ターン終端うなずき(2026-06-12): 無音窓が閉じた=「無音枠終端」で1回うなずき、ターン受け取りを視覚で示す。
     //   深さは直前の発話の長さ(録音フレーム数→ms)で出し分ける(短い=軽く / 長い=重め)。STT を待たない=窓終端ぴったり。
-    //   §6.2: ms と深さ(数値)のみログ・本文は出さない。listenOnly でも窓終端の視覚信号として出す。
+    //   §6.2: ms と深さ(数値)のみログ・本文は出さない。
     const speechMs = (this.recorded.length * VAD_FRAME_SIZE * 1000) / STT_SAMPLE_RATE;
     const nodStrength = turnNodStrength(speechMs);
     log.info(`turn nod (speech=${Math.round(speechMs)}ms strength=${nodStrength})`);
     this.send(IPC.TURN_NOD, nodStrength);
     this.backchannel?.reset(); // ターン終了=次の発話は相槌カウンタを 0 から
-    if (this.listenOnly) {
-      // 相槌テスト: 文字起こし・応答(Claude/記憶=レイテンシ源)をスキップし聞き取りに戻る。
-      this.recorded = [];
-      this.sendState('listening');
-      return;
-    }
     const audio = concat(this.recorded);
     this.recorded = [];
     this.sendState('transcribing');

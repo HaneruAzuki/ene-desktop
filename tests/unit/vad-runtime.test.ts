@@ -56,7 +56,7 @@ describe('VadRuntime — start ゲート', () => {
   it('STT モデル未配置なら start は false(push-to-talk のまま)', async () => {
     const { win } = fakeWin();
     const { model } = fakeVad(() => 0);
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model, {
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model, {
       isSttModelAvailable: async () => false,
     }));
     expect(await vad.start()).toBe(false);
@@ -65,16 +65,7 @@ describe('VadRuntime — start ゲート', () => {
   it('STT モデルがあれば start は true', async () => {
     const { win } = fakeWin();
     const { model } = fakeVad(() => 0);
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model));
-    expect(await vad.start()).toBe(true);
-  });
-
-  it('listenOnly は STT 無しでも start できる', async () => {
-    const { win } = fakeWin();
-    const { model } = fakeVad(() => 0);
-    const vad = new VadRuntime(win, undefined, true, undefined, makeDeps(model, {
-      isSttModelAvailable: async () => false,
-    }));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model));
     expect(await vad.start()).toBe(true);
   });
 });
@@ -83,7 +74,7 @@ describe('VadRuntime — フレームキュー(横断監査⑥)', () => {
   it('未開始ならフレームを無視する(process を呼ばない)', async () => {
     const { win } = fakeWin();
     const { model, processed } = fakeVad(() => 0);
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model));
     await vad.pushFrame(frame(1));
     expect(processed).toHaveLength(0);
   });
@@ -91,7 +82,7 @@ describe('VadRuntime — フレームキュー(横断監査⑥)', () => {
   it('上限以内のバーストは1つも取りこぼさず順序通り処理する', async () => {
     const { win } = fakeWin();
     const { model, processed } = fakeVad(() => 0); // 無音=セグメンタは何も発火しない
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model));
     await vad.start();
     const n = 10; // < VAD_FRAME_QUEUE_MAX
     await Promise.all(Array.from({ length: n }, (_, i) => vad.pushFrame(frame(i))));
@@ -101,7 +92,7 @@ describe('VadRuntime — フレームキュー(横断監査⑥)', () => {
   it('持続過負荷では最古を捨ててバックログを有界に保つ(最新フレームは残る)', async () => {
     const { win } = fakeWin();
     const { model, processed } = fakeVad(() => 0);
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model));
     await vad.start();
     // 同期バーストで CAP を大きく超えて積む。最初の1枚が処理中=in-flight、残りはキューへ。
     // キューが CAP に達すると最古を捨てるので、処理されるのは「先頭1枚 + 最新 CAP 枚」。
@@ -118,7 +109,7 @@ describe('VadRuntime — フレームキュー(横断監査⑥)', () => {
   it('stop でキューを破棄する', async () => {
     const { win } = fakeWin();
     const { model, processed } = fakeVad(() => 0);
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model));
     await vad.start();
     vad.stop();
     await vad.pushFrame(frame(1));
@@ -132,7 +123,7 @@ describe('VadRuntime — 発話→文字起こし', () => {
     // 最初の30フレームは発話(prob 0.9)、以降は無音(0.0)。無音が VAD_MIN_SILENCE_MS を超え終話確定。
     const { model } = fakeVad((i) => (i < 30 ? 0.9 : 0.0));
     const transcribe = vi.fn(async () => 'こんにちは');
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model, { transcribe }));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model, { transcribe }));
     await vad.start();
     // 120フレーム ≒ 3.8秒(無音 90フレーム ≒ 2.9秒 > 0.8秒)で確実に終話まで到達させる。
     for (let i = 0; i < 120; i++) await vad.pushFrame(new Float32Array(VAD_FRAME_SIZE));
@@ -151,7 +142,7 @@ describe('VadRuntime — 発話→文字起こし', () => {
     const { model } = fakeVad((i) => (i < 30 ? 0.9 : 0.0));
     const transcribe = vi.fn(async () => ''); // 空認識
     const onUnintelligible = vi.fn();
-    const vad = new VadRuntime(win, undefined, false, undefined, makeDeps(model, { transcribe }));
+    const vad = new VadRuntime(win, undefined, undefined, makeDeps(model, { transcribe }));
     vad.onUnintelligible = onUnintelligible;
     await vad.start();
     for (let i = 0; i < 120; i++) await vad.pushFrame(new Float32Array(VAD_FRAME_SIZE));
