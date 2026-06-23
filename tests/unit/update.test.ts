@@ -74,6 +74,27 @@ describe('update — refine / reattribute', () => {
     expect((await loadEpisodicById(target))?.entities).toEqual(['田中一郎']);
     expect((await loadEpisodicById(other))?.entities).toEqual(['田中']); // 触らない
   });
+
+  it('reattribute は provenance(self↔user)の取り違えも直せる(P1)', async () => {
+    const id = await saveEpisodic(mem({ date: '2026-03-05T00:00:00+09:00', topic: '取り違え', provenance: 'user' }));
+    await applyCorrections([{ targetFile: id, kind: 'reattribute', newProvenance: 'self' }]);
+    expect((await loadEpisodicById(id))?.provenance).toBe('self');
+  });
+
+  it('reattribute は entities と provenance を同時に直せる(P1)', async () => {
+    const id = await saveEpisodic(mem({ date: '2026-03-06T00:00:00+09:00', entities: ['田中'], provenance: 'user' }));
+    await applyCorrections([{ targetFile: id, kind: 'reattribute', newEntities: ['鈴木'], newProvenance: 'self' }]);
+    const m = await loadEpisodicById(id);
+    expect(m?.entities).toEqual(['鈴木']);
+    expect(m?.provenance).toBe('self');
+  });
+
+  it('reattribute で entities も provenance も無ければ何もしない(空 patch スキップ・P1)', async () => {
+    const id = await saveEpisodic(mem({ date: '2026-03-07T00:00:00+09:00', entities: ['田中'], provenance: 'user' }));
+    const applied = await applyCorrections([{ targetFile: id, kind: 'reattribute' }]);
+    expect(applied).toBe(0);
+    expect((await loadEpisodicById(id))?.entities).toEqual(['田中']);
+  });
 });
 
 describe('update — 堅牢性 / 索引整合', () => {

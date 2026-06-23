@@ -3,10 +3,12 @@ import {
   RRF_K,
   RECALL_SOFTMAX_TEMP,
   RECALL_CANDIDATE_POOL,
+  RECALL_TOPIC_MAX,
   INTEREST_AFFINITY_WEIGHT,
   CHEERUP_WEIGHT,
   USER_DOWN_THRESHOLD,
 } from '../shared/constants';
+import { pickDiverse } from './recall-select';
 import { log } from '../shared/logger';
 import { loadRecallPool } from './recall-pool';
 import { queryInverted } from './index-inverted';
@@ -219,24 +221,19 @@ export async function retrieveRecords(
     });
 
   // 4) 上位選択。まずスコア上位 RECALL_CANDIDATE_POOL 件へ絞り(無関係な裾を除外=precision)、
-  //    その中から RNG ありは softmax サンプリング(揺らぎ)、なしは決定論(スコア降順)。
+  //    その中で順序を決める(RNG ありは softmax で揺らし、なしは決定論=スコア降順)。
   const ranked = [...scored].sort((a, b) => b.score - a.score);
   const candidates = ranked.slice(0, Math.max(limit, RECALL_CANDIDATE_POOL));
+  // softmax は limit 件でなく候補**全体**の順序付けに使う(多様性選抜へ全候補を渡すため)。
   const orderedIds = deps.rng
-    ? softmaxSample(candidates, limit, RECALL_SOFTMAX_TEMP, deps.rng)
+    ? softmaxSample(candidates, candidates.length, RECALL_SOFTMAX_TEMP, deps.rng)
     : candidates.map((s) => s.id);
 
-  const picked: EpisodicRecord[] = [];
-  const pickedIds = new Set<string>();
-  for (const id of orderedIds) {
-    const rec = byId.get(id);
-    if (!rec) continue;
-    picked.push(rec);
-    pickedIds.add(id);
-    if (picked.length >= limit) break;
-  }
+  // 5) 多様性選抜(P2):同一トピックの占有を抑えて limit 件を選ぶ(偏り防止・純粋ロジック)。
+  const picked = pickDiverse(orderedIds, byId, limit, RECALL_TOPIC_MAX);
+  const pickedIds = new Set(picked.map((r) => r.id));
 
-  // 5) 安全網:不足分を「直近×高importance」で補完。**user のみ**(canon は直近の出来事ではない)。
+  // 6) 安全網:不足分を「直近×高importance」で補完。**user のみ**(canon は直近の出来事ではない)。
   if (picked.length < limit) {
     const rest = current
       .filter((r) => !pickedIds.has(r.id) && r.memory.provenance !== 'self')

@@ -107,3 +107,20 @@ describe('retriever — 安全網・フィルタ・件数・順序', () => {
     expect(recs[0]?.memory.topic).toBe('x');
   });
 });
+
+describe('retriever — 多様性(P2 トピック偏り抑制)', () => {
+  it('同一トピックが多くても返り値を独占させず、別話題を差し込む', async () => {
+    // 同じ話題(仕事の愚痴・高importance)が6件。別話題(猫・低importance)は1件。すべて entity「会社」で当たる。
+    for (let i = 0; i < 6; i++) {
+      await saveEpisodic(
+        mem({ date: `2026-08-0${i + 1}T00:00:00+09:00`, topic: '仕事の愚痴', entities: ['会社'], importance: 5 }),
+      );
+    }
+    await saveEpisodic(mem({ date: '2026-08-07T00:00:00+09:00', topic: '猫の話', entities: ['会社'], importance: 1 }));
+
+    const got = await retrieve({ text: '会社のこと' });
+    // 多様性が無ければ高importanceの「仕事の愚痴」が5枠を独占し「猫の話」は出ない。
+    expect(got.filter((m) => m.topic === '仕事の愚痴').length).toBeLessThan(5);
+    expect(got.map((m) => m.topic)).toContain('猫の話');
+  });
+});

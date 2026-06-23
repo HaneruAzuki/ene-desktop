@@ -10,7 +10,8 @@ import type { Correction } from '../shared/types/memory';
  * corrections を適用する。
  * - supersede: 旧記録に supersededBy(= 新記録 ID)を付与。新記録 ID が無ければスキップ。
  * - refine: summary / entities を上書き(指定されたものだけ)。
- * - reattribute: その1件のみ entities を差し替え(他の同名記録は触らない)。
+ * - reattribute: その1件のみ帰属を直す(他の同名記録は触らない)。
+ *   entities(人物の取り違え)と provenance(self↔user の取り違え・P1)のどちらか/両方を差し替える。
  *
  * 対象が見つからない/新記録 ID 不在などは黙ってスキップする(会話を妨げない・ベストエフォート)。
  * 1件でも適用したら逆引き索引を作り直す(entities/tags の変化を反映)。
@@ -55,9 +56,13 @@ export async function applyCorrections(
       await updateEpisodicById(c.targetFile, patch);
       applied++;
     } else if (c.kind === 'reattribute') {
-      if (!Array.isArray(c.newEntities)) continue;
       // その1件のみ再帰属する(過去の同名記録を推測で一括変更しない)。
-      await updateEpisodicById(c.targetFile, { entities: c.newEntities });
+      // entities(人物)と provenance(self↔user・P1)の指定されたものだけ差し替える。
+      const patch: { entities?: string[]; provenance?: 'user' | 'self' } = {};
+      if (Array.isArray(c.newEntities)) patch.entities = c.newEntities;
+      if (c.newProvenance === 'user' || c.newProvenance === 'self') patch.provenance = c.newProvenance;
+      if (Object.keys(patch).length === 0) continue;
+      await updateEpisodicById(c.targetFile, patch);
       applied++;
     }
   }

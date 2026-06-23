@@ -105,9 +105,11 @@ function formatSemantic(semantic: SemanticMemory): string {
   return `# あなたの長期的な記憶\n${body}`;
 }
 
-/** 一件の整形(日付＋要約)。 */
+/** 一件の整形(日付＋要約＋あれば主観的な受け取り)。印象は事実と区別して「主観」と明示する(P5)。 */
 function fmtEpisodicLine(m: EpisodicMemory): string {
-  return `- [${m.date.slice(0, 10)}] ${m.summary}`;
+  const base = `- [${m.date.slice(0, 10)}] ${m.summary}`;
+  // 印象(impression)は客観事実ではない=断定にしないため「あなたの受け取り」と括って提示する。
+  return m.impression ? `${base}(あなたの受け取り: ${m.impression})` : base;
 }
 
 /**

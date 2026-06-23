@@ -939,6 +939,23 @@
 - **検証**: typecheck/lint/**506テスト**緑(retriever-heart 4件含む・注入経路ゆえラッチ挙動は不変)。
 - **位置づけ**: 横断監査の「実害ある残り」の最重要1件。残る監査項目: C2(音声可否4箇所)/C3(visible 2経路)/disclosureLevel(user記憶へ未配線・要設計判断)/E2(軽微)/D群(索引性能=別タスク)は未着手。
 
+### N-RECALL-3 🟡 記憶/想起の構造監査 → P1〜P5(訂正の効き・偏り・焼き付き)を是正(2026-06-23)
+- **発端**: ユーザーの問い「ユーザが修正したら、修正するようになっているか／人間なら起きない不自然な記憶の焼き付きや、類似会話が多い時の偏りが構造的に起きないか」を**読取専用で精査**(敵対的に2並列)。3つの構造欠陥を確認し、修正方針 P1〜P5 を合意のうえ実装。
+- **精査の所見(構造リスク)**:
+  - (a) **訂正の届かなさ**: 訂正は persist 抽出時に「その会話で想起された上位~5件」しか対象にできない(話題から外れた訂正は対象が想起されず直せない)。さらに **provenance(self↔user)の取り違えは `Correction` に項が無く会話では直せない**=今回の挨拶取り違えバグ class が記憶リセットしか手段が無かった。
+  - (b) **不自然な焼き付き**: 受け取り(印象)が `summary` に事実として焼き込まれ、読み過ぎが捏造として残る。
+  - (c) **反復による偏り**: 書込時の重複検知が無く近似重複が無限蓄積/想起に多様性が無く返り5枠が同一話題で埋まる。
+- **修正(クリーンな配線・新規依存なし)**:
+  - **P1 provenance 訂正**: `Correction.newProvenance?` を追加し `reattribute` を entities だけでなく self↔user 付け替えへ拡張(`types/memory.ts`/`extractor.ts`/`update.ts`)。
+  - **P2 想起の多様性**: 純粋モジュール `recall-select.ts`(`pickDiverse`・トピック上限 `RECALL_TOPIC_MAX=2`)。retriever は softmax を候補**全体**の順序付けに使い、上限到達で別話題が枯れたら上限無視で補充(従来より少なく返さない)。
+  - **P3 書込時マージ**: 純粋モジュール `episodic-dedup.ts`(`findNearDuplicate`/`mergeEpisodic`・既存埋め込み器 ruri を再利用)。同カテゴリ・同 provenance・直近(`EPISODIC_DEDUP_MAX_AGE_DAYS=14`)・コサイン `≥EPISODIC_DEDUP_THRESHOLD=0.92` のみ統合。daily-life/サマリは対象外。抽出は応答経路外(B-01)ゆえ埋め込みコスト無害。**モデル不在/失敗時は新規保存に倒す**(既定挙動を壊さない)。
+  - **P4 訂正リーチ**: 純粋 `correction-cues.ts`(`hasCorrectionCue`/`augmentWithRecent`)。訂正の合図がある会話だけ関連記憶の窓を `RELEVANT_MEMORIES_CORRECTION_LIMIT=10` へ広げ、直近 user 記録を `RECENT_RECORDS_FOR_CORRECTION=5` まで補強。誤検知の害は無し(抽出器が渡る材料が少し増えるだけ・最終判断は LLM)。
+  - **P5 事実/印象分離**: `EpisodicMemory.impression?`(テキスト=保存される感情スカラー禁止 §5.3 に非抵触)。抽出は受け取りを `summary` から分離し捏造ガード強化、想起提示(`prompt-builder.fmtEpisodicLine`)は「あなたの受け取り: …」と**主観として**括る。
+- **§5.1 遵守**: 訂正の合図(P4)は言語的な一般語であってキャラの個性ではない(キャラ名のハードコードではない)。
+- **検証**: typecheck/lint/lint:deps/build 緑・**全549テスト**緑(新規 `recall-select`/`episodic-dedup`/`correction-cues` ＋ `update`/`extractor-corrections`/`retriever`/`prompt-builder` へ回帰追加)。
+- **要人間判定(自己認証しない)**: 実機での体感(「同じ話の繰り返し」減・訂正の効き・印象提示の自然さ)。閾値 `0.92`/上限 `2`/合図リストは実データで調律前提のツマミ。
+- **設計反映**: §2 ディレクトリ図(3新規ファイル)・§3.3 `EpisodicMemory.impression`/`Correction.newProvenance` 反映済。
+
 ---
 
 ## VRM キャラ表示(F・3D化・2026-06-12)

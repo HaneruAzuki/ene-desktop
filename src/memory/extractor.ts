@@ -44,21 +44,21 @@ const OPEN_LOOP_KINDS = ['user-event', 'promise-by-me', 'question'] as const;
 const EXTRACTION_SYSTEM = [
   '以下は「ユーザー」と「相手(=ユーザーと話している側=このキャラクター自身)」の会話です。ここから長期的に',
   '意味のある事実・嗜好・出来事を、**このキャラクター自身の記憶**として書き留めてください。',
-  '- 事実(ユーザーが何を言った/何が起きたか)は正確に記録する。',
-  '- そのうえで、ユーザーの発言を**相手がどう受け取ったか**が会話に表れていれば、一文で添えてよい。',
-  '  主語は立てず、記憶の持ち主自身の反応として書く(例「ユーザーが昇進を報告。素直に喜べず『別に』と流した」)。',
-  '  口調そのものは真似ず記録として簡潔に。反応が会話に無ければ受け取りは書かない(捏造しない)。',
+  '- summary には**客観的な事実**(ユーザーが何を言った/何が起きたか)だけを正確に書く。',
+  '- 相手(=このキャラクター自身)が**会話の中で実際に示した反応**があれば、それは impression に分けて一文で書く',
+  '  (例: summary「ユーザーが昇進を報告」/ impression「素直に喜べず『別に』と流した」)。主語は立てず簡潔に。',
+  '  ※ impression は会話に表れた反応だけ。反応が無ければ impression は省略する(感情を推測で書かない=捏造防止)。',
   '',
   '出力は次の JSON 形式のみ(前後に文章を付けない):',
-  '{"episodic": {"topic": string, "summary": string, "tags": string[], "entities": string[], "importance": number, "category": string, "valence": number, "provenance": "user"|"self", "openLoop": {"kind": "user-event"|"promise-by-me"|"question", "note": string} | null} | null,',
+  '{"episodic": {"topic": string, "summary": string, "impression"?: string, "tags": string[], "entities": string[], "importance": number, "category": string, "valence": number, "provenance": "user"|"self", "openLoop": {"kind": "user-event"|"promise-by-me"|"question", "note": string} | null} | null,',
   ' "semanticPatch": {"userName"?: string, "userNameReading"?: string, "userFullName"?: string, "userBirthday"?: {"month": number, "day": number, "year"?: number}, "preferences"?: object, "longTermGoals"?: string[], "personality"?: string[], "extra"?: object} | null,',
-  ' "corrections": [{"targetFile": string, "kind": "supersede"|"refine"|"reattribute", "newSummary"?: string, "newEntities"?: string[], "reason"?: string}],',
+  ' "corrections": [{"targetFile": string, "kind": "supersede"|"refine"|"reattribute", "newSummary"?: string, "newEntities"?: string[], "newProvenance"?: "user"|"self", "reason"?: string}],',
   ' "loopClosures": [{"targetFile": string, "resolution"?: string}] }',
   '',
   '抽出基準:',
   '- 一過性の話題ではなく、長期的に意味のある情報のみ。該当しなければ episodic は null。',
-  `- summary は ${EPISODIC_SUMMARY_MAX_CHARS} 文字以内。相手(=ユーザーと話している側)の立場や情報の出所も summary に文章として織り込む`,
-  '  (例:「ユーザーは…と言った。相手は反対した。」「田中さんから聞いた話では…」)。専用フィールドは作らない。',
+  `- summary は ${EPISODIC_SUMMARY_MAX_CHARS} 文字以内。客観的な事実と情報の出所だけを書く`,
+  '  (例:「ユーザーは…と言った。」「田中さんから聞いた話では…」)。相手の受け取り・反応は summary でなく impression へ。',
   `- importance は ${IMPORTANCE_MIN}(些細)〜${IMPORTANCE_MAX}(極めて重要)の整数。`,
   `- 本人の属性(名前・誕生日など、その人が誰かに関わる事実)は importance ${IMPORTANCE_MAX}(消えてはいけない情報・最優先)。`,
   '- それ以外は「相手(このキャラクター)にとっての印象深さ」で付ける:相手が会話で強い関心・感情を示した話題',
@@ -95,7 +95,9 @@ const EXTRACTION_SYSTEM = [
   '記憶の更新(corrections):',
   '- 末尾に「関連する既存の記憶」を id 付きで渡す。新しい会話がそれと矛盾・精緻化する場合のみ corrections を出す。',
   '- targetFile には該当する既存記憶の id をそのまま使う。',
-  '- kind: 事実が置き換わった=supersede / 内容を詳しくした=refine / 人物を取り違えていた=reattribute。',
+  '- kind: 事実が置き換わった=supersede / 内容を詳しくした=refine / 帰属の取り違えを直す=reattribute。',
+  '  reattribute は人物の取り違え(newEntities)に加え、「誰の人生の出来事か」の取り違えも直せる',
+  '  (例: 相手自身の出来事をユーザーのものと記録していた→ newProvenance:"self"。逆も同様)。',
   '- 確信が持てない場合は corrections を出さない(空配列か省略)。推測で過去を書き換えない。',
   '',
   '気にかけの解決(loopClosures):',
@@ -144,6 +146,10 @@ function normalizeEpisodic(raw: Record<string, unknown>): EpisodicMemory {
     // これを誤ると相手自身の暮らし(試験等)がユーザーの記憶として焼き付き、挨拶/会話で取り違える。
     provenance: raw.provenance === 'self' ? 'self' : 'user',
   };
+  // 主観的な受け取り(印象・P5)は summary と分けて持つ。非空のときだけ採用(無ければ持たない=捏造防止)。
+  if (typeof raw.impression === 'string' && raw.impression.trim().length > 0) {
+    episodic.impression = raw.impression.trim().slice(0, EPISODIC_SUMMARY_MAX_CHARS);
+  }
   const openLoop = normalizeOpenLoop(raw.openLoop);
   if (openLoop) episodic.openLoop = openLoop;
   return episodic;
@@ -180,6 +186,7 @@ function normalizeCorrections(raw: unknown): Correction[] {
     };
     if (typeof c.newSummary === 'string') correction.newSummary = c.newSummary;
     if (Array.isArray(c.newEntities)) correction.newEntities = toStringArray(c.newEntities);
+    if (c.newProvenance === 'user' || c.newProvenance === 'self') correction.newProvenance = c.newProvenance;
     if (typeof c.reason === 'string') correction.reason = c.reason;
     out.push(correction);
   }

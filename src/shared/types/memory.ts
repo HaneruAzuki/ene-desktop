@@ -21,7 +21,11 @@ export interface EpisodicMemory {
   schemaVersion?: number; // 欠落時は 1 扱い(migrateEpisodic で補完)。新規保存は 2。
   date: string; // ローカルTZ込み ISO 8601
   topic: string;
-  summary: string; // 200文字以内を目安。eneStance/provenance もここに文章で含める。
+  summary: string; // 200文字以内を目安。客観的な事実だけを書く(受け取り=印象は impression へ分離・P5)。
+  // 主観的な「受け取り(印象)」(P5)。会話に表れた反応のみ・無ければ持たない(捏造防止)。
+  // summary(客観事実)と分けることで、印象の読み過ぎが事実として焼き付くのを防ぎ、想起時に主観として提示できる。
+  // 数値スカラーではないテキスト=保存される感情状態の禁止(§5.3)には抵触しない。
+  impression?: string;
   tags?: string[]; // 軽い語彙アンカー(主役は summary + entities)
   entities?: string[]; // 正規名(canonical)の配列。人物優先。逆引き索引の素。
   importance: number; // 1-5(忘却の重み・感情ではない)
@@ -57,9 +61,13 @@ export interface EpisodicRecord {
 /** 記憶更新(supersede)の指示(抽出器が出力し、update.ts が非破壊適用する)。 */
 export interface Correction {
   targetFile: string; // 対象の旧記録 ID(= 相対パス)
+  // supersede=事実が置き換わった / refine=内容を詳しくした / reattribute=帰属の取り違えを直す。
   kind: 'supersede' | 'refine' | 'reattribute';
   newSummary?: string;
-  newEntities?: string[];
+  newEntities?: string[]; // reattribute: 人物の取り違えを直す
+  // reattribute: 「誰の人生の出来事か」(self=キャラ自身 / user=相手)の取り違えを直す(P1)。
+  // 一度焼き付いた provenance は従来 refine では直せず、記憶リセットしか手段がなかった穴を塞ぐ。
+  newProvenance?: 'user' | 'self';
   reason?: string;
 }
 

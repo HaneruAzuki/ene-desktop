@@ -71,6 +71,17 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     expect(lastUserText(p)).toContain('過去にラーメンの話をした');
   });
 
+  it('印象(impression)があれば「あなたの受け取り」として現 user ターンに出る(P5 事実/印象分離)', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        { date: '2026-05-10T00:00:00+09:00', topic: 't', summary: 'ユーザーが昇進を報告', impression: '素直に喜べず流した', importance: 3, category: 'work', provenance: 'user' },
+      ],
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).toContain('ユーザーが昇進を報告');
+    expect(text).toContain('あなたの受け取り: 素直に喜べず流した');
+  });
+
   it('canon(self)と user 記憶は別セクションに分けて提示される(provenance 混同防止)', () => {
     const mc = makeMemoryContext({
       relevantEpisodic: [

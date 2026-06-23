@@ -310,15 +310,18 @@ ene-desktop/
 │   │   ├── presence-reads.ts      ← 存在感(挨拶/自発発話)向け読み取り窓口(最近の暮らし＋気にかけ・§4.4 読み取り側 facade)
 │   │   ├── semantic.ts
 │   │   ├── retriever.ts           ← 想起(語彙+entity+ベクトルRRF・task_15)
-│   │   ├── update.ts              ← 非破壊更新 supersede/refine/reattribute(task_15)
+│   │   ├── recall-select.ts       ← 想起の多様性選抜(トピック偏り抑制・純粋・P2・2026-06-23)
+│   │   ├── update.ts              ← 非破壊更新 supersede/refine/reattribute(provenance訂正も・task_15/P1)
+│   │   ├── episodic-dedup.ts      ← 書込時の近似重複マージ(意味類似で統合・純粋・P3・2026-06-23)
+│   │   ├── correction-cues.ts     ← 訂正の合図検出＋直近補強(訂正リーチ拡張・純粋・P4・2026-06-23)
 │   │   ├── index-inverted.ts      ← entity/keyword 逆引き索引(派生キャッシュ)
 │   │   ├── index-vector.ts        ← 意味検索ベクトル索引(派生キャッシュ・Phase B)
 │   │   ├── recall-pool.ts         ← user episodic ＋ canon の統合プール(task_16)
 │   │   ├── life-memory.ts         ← 人生記憶 canon ローダ(task_16・provenance:self)
-│   │   ├── mood.ts                ← 心情導出(task_16・非対称減衰＋中立プライア)
+│   │   ├── user-tone.ts            ← 相手の波長 recentUserTone を導出(user記憶 valence の recency 平均・旧 mood の後継・2026-06-21)
 │   │   ├── familiarity.ts         ← 親しさ段階の導出(task_16・接触の事実)
 │   │   ├── context-builder.ts     ← MemoryContext 組み立て
-│   │   ├── extractor.ts           ← 会話から記憶抽出(中立観察者・LlmComplete 注入)
+│   │   ├── extractor.ts           ← 会話から記憶抽出(キャラ自身の記憶として記録・LlmComplete 注入・2026-06-21改訂)
 │   │   ├── extraction-trigger.ts  ← overflow/shutdown 抽出トリガ
 │   │   ├── extraction-scheduler.ts ← 抽出を応答クリティカルパスから外すスケジューラ(B-01/B-02)
 │   │   ├── forgetting.ts          ← 忘却機構の orchestrator(B-13・§11.6)
@@ -793,7 +796,8 @@ export interface EpisodicMemory {
   schemaVersion?: number;    // 欠落時は 1 扱い(migrateEpisodic で補完)。新規保存は 2
   date: string;              // ISO 8601
   topic: string;
-  summary: string;           // eneStance/provenance はここに文章で織り込む(専用フィールドにしない)
+  summary: string;           // 客観的な事実だけ。受け取り=印象は impression へ分離(P5・2026-06-23)
+  impression?: string;       // 主観的な受け取り(P5)。会話に表れた反応のみ・無ければ持たない(捏造防止・想起時は主観として提示)
   tags?: string[];           // 軽い語彙アンカー(主役は summary + entities)
   entities?: string[];       // 正規名(canonical)の配列・人物優先。逆引き索引の素
   importance: number;        // 1-5(忘却の重み・感情ではない)
@@ -814,7 +818,8 @@ export interface Correction {
   targetFile: string;        // 対象の旧記録 ID(= 相対パス)
   kind: "supersede" | "refine" | "reattribute";
   newSummary?: string;
-  newEntities?: string[];
+  newEntities?: string[];    // reattribute: 人物の取り違えを直す
+  newProvenance?: "user" | "self"; // reattribute: 誰の人生の出来事かの取り違えを直す(P1・2026-06-23)
   reason?: string;
 }
 
@@ -845,18 +850,8 @@ export interface MemoryContext {
   relevantEpisodic: EpisodicMemory[];
 }
 
-// N-03-1: 型名は MemorySearchQuery。Episodic は {year} 階層を持つため
-//         日付フィルタは単一 fromDate ではなく年範囲(yearFrom/yearTo)とする。
-export interface MemorySearchQuery {
-  tags?: string[];
-  category?: string;
-  minImportance?: number;
-  yearFrom?: number;
-  yearTo?: number;
-  limit?: number;            // デフォルト 5(DEFAULT_EPISODIC_SEARCH_LIMIT)
-}
-
-// 会話時の既定想起(task_15・Router 非依存)。searchEpisodic(明示フィルタ)とは別系統。
+// 会話時の既定想起(task_15・Router 非依存)。明示フィルタ用の MemorySearchQuery/searchEpisodic は
+// 結局実装せず、絞り込みは RetrievalQuery.category に集約した(現行の想起 API は retrieve/retrieveRecords のみ)。
 export interface RetrievalQuery {
   text: string;              // ユーザ発言(想起の引き金)
   entities?: string[];       // 抽出済み人物等(任意)
@@ -891,20 +886,20 @@ export function loadEpisodicById(id: string): Promise<EpisodicMemory | null>;
 export function updateEpisodicById(id: string, patch: Partial<EpisodicMemory>): Promise<void>;
 export function loadAllEpisodicFiles(): Promise<EpisodicRecord[]>;   // ID 付き
 export function migrateEpisodic(raw: EpisodicMemory): EpisodicMemory; // v1→既定値補完(読取時のみ)
-export function searchEpisodic(query: MemorySearchQuery): Promise<EpisodicMemory[]>; // 明示フィルタ・supersede除外
 
-// src/memory/retriever.ts(task_15 RRF ＋ task_16 心/開示。deps 未指定=従来の決定論的挙動)
-// RetrieverDeps = { embedder?, mood?, familiarityStage?, rng? }
+// src/memory/retriever.ts(task_15 RRF ＋ task_16 開示 ＋ P2 多様性。deps 未指定=従来の決定論的挙動)
+// RetrieverDeps = { embedder?, recentUserTone?, interests?, familiarityStage?, rng?, recallPool? }
 export function retrieve(query: RetrievalQuery, deps?: RetrieverDeps): Promise<EpisodicMemory[]>;
 export function retrieveRecords(query: RetrievalQuery, deps?: RetrieverDeps): Promise<EpisodicRecord[]>;
+// src/memory/recall-select.ts(P2: 想起の多様性選抜・純粋)
+export function pickDiverse(orderedIds: string[], byId: Map<string, EpisodicRecord>, limit: number, topicMax?: number): EpisodicRecord[];
 
 // src/memory/recall-pool.ts(task_16: user episodic ＋ canon の統合プール)
 export function loadRecallPool(): Promise<EpisodicRecord[]>;
 // src/memory/life-memory.ts(task_16: 人生記憶 canon・provenance:self・ID=self/N・読取専用)
 export function loadLifeMemory(characterId?: string): Promise<EpisodicRecord[]>;
-// src/memory/mood.ts(task_16: 心情導出・非対称減衰＋中立プライア・状態保存なし)
-export function deriveMood(records: EpisodicRecord[], nowMs: number): number; // user のみ・canon 除外
-export function clampMood(mood: number): number;                              // 下限 MOOD_FLOOR
+// src/memory/user-tone.ts(2026-06-21改訂: 相手の波長 recentUserTone を導出・状態保存なし・旧 mood 機構を撤去)
+export function recentUserTone(records: EpisodicRecord[], nowMs: number): number; // user のみ・canon 除外
 // src/memory/familiarity.ts(task_16: 開示段階を接触の事実から導出・単調)
 export function deriveFamiliarityStage(facts: RelationshipFacts | undefined, nowMs: number): number;
 
@@ -928,24 +923,26 @@ export function searchVectors(queryVector: number[], index: VectorIndex, topK: n
 
 // src/memory/semantic.ts
 export function getSemantic(): Promise<SemanticMemory>;
-export function saveSemantic(memory: SemanticMemory): Promise<void>;
-export function updateSemantic(patch: Partial<SemanticMemory>): Promise<void>;
+export function updateSemantic(patch: Partial<SemanticMemory>): Promise<void>; // 保存は内部(saveSemantic は非公開)
+// 主人名の硬いロック(初代のみ確定・以後は会話/抽出で不変・N-OWNER-1)。
+export function lockOwnerName(patch: Partial<SemanticMemory>, currentUserName?: string): Partial<SemanticMemory>;
 
 // src/memory/extractor.ts
-// N-03-4: 抽出は「中立的観察者」でキャラ非依存のため characterContext は不要。
-//   Claude 呼び出しは LlmComplete(差し替え可能)として注入し、Memory 層が
-//   Conversation Layer へ前方依存しない。LlmComplete 型は暫定的に extractor.ts に置く
-//   (将来 §11.7 の src/llm/types.ts へ移す)。引数は未抽出エントリのみ。
-export type LlmComplete = (req: { system: string; user: string; maxTokens?: number }) => Promise<string>;
-// task_15: 想起した旧記憶(relevantMemories)を渡し、矛盾/精緻化を corrections として返す。
+// 抽出は「キャラ自身の記憶」として記録する(2026-06-21改訂・旧「中立観察者」から転換)。キャラ名はコードに
+//   書かず会話ラベル「相手」で参照する(§5.1)。Claude 呼び出しは LlmComplete(差し替え可能)として注入し、
+//   Memory 層が Conversation Layer へ前方依存しない。LlmComplete 型は shared/types/llm へ移設済み(N-ARCH-5)。
+// task_15/P1/P4/P5: 想起した旧記憶(relevantMemories)＋未解決の気にかけ(openLoopRecords)を渡し、
+//   矛盾/精緻化を corrections(provenance訂正含む)、結末を loopClosures として返す。
 export async function extractMemoryFromConversation(
   unextractedEntries: ShortTermEntry[],
   relevantMemories: EpisodicRecord[],
-  complete: LlmComplete
+  complete: LlmComplete,
+  openLoopRecords?: EpisodicRecord[]
 ): Promise<{
-  episodic?: EpisodicMemory;
+  episodic?: EpisodicMemory;            // summary(客観事実)＋ impression(主観の受け取り・P5)
   semanticPatch?: Partial<SemanticMemory>;
-  corrections?: Correction[];
+  corrections?: Correction[];           // supersede/refine/reattribute(entities＋provenance・P1)
+  loopClosures?: LoopClosure[];         // 気にかけの解決(P4)
 }>;
 ```
 
@@ -954,7 +951,7 @@ export async function extractMemoryFromConversation(
 - **想起(retriever)**:ユーザ発言を引き金に全件横断。語彙/entity 逆引き候補とベクトル候補を **RRF** でローカル合流し、`supersededBy` 除外・category 補助フィルタ・上位 `limit` 件。関連が薄い場合も「直近×高 importance」を少量混ぜる安全網。ベクトルはモデル配置時のみ(未配置=語彙のみ自動フォールバック)。
 - **抽出の2層フロー**:(live)会話時は retriever が旧記憶をプロンプトに載せる(書き換えない)/(persist)抽出時に retriever を1回回し `relevantMemories` を抽出器へ→ `corrections` を `applyCorrections` で**非破壊適用**(`supersededBy` 付与・自動上書きしない)。
 - **派生キャッシュ**:`index/inverted.json`・`index/vectors.json` は真実の源でなく、episodic 本体から再生成可能(削除しても自己修復)。ベクトルは retriever 経路で増分 sync(抽出/更新はモデルに触れない)。
-- `searchEpisodic`(明示フィルタ)は存続。会話時の既定想起は retriever に移行(Router 非依存)。
+- 会話時の既定想起は retriever(`retrieve`/`retrieveRecords`)に一本化(Router 非依存)。当初案の `searchEpisodic`(明示フィルタ)は実装せず、絞り込みは `RetrievalQuery.category` に集約した。
 
 #### スケール想定と限界
 
@@ -2920,8 +2917,9 @@ win:
 
 > 📌 **MVP 0.3 で前倒し・方式確定**:SQLite ではなく、**JSON を真実の源**とし
 > **ローカル埋め込み＋派生ベクトル索引(再生成可キャッシュ)**を採用。会話時の想起は
-> `searchEpisodic`(明示フィルタ用に存続)とは別に **`MemoryRetriever` 抽象**(ベクトル＋語彙＋entity を
-> RRF 合流)を新設する。詳細は `tasks/task_15_memory_recall_update.md` と
+> **`MemoryRetriever` 抽象**(ベクトル＋語彙＋entity を RRF 合流)を新設する
+> (当初想定した明示フィルタ `searchEpisodic` は最終的に実装せず、絞り込みは `RetrievalQuery.category` に集約)。
+> 詳細は `tasks/task_15_memory_recall_update.md` と
 > `docs/archive/design-revision-memory-v2.md`。埋め込みモデルは別DL・要承認(§1.2 更新を伴う)。
 
 ### 11.5 感情モデル / 心

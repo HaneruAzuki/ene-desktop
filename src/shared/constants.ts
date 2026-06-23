@@ -73,9 +73,6 @@ export const FORGET_SUMMARY_CATEGORY = 'summary';
 /** 月次サマリ記録の合成日アンカー(月内固定日・ファイル名衝突回避)。 */
 export const FORGET_MONTHLY_SUMMARY_DAY = 15;
 
-/** Episodic 検索のデフォルト取得件数。要件 F-MEM-F-05。 */
-export const DEFAULT_EPISODIC_SEARCH_LIMIT = 5;
-
 /** Episodic summary の文字数上限の目安。設計書 §3.4 / F-MEM-E-06。 */
 export const EPISODIC_SUMMARY_MAX_CHARS = 200;
 
@@ -359,6 +356,38 @@ export const RECALL_SOFTMAX_TEMP = 0.006;
  * 「無関係な記憶の混入(precision 低下)」を構造的に断つ。揺らぎは上位 N の中だけで起こす。
  */
 export const RECALL_CANDIDATE_POOL = 8;
+
+/**
+ * 想起の多様性: 1回の想起で返す記憶のうち、同一トピックが占めてよい最大件数(P2・偏り抑制)。
+ * 同じ話題を繰り返すと語彙/ベクトルの両アームがその話題に偏り、返り値が全部同じ話題で埋まって
+ * 「同じ話を繰り返す/固執する」ように見える。トピック上限で占有を断ち、別話題が候補にあれば差し込む。
+ * 上限到達で別話題が枯れた場合は、上限を無視して関連順に補充する(=従来より少なく返さない)。
+ */
+export const RECALL_TOPIC_MAX = 2;
+
+// --- 書込時の近似重複マージ(P3・重複の無限蓄積を断つ) ---
+// 抽出は応答経路の外(オーバーフロー/終了時)で走るため、ここでの埋め込みコストは体感に影響しない。
+// 既存埋め込み器(ruri)を再利用し、新規依存は足さない。モデル不在時は判定せず新規保存に倒す。
+
+/**
+ * 近似重複と見なすコサイン類似度の下限(これ以上で「ほぼ同じ出来事」=既存へマージ・調律可)。
+ * 別個の出来事を誤って潰さないよう高め(保守的)に置く。
+ */
+export const EPISODIC_DEDUP_THRESHOLD = 0.92;
+
+/** 近似重複の探索対象とする「直近」の窓(日)。古い記録は文脈が違う別物として扱い、マージしない。 */
+export const EPISODIC_DEDUP_MAX_AGE_DAYS = 14;
+
+// --- 訂正リーチの拡張(P4・斜めの訂正でも対象記憶に届かせる) ---
+
+/**
+ * 会話に「訂正の合図」(違う/そうじゃなくて 等)がある時、抽出器へ載せる関連記憶の上限を広げる
+ * (既定 DEFAULT_RETRIEVAL_LIMIT より大きく)。多くの記憶が当たる時に訂正対象が上位から押し出されるのを防ぐ。
+ */
+export const RELEVANT_MEMORIES_CORRECTION_LIMIT = 10;
+
+/** 訂正の合図がある時、関連記憶に加えて差し込む「直近の user 記録」の最大件数(セッション内の言及を拾う)。 */
+export const RECENT_RECORDS_FOR_CORRECTION = 5;
 
 /**
  * 開示ゲーティングの段階閾値(接触の事実3要素・連言・Lv5≈1年)。

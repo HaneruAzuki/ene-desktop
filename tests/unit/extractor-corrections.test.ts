@@ -77,6 +77,43 @@ describe('extractor v2 — corrections', () => {
     );
     expect(r.corrections).toBeUndefined();
   });
+});
+
+describe('extractor — impression(P5 事実/印象分離)', () => {
+  it('impression を summary と分けて取り出す', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({
+        episodic: { topic: 't', summary: 'ユーザーが昇進を報告', impression: '素直に喜べず流した', importance: 3, category: 'work' },
+      }),
+    );
+    expect(r.episodic?.summary).toBe('ユーザーが昇進を報告');
+    expect(r.episodic?.impression).toBe('素直に喜べず流した');
+  });
+
+  it('impression が空白/欠落なら持たない(捏造防止)', async () => {
+    const blank = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({ episodic: { topic: 't', summary: 's', impression: '   ', importance: 3, category: 'work' } }),
+    );
+    expect(blank.episodic?.impression).toBeUndefined();
+    const missing = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({ episodic: { topic: 't', summary: 's', importance: 3, category: 'work' } }),
+    );
+    expect(missing.episodic?.impression).toBeUndefined();
+  });
+
+  it('reattribute の newProvenance(self↔user)を取り出す(P1)', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({ corrections: [{ targetFile: 'ok.json', kind: 'reattribute', newProvenance: 'self' }] }),
+    );
+    expect(r.corrections?.[0]?.newProvenance).toBe('self');
+  });
+
+  it('不正な newProvenance は捨てる(P1)', async () => {
+    const r = await extractMemoryFromConversation(entries, [], async () =>
+      JSON.stringify({ corrections: [{ targetFile: 'ok.json', kind: 'reattribute', newProvenance: 'both' }] }),
+    );
+    expect(r.corrections?.[0]?.newProvenance).toBeUndefined();
+  });
 
   it('relevantMemories を id 付きでプロンプトへ載せる(supersede 検知の前提)', async () => {
     const relevant: EpisodicRecord[] = [
