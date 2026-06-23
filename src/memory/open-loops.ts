@@ -1,100 +1,72 @@
-import {
-  DAY_MS,
-  OPEN_LOOP_LOOKBACK_DAYS,
-  OPEN_LOOP_SURFACE_MAX,
-  OPEN_LOOP_COOLDOWN_DAYS,
-  OPEN_LOOP_MAX_SURFACES,
-} from '../shared/constants';
+import { DAY_MS, OPEN_LOOP_LOOKBACK_DAYS, OPEN_LOOP_SURFACE_MAX } from '../shared/constants';
 import { getOpenLoopStatePath } from '../shared/node/paths';
 import { readJson, writeJson } from '../shared/node/json-store';
 import { loadEpisodicById, updateEpisodicById } from './episodic';
 import type { EpisodicRecord } from '../shared/types/memory';
 
-// 気にかけエンジン(P4・open loops・N-PRES-4)。
+// 気にかけエンジン(P4・open loops・N-PRES-4 / ⑦再設計 2026-06-24)。
 //
-// 想起(retriever)は「話題に関連する記憶」を引くが、気にかけは話題に関係なく
-// 「結末が出ていない事柄」を話の切れ目で自発的に持ち出すための別経路。
-//  - 選択(selectOpenLoops): 未解決・期間内・上限未到達・クールダウン外の open loop を最大 N 件、新しい順に選ぶ(純粋)。
-//  - 上限(OPEN_LOOP_MAX_SURFACES): 自分から持ち出してよい回数の上限。到達=休眠(もう蒸し返さない・しつこさ防止)。
-//    既定 1=「一度聞いて答えが無ければ引く」。関連話題が出れば retriever 経路で自然に再訪できる(別経路)。
-//  - クールダウン(open-loop-state.json): 上限が 2 以上のとき、複数回の注入を OPEN_LOOP_COOLDOWN_DAYS だけ空ける。
-//  - 解決(resolveOpenLoop): 結末が判明した loop に resolvedAt を立て、以後の探索から外す(非破壊更新)。
+// 想起(retriever)は「話題に関連する記憶」を引くが、気にかけは話題に関係なく「結末が出ていない事柄」を
+// 持ち出すための別経路。設計は「1回は素直に＋2回目以降は関連トピックで」:
+//  - 能動提示(selectOpenLoops): 未解決の open loop を、**まだ能動提示していないものだけ**、新しい順に最大 N 件。
+//    提示したら id を surfaced 集合に記録し、以後は自分から蒸し返さない(人間の自然な引き際)。
+//  - 関連トピック再質問(2回目以降): 同じ loop が会話の話題に関連して想起(retriever)で再浮上したら、
+//    prompt-builder が「まだ結末を聞いていない」ヒントを添える=相手がその話題に触れた今なら自然に尋ねられる。
+//  - 解決(resolveOpenLoop): 結末が出た loop に resolvedAt を立て、以後の探索から外す(非破壊更新)。
+//  - 開示ゲート(§1.5): 親密度(stage)より深い気にかけは能動提示しない。
+//
+// ※ 旧実装の {at, count} ＋ per-loop クールダウン(OPEN_LOOP_COOLDOWN_DAYS / MAX_SURFACES)は、1ショット運用に
+//   対して過剰(到達不能な分岐)だったため撤去し、「能動提示済み id の集合」へ簡素化した。
 
-/** 1件の気にかけの注入履歴(回数＋最後に注入した日時)。 */
-export interface OpenLoopSurface {
-  /** 最後に注入した日時(ローカルTZ込み ISO 8601)。 */
-  at: string;
-  /** これまでに「自分から」注入した累計回数(上限 OPEN_LOOP_MAX_SURFACES で休眠)。 */
-  count: number;
-}
-
-/** 気にかけ注入の履歴記録(派生状態・真実の源は episodic 本体の openLoop)。 */
+/** 気にかけ注入の履歴(派生状態・真実の源は episodic 本体の openLoop)。 */
 export interface OpenLoopState {
-  /** loop の id(= episodic 相対パス)→ 注入履歴。 */
-  surfaced: Record<string, OpenLoopSurface>;
-  /**
-   * 「気にかけ」(open-loops)を最後に提示した日時(ローカルTZ込み ISO・⑥)。
-   * 会話経路が OPEN_LOOP_GLOBAL_COOLDOWN_HOURS の間引きに使う。他経路(idle/挨拶)は上書きしない。
-   */
+  /** これまで「自分から」能動提示した loop の id(=相対パス)。一度提示したら以後は能動提示しない。 */
+  surfaced: string[];
+  /** 会話経路が「気にかけ」を最後に提示した日時(全体頻度を OPEN_LOOP_GLOBAL_COOLDOWN_HOURS で間引く・⑥)。 */
   lastOpenLoopAt?: string;
-  /**
-   * 「まだ知らないこと」(knowledge-gaps)を最後に提示した日時(ローカルTZ込み ISO・⑥)。
-   * 会話経路が KNOWLEDGE_GAP_COOLDOWN_HOURS の間引きに使う(open-loop とは独立)。
-   */
+  /** 会話経路が「まだ知らないこと」(knowledge-gaps)を最後に提示した日時(open-loop とは独立・⑥)。 */
   lastGapAt?: string;
 }
 
 export interface OpenLoopSelection {
   /** 揮発コンテキストへ載せる覚書(openLoop.note)。最大 OPEN_LOOP_SURFACE_MAX 件。 */
   notes: string[];
-  /** 注入分を記録した更新後の state(呼出側が保存する)。 */
-  surfaced: Record<string, OpenLoopSurface>;
+  /** 今回の能動提示分を加えた更新後の surfaced(呼出側が保存する)。 */
+  surfaced: string[];
 }
 
 /**
- * 未解決の気にかけを選ぶ(純粋)。新しい順・最大 OPEN_LOOP_SURFACE_MAX 件。
- *  - resolvedAt が立っている = 閉じた → 除外。
- *  - date が OPEN_LOOP_LOOKBACK_DAYS より古い = 掘り起こさない(日付不明は保守的に残す)。
- *  - 注入回数が OPEN_LOOP_MAX_SURFACES に達している = 休眠 → 除外(「一度聞いたら引く」)。
- *  - 上限未到達でも直近 OPEN_LOOP_COOLDOWN_DAYS 以内に注入済み = クールダウン中 → 除外。
- * 戻り値の surfaced には、今回選んだ loop の at を nowIso に、count を +1 して返す。
+ * 能動提示する未解決の気にかけを選ぶ(純粋)。新しい順・最大 OPEN_LOOP_SURFACE_MAX 件。
+ *  - resolvedAt が立っている=閉じた → 除外。
+ *  - date が OPEN_LOOP_LOOKBACK_DAYS より古い → 掘り起こさない(日付不明は保守的に残す)。
+ *  - 既に能動提示済み(surfaced に id あり) → もう自分からは出さない(関連話題は想起経路で再訪)。
+ *  - 親密度(stage)より深い(disclosureLevel > stage) → まだ持ち出さない(§1.5・未指定=全開示)。
+ * 戻り値の surfaced には、今回選んだ id を加えて返す。
  */
 export function selectOpenLoops(
   records: EpisodicRecord[],
   state: OpenLoopState,
   nowMs: number,
-  nowIso: string,
   stage: number = 5,
 ): OpenLoopSelection {
   const lookbackMs = OPEN_LOOP_LOOKBACK_DAYS * DAY_MS;
-  const cooldownMs = OPEN_LOOP_COOLDOWN_DAYS * DAY_MS;
+  const already = new Set(state.surfaced);
 
   const candidates = records
     .filter((r) => {
       const ol = r.memory.openLoop;
       if (!ol || ol.resolvedAt) return false;
-      // 開示ゲート(§1.5): 親密度(stage)より深い気にかけは自分から持ち出さない。未指定(5)=全開示(後方互換)。
       if ((r.memory.disclosureLevel ?? 1) > stage) return false;
       const ts = Date.parse(r.memory.date);
       if (!Number.isNaN(ts) && nowMs - ts > lookbackMs) return false; // 古すぎる未解決は掘らない
-      const prev = state.surfaced[r.id];
-      if (prev) {
-        if (prev.count >= OPEN_LOOP_MAX_SURFACES) return false; // 上限到達=休眠(もう自分からは出さない)
-        const lastMs = Date.parse(prev.at);
-        if (!Number.isNaN(lastMs) && nowMs - lastMs < cooldownMs) return false; // クールダウン中
-      }
+      if (already.has(r.id)) return false; // 能動提示済み=休眠(関連話題で想起されれば prompt 側で再質問)
       return true;
     })
     .sort((a, b) => b.memory.date.localeCompare(a.memory.date))
     .slice(0, OPEN_LOOP_SURFACE_MAX);
 
-  const surfaced = { ...state.surfaced };
-  for (const r of candidates) {
-    surfaced[r.id] = { at: nowIso, count: (state.surfaced[r.id]?.count ?? 0) + 1 };
-  }
-  const notes = candidates
-    .map((r) => r.memory.openLoop?.note ?? '')
-    .filter((n) => n.length > 0);
+  const surfaced = [...state.surfaced, ...candidates.map((r) => r.id)];
+  const notes = candidates.map((r) => r.memory.openLoop?.note ?? '').filter((n) => n.length > 0);
   return { notes, surfaced };
 }
 
@@ -108,40 +80,26 @@ export function formatOpenLoopsForExtractor(records: EpisodicRecord[]): string {
   );
 }
 
-// --- クールダウン状態の I/O(派生状態・壊れても会話に影響させない) ---
+// --- 状態の I/O(派生状態・壊れても会話に影響させない) ---
 
 export async function loadOpenLoopState(): Promise<OpenLoopState> {
-  const raw = await readJson<{
-    surfaced?: Record<string, unknown>;
-    lastOpenLoopAt?: unknown;
-    lastGapAt?: unknown;
-  }>(getOpenLoopStatePath());
-  if (raw && typeof raw === 'object' && raw.surfaced && typeof raw.surfaced === 'object') {
-    const state: OpenLoopState = { surfaced: normalizeSurfaced(raw.surfaced) };
-    if (typeof raw.lastOpenLoopAt === 'string') state.lastOpenLoopAt = raw.lastOpenLoopAt;
-    if (typeof raw.lastGapAt === 'string') state.lastGapAt = raw.lastGapAt;
-    return state;
-  }
-  return { surfaced: {} };
+  const raw = await readJson<{ surfaced?: unknown; lastOpenLoopAt?: unknown; lastGapAt?: unknown }>(
+    getOpenLoopStatePath(),
+  );
+  const state: OpenLoopState = { surfaced: normalizeSurfaced(raw?.surfaced) };
+  if (raw && typeof raw.lastOpenLoopAt === 'string') state.lastOpenLoopAt = raw.lastOpenLoopAt;
+  if (raw && typeof raw.lastGapAt === 'string') state.lastGapAt = raw.lastGapAt;
+  return state;
 }
 
 /**
- * 旧形式(id→ISO文字列・回数概念なし)を新形式({at, count})へ寛容に変換する。
- * 旧記録は「1回注入済み」とみなす(count=1)=既定の上限(1)では即休眠になり、過去の気にかけを蒸し返さない。
+ * surfaced を id 配列へ寛容に正規化する。
+ * 旧形式(id→ISO文字列 / id→{at,count} の Record)は**キー(id)だけ**拾う(「能動提示済み」の意味は保たれる)。
  */
-function normalizeSurfaced(raw: Record<string, unknown>): Record<string, OpenLoopSurface> {
-  const out: Record<string, OpenLoopSurface> = {};
-  for (const [id, v] of Object.entries(raw)) {
-    if (typeof v === 'string') {
-      out[id] = { at: v, count: 1 };
-    } else if (v && typeof v === 'object') {
-      const o = v as Record<string, unknown>;
-      const at = typeof o.at === 'string' ? o.at : '';
-      const count = typeof o.count === 'number' && o.count > 0 ? Math.floor(o.count) : 1;
-      out[id] = { at, count };
-    }
-  }
-  return out;
+function normalizeSurfaced(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((x): x is string => typeof x === 'string');
+  if (raw && typeof raw === 'object') return Object.keys(raw as Record<string, unknown>);
+  return [];
 }
 
 export async function saveOpenLoopState(state: OpenLoopState): Promise<void> {

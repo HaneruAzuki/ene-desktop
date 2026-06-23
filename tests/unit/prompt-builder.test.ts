@@ -82,6 +82,26 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     expect(text).toContain('あなたの受け取り: 素直に喜べず流した');
   });
 
+  it('未解決の気にかけ付き記憶が想起されたら「まだ結末を聞いていない」ヒントが出る(⑦ 話題トリガ再質問)', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        { date: '2026-06-01T00:00:00+09:00', topic: '面接', summary: '相手は来週面接を受ける', importance: 4, category: 'work', provenance: 'user', openLoop: { kind: 'user-event', note: '面接の結果を聞いていない' } },
+      ],
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).toContain('まだ結末を聞いていない');
+  });
+
+  it('解決済みの気にかけにはヒントを出さない', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        { date: '2026-06-01T00:00:00+09:00', topic: '面接', summary: '面接を受けた', importance: 4, category: 'work', provenance: 'user', openLoop: { kind: 'user-event', note: '結果', resolvedAt: '2026-06-05T00:00:00+09:00' } },
+      ],
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).not.toContain('まだ結末を聞いていない');
+  });
+
   it('canon(self)と user 記憶は別セクションに分けて提示される(provenance 混同防止)', () => {
     const mc = makeMemoryContext({
       relevantEpisodic: [

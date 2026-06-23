@@ -23,13 +23,12 @@ export interface PresenceMemory {
 
 /**
  * 存在感の発話材料(最近の暮らし＋気にかけ)を1回のロードで読み出す。
- * @param state 「気にかけ」の露出履歴(上限・休眠の共有用・呼出側が loadOpenLoopState で得る)。
- * @param nowMs 現在時刻(ms)。@param nowIso 現在時刻(ローカルTZ込み ISO)。
+ * @param state 「気にかけ」の能動提示履歴(共有用・呼出側が loadOpenLoopState で得る)。
+ * @param nowMs 現在時刻(ms)。
  */
 export async function readPresenceMemory(
   state: OpenLoopState,
   nowMs: number,
-  nowIso: string,
   stage: number = 5,
 ): Promise<PresenceMemory> {
   const all = await loadAllEpisodicFiles();
@@ -38,6 +37,6 @@ export async function readPresenceMemory(
     .filter((r) => r.memory.category === DAILY_LIFE_CATEGORY)
     .sort((a, b) => b.memory.date.localeCompare(a.memory.date));
   // 気にかけ(open-loops)は開示ゲート(§1.5): 親密度より深い気にかけは出さない(stage 未指定=全開示)。
-  const openLoops = selectOpenLoops(all, state, nowMs, nowIso, stage);
+  const openLoops = selectOpenLoops(all, state, nowMs, stage);
   return { dailyLife, openLoops };
 }

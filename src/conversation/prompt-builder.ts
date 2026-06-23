@@ -107,9 +107,14 @@ function formatSemantic(semantic: SemanticMemory): string {
 
 /** 一件の整形(日付＋要約＋あれば主観的な受け取り)。印象は事実と区別して「主観」と明示する(P5)。 */
 function fmtEpisodicLine(m: EpisodicMemory): string {
-  const base = `- [${m.date.slice(0, 10)}] ${m.summary}`;
+  let line = `- [${m.date.slice(0, 10)}] ${m.summary}`;
   // 印象(impression)は客観事実ではない=断定にしないため「あなたの受け取り」と括って提示する。
-  return m.impression ? `${base}(あなたの受け取り: ${m.impression})` : base;
+  if (m.impression) line += `(あなたの受け取り: ${m.impression})`;
+  // ⑦: 未解決の気にかけは「関連話題が出た今なら自然に尋ねてよい」と添える(能動提示は1回・以降は話題トリガで再質問)。
+  if (m.openLoop && !m.openLoop.resolvedAt) {
+    line += '(※この件はまだ結末を聞いていない。話題が出た今なら自然に尋ねてよい)';
+  }
+  return line;
 }
 
 /**

@@ -12,7 +12,7 @@ import {
 } from '../../conversation/idle-talk';
 import { makeLlmComplete } from '../../conversation/client';
 import { speakResponse } from './voice-runtime';
-import { loadOpenLoopState, saveOpenLoopState, type OpenLoopSurface } from '../../memory/open-loops';
+import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
 import { readPresenceMemory } from '../../memory/presence-reads';
 import { appendShortTerm } from '../../memory/short-term';
 import { loadAppSettings } from '../../shared/node/app-settings';
@@ -40,7 +40,7 @@ interface Material {
   recentLife: string[];
   timeOfDay: string;
   /** 今回の気にかけ選択を反映した注入履歴(実際に発話できたら emit が保存する=会話経路と上限を共有)。 */
-  openLoopState?: Record<string, OpenLoopSurface>;
+  openLoopState?: string[]; // 能動提示済み loop の id 集合(⑦・更新後の surfaced を保存に使う)
 }
 
 export class IdleTalkManager {
@@ -187,7 +187,7 @@ export class IdleTalkManager {
       // 会話経路と同じ気にかけ選択を使う(上限・クールダウン・休眠を共有)。memory の読み取り窓口から
       // 最近の暮らし＋気にかけを1回で得る。選択だけ行い、発話できたら emit で state を保存する(黙ったまま上限を消費しない)。
       const state = await loadOpenLoopState();
-      const { dailyLife, openLoops: sel } = await readPresenceMemory(state, d.getTime(), nowLocalIso());
+      const { dailyLife, openLoops: sel } = await readPresenceMemory(state, d.getTime());
       const recentLife = dailyLife.slice(0, 2).map((r) => r.memory.summary);
       return {
         hasMaterial: sel.notes.length > 0 || recentLife.length > 0,
