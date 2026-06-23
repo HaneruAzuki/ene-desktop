@@ -27,7 +27,6 @@ export interface OffscreenBeat {
   summary: string; // 事実だけを terse に(口調は実行時 LLM が付与)
   tags?: string[];
   entities?: string[];
-  valence?: number; // -2..+2(既定 0)
   importance?: number; // 1..5(基本 1〜2・3+ は稀)
   category?: string; // 既定 daily-life
   disclosureLevel?: number; // 1..5(既定 1)

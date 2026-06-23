@@ -50,7 +50,7 @@ const EXTRACTION_SYSTEM = [
   '  ※ impression は会話に表れた反応だけ。反応が無ければ impression は省略する(感情を推測で書かない=捏造防止)。',
   '',
   '出力は次の JSON 形式のみ(前後に文章を付けない):',
-  '{"episodic": {"topic": string, "summary": string, "impression"?: string, "tags": string[], "entities": string[], "importance": number, "category": string, "valence": number, "provenance": "user"|"self", "openLoop": {"kind": "user-event"|"promise-by-me"|"question", "note": string} | null} | null,',
+  '{"episodic": {"topic": string, "summary": string, "impression"?: string, "tags": string[], "entities": string[], "importance": number, "category": string, "provenance": "user"|"self", "openLoop": {"kind": "user-event"|"promise-by-me"|"question", "note": string} | null} | null,',
   ' "semanticPatch": {"userName"?: string, "userNameReading"?: string, "userFullName"?: string, "userBirthday"?: {"month": number, "day": number, "year"?: number}, "preferences"?: object, "longTermGoals"?: string[], "personality"?: string[], "extra"?: object} | null,',
   ' "corrections": [{"targetFile": string, "kind": "supersede"|"refine"|"reattribute", "newSummary"?: string, "newEntities"?: string[], "newProvenance"?: "user"|"self", "reason"?: string}],',
   ' "loopClosures": [{"targetFile": string, "resolution"?: string}] }',
@@ -64,9 +64,6 @@ const EXTRACTION_SYSTEM = [
   '- それ以外は「相手(このキャラクター)にとっての印象深さ」で付ける:相手が会話で強い関心・感情を示した話題',
   '  (食いついた/喜んだ/こだわった)は importance を高め・summary も少し詳しく。興味を示さなかった事務的な話は簡潔・低めでよい。',
   '- category は health / work / hobby / relationship / general などの短い英単語。',
-  '- valence は**ユーザーにとっての**出来事の感情的トーン(-2=とてもつらい 〜 0=中立 〜 +2=とてもうれしい)の整数。',
-  '  「ユーザーが楽しそうに/つらそうに語ったか」の客観的トーンで、上記の“相手の受け取り”とは別物',
-  '  (ユーザーの近況を後で気づかうために使う)。話題が負でもユーザーが淡々と話したなら 0 でよい。',
   '- provenance: その出来事・事実が**誰の人生のことか**を区別する。ユーザー自身に起きたこと/ユーザーの嗜好・経験 = "user"(既定)。',
   '  相手(=このキャラクター自身)が会話で語った**自分自身の暮らし・経験**(学校・試験・趣味・家族・体調など)= "self"。',
   '  ※重要: ここを誤ると、相手自身の出来事をユーザーのものとして記憶し、挨拶や会話で取り違える。誰の話か曖昧なら "user"。',
@@ -111,13 +108,6 @@ function clampImportance(v: unknown): number {
   return Math.min(IMPORTANCE_MAX, Math.max(IMPORTANCE_MIN, n));
 }
 
-/** valence を -2..+2 の整数にクランプ(不正・欠落は 0=中立)。 */
-function clampValence(v: unknown): number {
-  const n = typeof v === 'number' ? Math.round(v) : NaN;
-  if (Number.isNaN(n)) return 0;
-  return Math.min(2, Math.max(-2, n));
-}
-
 /** openLoop を検証・正規化する(kind が許可値 & note が非空のときだけ採用)。 */
 function normalizeOpenLoop(raw: unknown): OpenLoop | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
@@ -141,7 +131,6 @@ function normalizeEpisodic(raw: Record<string, unknown>): EpisodicMemory {
     entities: toStringArray(raw.entities),
     importance: clampImportance(raw.importance),
     category: typeof raw.category === 'string' && raw.category.length > 0 ? raw.category : 'general',
-    valence: clampValence(raw.valence),
     // 誰の人生の出来事か(self=相手=このキャラクター自身の暮らし / user=ユーザー)。既定 user。
     // これを誤ると相手自身の暮らし(試験等)がユーザーの記憶として焼き付き、挨拶/会話で取り違える。
     provenance: raw.provenance === 'self' ? 'self' : 'user',

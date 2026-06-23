@@ -34,7 +34,6 @@ export interface EpisodicMemory {
   extra?: Record<string, ExtraValue>; // 拡張領域(emotion/isFirst 等は当面ここに溜める)
   // --- 心(task_16・全 optional・後方互換・design-revision-character-heart §6) ---
   provenance?: 'user' | 'self'; // 欠落=user。self=キャラ自身の人生記憶(canon・読取専用・忘却外)
-  valence?: number; // -2..+2。欠落=0(中立)。出来事の感情的トーン(想起バイアス用・感情管理ではない)
   disclosureLevel?: number; // 1..5。欠落=1(初対面から)。親しさ段階で開示制御(開示ゲーティング)
   // --- 気にかけ(P4・open loops・N-PRES-4・全 optional・後方互換) ---
   // 「まだ結末が出ていない出来事」「キャラ自身がした約束」「聞きそびれ」を未解決マークとして持つ。

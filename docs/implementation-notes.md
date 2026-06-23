@@ -1135,11 +1135,23 @@
 
 ### N-CLEANUP-2 🟢 記憶/想起の簡素化(③b 元気づけ・④ 揺らぎ・⑦ 気にかけ再設計・2026-06-24)
 - **方針(ユーザ)**: 記憶・想起の層が複雑化していたため深掘りし、「最初から書いてもこの形か?」で各層を本質/偶発/機能に分類して整理。
-- **③b 「元気づけ(心)」の簡素化**: 旧「valence の減衰平均 recentUserTone → 落ち込み時に正valence記憶を recall 加点」(user-tone.ts＋cheerupBoost＋定数4)を撤去。複雑な割に体感に出ず、履歴平均は「いま落ち込んでいるか」とズレていた。代わりに `mood-cues.ts`(seemsDown): **現在の会話**の落ち込み cue → `moment.lowMoodHint` で「明るい話題にそっと触れてよい」と LLM へ促す。valence フィールドは記録のみ残置(offscreen パック形式へ波及するため撤去は別途)。
+- **③b 「元気づけ(心)」の簡素化**: 旧「valence の減衰平均 recentUserTone → 落ち込み時に正valence記憶を recall 加点」(user-tone.ts＋cheerupBoost＋定数4)を撤去。複雑な割に体感に出ず、履歴平均は「いま落ち込んでいるか」とズレていた。代わりに `mood-cues.ts`(seemsDown): **現在の会話**の落ち込み cue → `moment.lowMoodHint` で「明るい話題にそっと触れてよい」と LLM へ促す。valence フィールドは当初記録のみ残置としたが、読み手ゼロの dead-read のため**その後 2026-06-24 に完全撤去**(N-CLEANUP-3)。
 - **④ softmax の揺らぎ復活**: `RECALL_SOFTMAX_TEMP` 0.006→0.012。候補プール上限(8)が precision を構造的に守るので、温度を上げ「同じ問いでも毎回同じ並びにしない」本来の揺らぎを戻した。
 - **⑦ 気にかけ「1回素直＋以降は関連トピック」再設計**: 状態を `{at,count}`＋per-loopクールダウン(1ショットに過剰=到達不能)から **「能動提示済み id の集合(string[])」** に縮約(`OPEN_LOOP_MAX_SURFACES`/`OPEN_LOOP_COOLDOWN_DAYS` 撤去・`selectOpenLoops` の `nowIso` 引数も除去)。能動提示は1loop1回。2回目以降は、関連話題で想起された未解決 openLoop に prompt-builder が「まだ結末を聞いていない」ヒントを添え、相手がその話題に触れた今なら自然に再質問する(状態不要・解決で自動停止)。＝簡素化と「人間的な再訪」を同時に実現。
 - **検証**: typecheck/lint/lint:deps(164)/build 緑・全テスト緑(③④で 532、⑦ で open-loops/prompt-builder テスト更新)。
-- **未着手(別)**: valence フィールド完全撤去(8テスト＋offscreen パック形式に波及)。`paths.ts`/`init-directories.ts` の N-REL-2 改修は別作業(本コミット対象外)。
+- **続き**: valence フィールド完全撤去は **N-CLEANUP-3 で実施済み**(2026-06-24)。
+
+---
+
+### N-CLEANUP-3 🟢 valence(各記憶の感情価)フィールドの完全撤去(2026-06-24)
+- **理由**: ③b で唯一のコード消費者(cheerup/recentUserTone)を外した結果、valence は**読み手ゼロの dead-read**になった。off-screen-life・canon を執筆するユーザーが「使われない値を書かされる」のは無駄、との判断で完全撤去。
+- **コード**: `EpisodicMemory.valence` / `OffscreenBeat.valence` 削除。extractor(スキーマ・指示・clampValence・正規化)・episodic.migrateEpisodic・forgetting サマリ・offscreen-life-select の valence を撤去。
+- **データ**: `ene/life-memory.json`(canon 全エントリ)＋ `ene/off-screen-life/*.json`(3パック・計~55箇所)から valence を除去(JSON 妥当性確認済)。
+- **テスト**: extractor-corrections(valence クランプ test 削除)・episodic-v2・life-memory・offscreen-life-select・memory-regression の valence 参照を除去。
+- **docs**: 設計§3.3/§11.6・要件 F-MEM-H-02..04・off-screen 執筆ガイド/計画・canon-plan・ビジョン/哲学の valence 記述を更新。
+- **感情の起伏はどこへ**: 数値 valence ではなく、記憶本文(summary/impression)＋ emotion 表情/声＋落ち込み cue ヒント＋LLM の共感で扱う(§5.3 数値状態なし)。
+- **検証**: typecheck/lint/lint:deps(164)/build 緑・全533テスト緑。
+- **付随**: init-directories.test の paths モックに getConfigDir/getLogsDir を追加(N-REL-2 でコミット済 init-directories.ts の追従漏れ=HEAD レッドを解消)。
 
 ---
 

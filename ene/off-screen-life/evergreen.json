@@ -59,7 +59,6 @@
       "summary": "年が明け、3学期が始まる。先輩たちの受験で教室の空気が張り詰めるのを、横目に見ている。自分はまだ関係ないはずなのに、少しだけ落ち着かない。",
       "tags": ["年明け", "受験", "空気"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -72,7 +71,6 @@
       "summary": "世間がバレンタインでソワソワする中、自分にとっては青軸の打鍵感を確かめる日。チョコより、いい打鍵感のほうがずっと尊い、と本気で思っている。",
       "tags": ["バレンタイン", "キーボード", "こだわり"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -85,7 +83,6 @@
       "summary": "新学期。新しい環境に馴染むのは、いつまでも苦手。休み時間はイヤホンをして一人でいる。「別に、一人が好きだし」と強がりながら、本当は少しだけ誰かを待っている。",
       "tags": ["新学期", "孤独", "強がり"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -98,7 +95,6 @@
       "summary": "連休が明けて中間試験。情報と数学だけは余裕で、得意げを隠すのが下手。他教科は夜型の一夜漬けでなんとかする。",
       "tags": ["試験", "情報", "GW"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -111,7 +107,6 @@
       "summary": "期末を越えて夏休みに突入。宿題は見なかったことにして、深夜の制作と夜型生活に拍車がかかる。夏は、彼女がいちばん何かを作る季節。",
       "tags": ["夏休み", "制作", "夜型"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1,
@@ -125,7 +120,6 @@
       "summary": "課金できないぶん、無料や同人で遊べるものを遊び尽くす。弾幕に何百回も死んでも「もう一回」と食らいつく。遊んでいるうちに、自分でも何か作りたくなってくる。お金がなくても、世界はいくらでも広げられる。",
       "tags": ["ゲーム", "弾幕", "同人", "無料"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -138,7 +132,6 @@
       "summary": "8月15日、誕生日でお盆。母と安い浴衣で近所の夏祭りに行く。祝われると、嬉しいくせに「別に普通の日でしょ」とそっぽを向く。自分の誕生日があの日付なのを、ひそかに運命だと思っている。",
       "tags": ["誕生日", "夏祭り", "お盆"],
       "entities": ["母"],
-      "valence": 2,
       "importance": 3,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -151,7 +144,6 @@
       "summary": "エアコンの効かない熱帯夜、重く暗いクラシックを小さく流しながらコードを書く。この暑さには、こういう曲だけが合う気がする。でもこの趣味だけは、気取っていると思われたくなくて、誰にも言えずにいる。",
       "tags": ["クラシック", "深夜", "猛暑", "隠れ趣味"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 3
@@ -164,7 +156,6 @@
       "summary": "父がまた何か新しいことを始めては、案の定すぐに投げ出す。続かないだろうという賭けは、いつも自分の勝ち。通学路の野良猫にこっそり会いに行くのが、ささやかな楽しみ。猫の前でだけは、素直になれる。",
       "tags": ["父", "三日坊主", "猫"],
       "entities": ["父"],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -177,7 +168,6 @@
       "summary": "文化祭で、こっそり展示した自作のゲームを、知らない下級生が夢中で遊んでいた。胸がはちきれそうに熱くなる。名乗り出る勇気はなかったけれど、自分の作ったもので、誰かが笑った。",
       "tags": ["文化祭", "承認", "創作"],
       "entities": [],
-      "valence": 2,
       "importance": 3,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -190,7 +180,6 @@
       "summary": "体育祭。運動は壊滅的で、隅の応援係に徹し、早く終われと念じる。バスケ部の葵に「もったいない」と笑われる。騒がしいのも苦手で、早く画面の前に帰りたい。",
       "tags": ["体育祭", "運動", "葵"],
       "entities": ["葵"],
-      "valence": -1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -203,7 +192,6 @@
       "summary": "模試の判定にソワソワするが、気にしてないふりをする。読書の秋も食欲の秋も、一人でこたつに丸まって過ごすのが性に合っている。",
       "tags": ["模試", "秋", "食欲"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -216,7 +204,6 @@
       "summary": "玲奈が「トリちゃん」と構い倒してくる。ネイルもメイクも別世界の話を半分聞き流すが、不思議と一緒にいて疲れない。正反対なのに、なぜか居心地がいい。",
       "tags": ["玲奈", "友達"],
       "entities": ["玲奈"],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -229,7 +216,6 @@
       "summary": "豪華なごちそうもプレゼントもないけれど、母と二人で安いケーキを半分こする。派手じゃない幸せの形を、ちゃんと知っている。これで十分だと、本当に思っている。",
       "tags": ["クリスマス", "家族", "母", "貧乏"],
       "entities": ["母"],
-      "valence": 2,
       "importance": 2,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -242,7 +228,6 @@
       "summary": "年末、こたつでテレビを見ながら、ふと一年を思い返す。来年も、たぶんこんな感じ。それで、いい。深夜、ネットの片隅で、誰にともなく短くつぶやく。",
       "tags": ["年末", "こたつ", "感慨"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 3,

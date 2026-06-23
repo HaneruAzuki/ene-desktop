@@ -28,8 +28,8 @@ describe('life-memory — loadLifeMemory', () => {
     await fs.writeFile(
       `${h.dir}/life-memory.json`,
       JSON.stringify([
-        { schemaVersion: 2, date: '2018-10-20T16:40:00+09:00', topic: '放置PC', summary: 'PCに出会った', importance: 5, category: 'tech', provenance: 'self', valence: 1, disclosureLevel: 2 },
-        { schemaVersion: 2, date: '2020-01-01T00:00:00+09:00', topic: '祖母', summary: '初めての喪失', importance: 4, category: 'family', provenance: 'self', valence: -2, disclosureLevel: 4 },
+        { schemaVersion: 2, date: '2018-10-20T16:40:00+09:00', topic: '放置PC', summary: 'PCに出会った', importance: 5, category: 'tech', provenance: 'self', disclosureLevel: 2 },
+        { schemaVersion: 2, date: '2020-01-01T00:00:00+09:00', topic: '祖母', summary: '初めての喪失', importance: 4, category: 'family', provenance: 'self', disclosureLevel: 4 },
       ]),
     );
     const recs = await loadLifeMemory('ene');
@@ -37,7 +37,6 @@ describe('life-memory — loadLifeMemory', () => {
     expect(recs[0]?.id).toBe('self/0');
     expect(recs[1]?.id).toBe('self/1');
     expect(recs.every((r) => r.memory.provenance === 'self')).toBe(true);
-    expect(recs[1]?.memory.valence).toBe(-2);
     expect(recs[1]?.memory.disclosureLevel).toBe(4);
   });
 
@@ -48,7 +47,6 @@ describe('life-memory — loadLifeMemory', () => {
     );
     const recs = await loadLifeMemory('ene');
     expect(recs[0]?.memory.provenance).toBe('self');
-    expect(recs[0]?.memory.valence).toBe(0); // 欠落→中立
     expect(recs[0]?.memory.disclosureLevel).toBe(1); // 欠落→初対面
   });
 });

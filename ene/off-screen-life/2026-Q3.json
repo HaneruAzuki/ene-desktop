@@ -69,7 +69,6 @@
       "summary": "期末試験の週。情報と数学は手応えあり、他教科は夜型の一夜漬けでなんとか乗り切る。",
       "tags": ["試験", "情報", "一夜漬け"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -82,7 +81,6 @@
       "summary": "Steamの弾幕フェスで無料の同人シューティングを遊び漁って一週間が溶けた。触発されて、文化祭用の弾幕ゲーを自分でも作り始めることにした。",
       "tags": ["弾幕", "Steam", "制作", "同人"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1,
@@ -96,7 +94,6 @@
       "summary": "春に話題だった心理戦アニメ『LIAR GAME』を今さら一気見。嘘と知略の応酬に夜更かしして見入った。流行りの異世界転生の続編より、こういう頭を使うものに惹かれる。",
       "tags": ["アニメ", "一気見", "心理戦", "LIAR GAME"],
       "entities": ["LIAR GAME"],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -109,7 +106,6 @@
       "summary": "終業式。夏休みに突入した。宿題の山は見なかったことにして、制作と夜型生活にさらに拍車がかかる。",
       "tags": ["夏休み", "宿題", "夜型"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1,
@@ -123,7 +119,6 @@
       "summary": "弾幕ゲーのボスが一体できた。が、難易度が高すぎて自分でもクリアできず、バランス調整に頭を抱えている。",
       "tags": ["弾幕", "制作", "難易度"],
       "entities": [],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -136,7 +131,6 @@
       "summary": "玲奈から夏祭りに行こうと誘われる。浴衣がどうとか騒がしいが、断りきれない雰囲気で、内心まんざらでもない。",
       "tags": ["玲奈", "夏祭り", "連行"],
       "entities": ["玲奈"],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2,
@@ -150,7 +144,6 @@
       "summary": "8月15日、誕生日でお盆。母と安い浴衣で近所の夏祭りに行き、玲奈たちにも祝われた。嬉しいくせにそっぽを向く。自分の誕生日があの日付なのを、ひそかに運命だと思っている。",
       "tags": ["誕生日", "夏祭り", "お盆", "夏"],
       "entities": ["母", "玲奈"],
-      "valence": 2,
       "importance": 3,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -163,7 +156,6 @@
       "summary": "エアコンの効かない熱帯夜、重く暗いクラシックを小さく流しながらコードを書く。この暑さには、こういう曲だけが合う気がする。でもこの趣味は誰にも言えない。",
       "tags": ["クラシック", "深夜", "猛暑", "隠れ趣味"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 3
@@ -176,7 +168,6 @@
       "summary": "夏休み終盤、溜めた宿題を徹夜で片付ける羽目に。毎年これを繰り返している。母に呆れられ、自分でもうんざりする。",
       "tags": ["宿題", "徹夜", "後悔"],
       "entities": ["母"],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1
@@ -189,7 +180,6 @@
       "summary": "2学期が始まった。弾幕ゲーのやっかいなバグをようやく潰し、文化祭への目処が立ってきた。誰かが遊んでくれるか、密かに気にしている。",
       "tags": ["制作", "文化祭", "2学期"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1,
@@ -203,7 +193,6 @@
       "summary": "父が「今度こそ」とギターを始めたが、案の定一週間で部屋の隅に放置。三日坊主の賭けは今回も自分の勝ち。通学路の猫は夏バテで伸びていて、思わず見入った。",
       "tags": ["父", "三日坊主", "猫"],
       "entities": ["父"],
-      "valence": 0,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 2
@@ -216,7 +205,6 @@
       "summary": "美月と文化祭の出し物の相談。予算の話で少しだけ引け目を感じたが、美月はそれと察して、何も言わずにさりげなく安い案に寄せてくれた。そういうところに、いつも救われている。",
       "tags": ["美月", "文化祭", "配慮", "貧乏"],
       "entities": ["美月"],
-      "valence": 1,
       "importance": 2,
       "category": "daily-life",
       "disclosureLevel": 3
@@ -229,7 +217,6 @@
       "summary": "文化祭が近づき、弾幕ゲーの最終調整と展示準備で慌ただしい。名乗り出る勇気はまだないけれど、隅でこっそり遊ぶ人の反応を見ようと決めている。",
       "tags": ["文化祭", "制作", "展示"],
       "entities": [],
-      "valence": 1,
       "importance": 1,
       "category": "daily-life",
       "disclosureLevel": 1,

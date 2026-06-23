@@ -95,7 +95,6 @@ describe('beatToEpisodic', () => {
       summary: 'あ'.repeat(300),
       tags: ['誕生日'],
       entities: ['母'],
-      valence: 2,
       importance: 3,
       category: 'daily-life',
       disclosureLevel: 2,
@@ -104,17 +103,15 @@ describe('beatToEpisodic', () => {
     const mem = beatToEpisodic(beat, '2026-08-15T19:40:00+09:00');
     expect(mem.provenance).toBe('self');
     expect(mem.date).toBe('2026-08-15T19:40:00+09:00');
-    expect(mem.valence).toBe(2);
     expect(mem.importance).toBe(3);
     expect(mem.disclosureLevel).toBe(2);
     expect(mem.summary.length).toBe(200); // EPISODIC_SUMMARY_MAX_CHARS
     expect(mem.openLoop?.note).toBe('まだ続く');
   });
 
-  it('欠落フィールドは既定値(valence0/importance2/disclosure1/daily-life/空配列)', () => {
+  it('欠落フィールドは既定値(importance2/disclosure1/daily-life/空配列)', () => {
     const beat: OffscreenBeat = { id: 'b2', arcId: 'a', week: 5, topic: 't', summary: 's' };
     const mem = beatToEpisodic(beat, '2026-01-01T00:00:00+09:00');
-    expect(mem.valence).toBe(0);
     expect(mem.importance).toBe(2);
     expect(mem.disclosureLevel).toBe(1);
     expect(mem.category).toBe('daily-life');

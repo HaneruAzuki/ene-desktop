@@ -6,8 +6,9 @@ import path from 'node:path';
 
 const h = vi.hoisted(() => ({ dataDir: '', memDir: '' }));
 vi.mock('../../src/shared/node/paths', () => ({
-  getPortableDataDir: (): string => h.dataDir,
   getMemoryDir: (): string => h.memDir,
+  getConfigDir: (): string => `${h.dataDir}/config`,
+  getLogsDir: (): string => `${h.dataDir}/logs`,
 }));
 
 import { ensureMemoryDirectories } from '../../src/app/main/init-directories';

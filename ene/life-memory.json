@@ -16,7 +16,6 @@
     "importance": 5,
     "category": "tech",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "小学校",
@@ -38,7 +37,6 @@
     "importance": 5,
     "category": "tech",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -61,7 +59,6 @@
     "importance": 3,
     "category": "family",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "中学",
@@ -85,7 +82,6 @@
     "importance": 4,
     "category": "family",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -109,7 +105,6 @@
     "importance": 2,
     "category": "daily",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "高校",
@@ -132,7 +127,6 @@
     "importance": 3,
     "category": "family",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "小学校",
@@ -153,7 +147,6 @@
     "importance": 4,
     "category": "daily",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "小学校",
@@ -175,7 +168,6 @@
     "importance": 4,
     "category": "tech",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -197,7 +189,6 @@
     "importance": 3,
     "category": "family",
     "provenance": "self",
-    "valence": -2,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "中学",
@@ -221,7 +212,6 @@
     "importance": 4,
     "category": "family",
     "provenance": "self",
-    "valence": -2,
     "disclosureLevel": 4,
     "extra": {
       "lifeStage": "小学校",
@@ -244,7 +234,6 @@
     "importance": 2,
     "category": "school",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -266,7 +255,6 @@
     "importance": 3,
     "category": "school",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -290,7 +278,6 @@
     "importance": 2,
     "category": "school",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "高校",
@@ -313,7 +300,6 @@
     "importance": 3,
     "category": "friendship",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -337,7 +323,6 @@
     "importance": 5,
     "category": "friendship",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "小学校",
@@ -361,7 +346,6 @@
     "importance": 3,
     "category": "friendship",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "高校",
@@ -382,7 +366,6 @@
     "importance": 5,
     "category": "tech",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -404,7 +387,6 @@
     "importance": 4,
     "category": "tech",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "高校",
@@ -428,7 +410,6 @@
     "importance": 4,
     "category": "failure",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 4,
     "extra": {
       "lifeStage": "中学",
@@ -450,7 +431,6 @@
     "importance": 4,
     "category": "music",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "中学",
@@ -478,7 +458,6 @@
     "importance": 3,
     "category": "music",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "高校",
@@ -502,7 +481,6 @@
     "importance": 4,
     "category": "hobby",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -526,7 +504,6 @@
     "importance": 3,
     "category": "hobby",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "中学",
@@ -547,7 +524,6 @@
     "importance": 3,
     "category": "hobby",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "高校",
@@ -571,7 +547,6 @@
     "importance": 4,
     "category": "identity",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -592,7 +567,6 @@
     "importance": 3,
     "category": "identity",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "中学",
@@ -617,7 +591,6 @@
     "importance": 2,
     "category": "identity",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "中学",
@@ -639,7 +612,6 @@
     "importance": 5,
     "category": "identity",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 4,
     "extra": {
       "lifeStage": "小学校",
@@ -663,7 +635,6 @@
     "importance": 3,
     "category": "identity",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "高校",
@@ -684,7 +655,6 @@
     "importance": 3,
     "category": "identity",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "高校",
@@ -708,7 +678,6 @@
     "importance": 3,
     "category": "failure",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 5,
     "extra": {
       "lifeStage": "中学",
@@ -730,7 +699,6 @@
     "importance": 5,
     "category": "milestone",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "高校",
@@ -753,7 +721,6 @@
     "importance": 4,
     "category": "friendship",
     "provenance": "self",
-    "valence": 2,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "高校",
@@ -777,7 +744,6 @@
     "importance": 3,
     "category": "season",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "高校",
@@ -801,7 +767,6 @@
     "importance": 2,
     "category": "season",
     "provenance": "self",
-    "valence": 1,
     "disclosureLevel": 2,
     "extra": {
       "lifeStage": "中学",
@@ -822,7 +787,6 @@
     "importance": 1,
     "category": "daily",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "高校",
@@ -843,7 +807,6 @@
     "importance": 1,
     "category": "daily",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "高校",
@@ -867,7 +830,6 @@
     "importance": 1,
     "category": "daily",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "高校",
@@ -889,7 +851,6 @@
     "importance": 1,
     "category": "daily",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 1,
     "extra": {
       "lifeStage": "高校",
@@ -910,7 +871,6 @@
     "importance": 3,
     "category": "love",
     "provenance": "self",
-    "valence": 0,
     "disclosureLevel": 3,
     "extra": {
       "lifeStage": "高校",
@@ -932,7 +892,6 @@
     "importance": 4,
     "category": "love",
     "provenance": "self",
-    "valence": -1,
     "disclosureLevel": 5,
     "extra": {
       "lifeStage": "高校",

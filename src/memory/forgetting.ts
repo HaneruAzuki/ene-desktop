@@ -26,7 +26,7 @@ import type { EpisodicMemory } from '../shared/types/memory';
 //  - 物理削除(§6.4)。派生索引(inverted/vector)は削除後に再生成/掃除(真実の源は episodic 本体)。
 //  - 暮らしの断片(daily-life・provenance:'self')は user サマリに混ぜず、十分古い低importanceを直接削除(B-18)。
 
-/** サマリの EpisodicMemory を組み立てる(専用カテゴリ・合成日アンカー・相手のトーンを動かさない valence=0)。 */
+/** サマリの EpisodicMemory を組み立てる(専用カテゴリ・合成日アンカー)。 */
 function buildSummaryMemory(
   s: PeriodSummary,
   tier: SummaryTier,
@@ -50,7 +50,6 @@ function buildSummaryMemory(
     importance,
     category: FORGET_SUMMARY_CATEGORY,
     provenance: 'user',
-    valence: 0, // サマリは相手のトーン(recentUserTone)を動かさない(感情の主役は生の記憶)
     disclosureLevel: 1,
     extra: { summaryTier: tier, period, sourceCount },
   };

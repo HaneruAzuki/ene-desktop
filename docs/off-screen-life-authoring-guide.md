@@ -45,7 +45,7 @@
   "beats": [
     { "id": "kbd-1", "arcId": "hobby-keyboard", "week": "2026-W27",
       "topic": "...", "summary": "...(terse な事実・200字以内・相対表現)",
-      "tags": [], "entities": [], "valence": 0, "importance": 1,
+      "tags": [], "entities": [], "importance": 1,
       "category": "daily-life", "disclosureLevel": 1,
       "openLoop": { "kind": "question", "note": "..." } }   // 任意
   ],
@@ -55,7 +55,7 @@
 
 **beat フィールド規約:**
 - `week`：ISO週（seasonal）。`summary`：**事実だけを terse に**（口調はアプリ側のLLMが当日付与）。絶対日付・絶対年を書かない。
-- `valence`：-2..+2（中立0）。`importance`：**基本1〜2**（薄れてよい）。**3+は稀**（＝想起に残す「原体験」級・良い思い出も傷も）。
+- `importance`：**基本1〜2**（薄れてよい）。**3+は稀**（＝想起に残す「原体験」級・良い思い出も傷も）。
 - `category`：原則 `daily-life`。`disclosureLevel`：1（誰にでも）〜5（深い仲だけ）。
 - `openLoop`：未解決を残す時のみ（一度匂わせ→後続beatで回収→次を開く鎖）。
 

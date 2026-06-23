@@ -90,7 +90,6 @@ function userMemory(over: Partial<EpisodicMemory>): EpisodicMemory {
     importance: 3,
     category: 'general',
     provenance: 'user',
-    valence: 0,
     disclosureLevel: 1,
     ...over,
   };

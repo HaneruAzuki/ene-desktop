@@ -47,7 +47,6 @@ describe('episodic v2 (design-revision-memory-v2)', () => {
     expect(m.topic).toBe('a');
     // 心(task_16)の既定補完
     expect(m.provenance).toBe('user');
-    expect(m.valence).toBe(0);
     expect(m.disclosureLevel).toBe(1);
   });
 

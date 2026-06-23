@@ -201,7 +201,7 @@ current-state は「彼女の今」の MVP スタブだった。off-screen-life(
     { "id": "kbd-1", "arcId": "hobby-keyboard", "week": "2026-W27",  // seasonal=ISO週 / evergreen=weekOfYear(1..53)
       "topic": "注文した軸が届かない",
       "summary": "数日前に頼んだ静音軸が、まだ届かない。…別に楽しみにしてるわけじゃないけど。",  // 事実(terse・固定)
-      "tags": ["キーボード"], "entities": [], "valence": 0, "importance": 1,
+      "tags": ["キーボード"], "entities": [], "importance": 1,
       "category": "daily-life", "disclosureLevel": 1,
       "openLoop": { "kind": "question", "note": "頼んだ軸がまだ届かない" } }
   ]

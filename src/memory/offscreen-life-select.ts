@@ -117,7 +117,6 @@ export function beatToEpisodic(beat: OffscreenBeat, dateIso: string): EpisodicMe
     importance: beat.importance ?? DAILY_LIFE_IMPORTANCE,
     category: beat.category ?? DAILY_LIFE_CATEGORY,
     provenance: 'self',
-    valence: beat.valence ?? 0,
     disclosureLevel: beat.disclosureLevel ?? 1,
   };
   if (beat.openLoop) memory.openLoop = beat.openLoop;

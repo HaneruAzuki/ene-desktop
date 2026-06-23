@@ -773,9 +773,10 @@ export interface RouterResult {
 > 想起方式(**語彙＋entity＋ベクトルの RRF ハイブリッド**・`MemoryRetriever` 抽象・Router 非依存)を本節に反映済み。
 > 元の改訂案は **`docs/archive/design-revision-memory-v2.md`**(マージ元)。想起・更新の処理詳細は `tasks/task_15_*.md`。
 >
-> 📌 **製品1.0 実装済み(task_16・2026-06)**:`EpisodicMemory` への `provenance`(user/self)・`valence`(感情価)・
-> `disclosureLevel`(開示段階)追加、人生記憶 canon(`{id}/life-memory.json`)、心(感情価バイアス想起)・
-> 開示ゲーティング・現在状態レイヤーを本節/§3.1/§5 に反映済み。元の改訂案は
+> 📌 **製品1.0 実装済み(task_16・2026-06)**:`EpisodicMemory` への `provenance`(user/self)・
+> `disclosureLevel`(開示段階)追加、人生記憶 canon(`{id}/life-memory.json`)、開示ゲーティング・現在状態
+> レイヤーを本節/§3.1/§5 に反映済み(`valence`(感情価)＋感情価バイアス想起は 2026-06-24 に撤去=③b。落ち込み対応は
+> 現在の会話 cue→明るい話題ヒントへ簡素化)。元の改訂案は
 > **`docs/archive/design-revision-character-heart.md`**(マージ元)。処理詳細は `tasks/task_16_*.md`。
 
 #### 主要型定義
@@ -805,7 +806,6 @@ export interface EpisodicMemory {
   extra?: Record<string, ExtraValue>;  // 拡張領域
   // --- 心(task_16・全 optional・後方互換) ---
   provenance?: "user" | "self";  // 欠落=user。self=人生記憶 canon(読取専用・忘却外)
-  valence?: number;              // -2..+2。欠落=0(中立)。出来事のトーン(想起バイアス用・感情管理ではない)
   disclosureLevel?: number;      // 1..5。欠落=1(初対面から)。親しさ段階で開示制御
 }
 
@@ -2914,7 +2914,7 @@ win:
 
 > ✅ **実装済み＋実機検証済(B-13・task_19・2026-06-09)**:月次/年次サマリ＋重要度しきい値の
 > **物理削除**(§6.4)を実装。サマリは専用フォーマットではなく**通常の `EpisodicMemory`**
-> (`category="summary"` ＋ `extra.summaryTier`・月次 importance=4 / 年次=5・`valence=0`=mood 不変)
+> (`category="summary"` ＋ `extra.summaryTier`・月次 importance=4 / 年次=5)
 > として保存し、既存スキーマ・索引・想起・平文可搬性を流用する。**要約成功→削除**の順で進め、
 > サマリ無しに記憶を失わない。起動時に**背景**で実行し冪等(済み期間はサマリ有無で判定)。
 > **常時オン**(「人間らしい忘却」は製品同一性=トグルで切らない・2026-06-24 設定棚卸しで旧 `ENE_FORGETTING` 撤去)。canon(`provenance:'self'`)は対象外。
