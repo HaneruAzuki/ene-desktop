@@ -12,9 +12,9 @@ import {
 
 // ファイルパスの統一管理(設計書 §3.6 / §5.5)。
 //
-// - ポータブルデータ: exe と同じディレクトリ(本番)/ プロジェクトルート(開発)の data/
-// - Electron userData(Local Storage・api-key.enc 等)も index.ts で data/app/ へ向け直す
-//   (ポータブル運用=%APPDATA% に痕跡を残さない・フォルダ削除で完全に消える・§6.3)。
+// 置き場は2 root に分かれる(N-REL-2・詳細は下の getPortableDataDir / getUserDataDir)。
+// - 同梱アセット(モデル/音声エンジン・読取専用・更新で入れ替わる)= getPortableDataDir()
+// - ユーザーデータ(記憶/設定/APIキー/ログ・更新を跨いで残す) = getUserDataDir()
 //
 // 記憶系パスは「現在使用中キャラの characterId」に依存して動的に変わる。
 // characterId の読込(active-character.json)は非同期 I/O のため、起動時に
@@ -66,7 +66,8 @@ export function getUserDataDir(): string {
   return path.join(process.cwd(), 'data');
 }
 
-function getConfigDir(): string {
+/** ユーザーデータ root/config/(設定 JSON 群の親)。 */
+export function getConfigDir(): string {
   return path.join(getUserDataDir(), 'config');
 }
 
@@ -160,7 +161,7 @@ export function getConsolidationStatePath(): string {
   return path.join(getMemoryDir(), 'consolidation-state.json');
 }
 
-/** data/memory/{activeCharacterId}/open-loop-state.json(気にかけ注入のクールダウン記録・P4・派生状態)。 */
+/** data/memory/{activeCharacterId}/open-loop-state.json(気にかけの能動提示済み集合＋提示頻度の記録・P4・派生状態)。 */
 export function getOpenLoopStatePath(): string {
   return path.join(getMemoryDir(), 'open-loop-state.json');
 }
