@@ -84,6 +84,14 @@ async function ensureWorker(): Promise<boolean> {
 
 /** STT を worker 経由で実行(失敗・タイムアウトは in-process フォールバック)。VAD/PTT 共通の入口。 */
 export async function transcribeViaWorker(samples: Float32Array): Promise<string> {
+  const text = await runTranscribeViaWorker(samples);
+  // デバッグ専用(ENE_DEBUG_STT=1・既定 off): 文字起こし本文を**永続ログ(main.log)には出さず**、
+  // 開発時のターミナル(stdout)にのみ表示する(§6.2: 会話内容を電子ログに残さない)。診断後は env を外せば消える。
+  if (process.env['ENE_DEBUG_STT'] === '1') console.log(`[stt-debug] "${text}"`);
+  return text;
+}
+
+async function runTranscribeViaWorker(samples: Float32Array): Promise<string> {
   const ready = await ensureWorker();
   const proc = child;
   if (!ready || !proc) return transcribeInProcess(samples);
