@@ -204,11 +204,6 @@ export function getOffscreenLifeDir(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'off-screen-life');
 }
 
-/** {characterId}/animation.json(アニメ定義・任意・task_13)。 */
-export function getAnimationPath(characterId: string): string {
-  return path.join(getCharacterDir(characterId), 'animation.json');
-}
-
 /** {characterId}/voice.json(音声設定・emotion→スタイル/パラメータ・任意・task_17)。 */
 export function getVoiceConfigPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'voice.json');
@@ -224,7 +219,7 @@ export function getBackchannelPoolPath(characterId: string): string {
   return path.join(getCharacterDir(characterId), 'backchannels.json');
 }
 
-/** {characterId}/{file}(スプライト等・animation.json の frames が指す実ファイル)。 */
+/** {characterId}/{file}(キャラ同梱アセットの実ファイル。例: VRM モデル本体を vrm-loader が読む)。 */
 export function getCharacterAssetPath(characterId: string, file: string): string {
   return path.join(getCharacterDir(characterId), file);
 }
