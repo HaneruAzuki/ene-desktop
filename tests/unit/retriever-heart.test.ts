@@ -75,29 +75,6 @@ describe('retriever — 開示ゲーティング', () => {
   });
 });
 
-describe('retriever — 元気づけ(相手が落ち込み気味なら明るい記憶)', () => {
-  it('トーンが負(相手が落ち込み気味)だと、相手が楽しそうに語った(正valence)記憶が選ばれやすい(統計的)', async () => {
-    // 同一 entity・同 importance。P=正(楽しい話・新)/N=負(つらい話・旧)。limit1 で top を多数サンプリング。
-    await saveEpisodic(mem({ date: '2026-02-02T00:00:00+09:00', topic: 'P正(楽しい話)', entities: ['田中'], valence: 2 }));
-    await saveEpisodic(mem({ date: '2026-02-01T00:00:00+09:00', topic: 'N負(つらい話)', entities: ['田中'], valence: -2 }));
-
-    const countP = async (tone: number): Promise<number> => {
-      const rng = mulberry32(12345);
-      let n = 0;
-      for (let i = 0; i < 300; i++) {
-        const got = await retrieve({ text: '田中', limit: 1 }, { recentUserTone: tone, rng });
-        if (got[0]?.topic === 'P正(楽しい話)') n++;
-      }
-      return n;
-    };
-
-    const nDown = await countP(-1.0); // 落ち込み気味(閾値 -0.5 未満)→元気づけ発火
-    const nCalm = await countP(0); // 平常→発火しない
-    expect(nDown).toBeGreaterThan(nCalm); // 落ち込み時は明るい記憶が増える
-    expect(nDown).toBeGreaterThan(200); // 強く落ち込み時はほぼ明るい記憶
-  });
-});
-
 describe('retriever — 関心アフィニティ(自分の関心事に飛びつく)', () => {
   it('トリミの関心(プログラミング)に触れる記憶が、無関係な記憶より選ばれやすい(統計的)', async () => {
     // 両方とも entity 田中 で同等にヒット。片方だけ tags にトリミの関心を持つ。

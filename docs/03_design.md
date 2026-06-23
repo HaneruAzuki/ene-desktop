@@ -318,7 +318,7 @@ ene-desktop/
 │   │   ├── index-vector.ts        ← 意味検索ベクトル索引(派生キャッシュ・Phase B)
 │   │   ├── recall-pool.ts         ← user episodic ＋ canon の統合プール(task_16)
 │   │   ├── life-memory.ts         ← 人生記憶 canon ローダ(task_16・provenance:self)
-│   │   ├── user-tone.ts            ← 相手の波長 recentUserTone を導出(user記憶 valence の recency 平均・旧 mood の後継・2026-06-21)
+│   │   ├── mood-cues.ts            ← 落ち込みの cue 検出(現在の会話→明るい話題ヒント・純粋・③b・旧 user-tone/元気づけ撤去・2026-06-24)
 │   │   ├── familiarity.ts         ← 親しさ段階の導出(task_16・接触の事実)
 │   │   ├── context-builder.ts     ← MemoryContext 組み立て
 │   │   ├── extractor.ts           ← 会話から記憶抽出(キャラ自身の記憶として記録・LlmComplete 注入・2026-06-21改訂)
@@ -804,7 +804,7 @@ export interface EpisodicMemory {
   supersededBy?: string;     // 置換した新記録の ID(相対パス)。存在=この記録は古い(非破壊更新)
   extra?: Record<string, ExtraValue>;  // 拡張領域
   // --- 心(task_16・全 optional・後方互換) ---
-  provenance?: "user" | "self";  // 欠落=user。self=人生記憶 canon(読取専用・忘却外・mood 対象外)
+  provenance?: "user" | "self";  // 欠落=user。self=人生記憶 canon(読取専用・忘却外)
   valence?: number;              // -2..+2。欠落=0(中立)。出来事のトーン(想起バイアス用・感情管理ではない)
   disclosureLevel?: number;      // 1..5。欠落=1(初対面から)。親しさ段階で開示制御
 }
@@ -887,7 +887,7 @@ export function loadAllEpisodicFiles(): Promise<EpisodicRecord[]>;   // ID 付�
 export function migrateEpisodic(raw: EpisodicMemory): EpisodicMemory; // v1→既定値補完(読取時のみ)
 
 // src/memory/retriever.ts(task_15 RRF ＋ task_16 開示 ＋ P2 多様性。deps 未指定=従来の決定論的挙動)
-// RetrieverDeps = { embedder?, recentUserTone?, interests?, familiarityStage?, rng?, recallPool? }
+// RetrieverDeps = { embedder?, interests?, familiarityStage?, rng?, recallPool? }
 export function retrieve(query: RetrievalQuery, deps?: RetrieverDeps): Promise<EpisodicMemory[]>;
 export function retrieveRecords(query: RetrievalQuery, deps?: RetrieverDeps): Promise<EpisodicRecord[]>;
 // src/memory/recall-select.ts(P2: 想起の多様性選抜・純粋)
@@ -897,8 +897,8 @@ export function pickDiverse(orderedIds: string[], byId: Map<string, EpisodicReco
 export function loadRecallPool(): Promise<EpisodicRecord[]>;
 // src/memory/life-memory.ts(task_16: 人生記憶 canon・provenance:self・ID=self/N・読取専用)
 export function loadLifeMemory(characterId?: string): Promise<EpisodicRecord[]>;
-// src/memory/user-tone.ts(2026-06-21改訂: 相手の波長 recentUserTone を導出・状態保存なし・旧 mood 機構を撤去)
-export function recentUserTone(records: EpisodicRecord[], nowMs: number): number; // user のみ・canon 除外
+// src/memory/mood-cues.ts(③b・2026-06-24: 現在の会話の落ち込み cue を検出→明るい話題ヒント。旧 user-tone/元気づけ撤去)
+export function seemsDown(text: string): boolean;
 // src/memory/familiarity.ts(task_16: 開示段階を接触の事実から導出・単調)
 export function deriveFamiliarityStage(facts: RelationshipFacts | undefined, nowMs: number): number;
 

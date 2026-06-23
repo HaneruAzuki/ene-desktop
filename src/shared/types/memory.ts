@@ -138,4 +138,5 @@ export interface ConversationMoment {
   knowledgeGaps?: string[]; // まだ知らない相手の属性ラベル(最大 KNOWLEDGE_GAP_SURFACE_MAX 件・親密度ゲート済・P5)
   userBirthdayToday?: boolean; // 今日が相手の誕生日か(P5)
   finitenessHint?: string; // 有限性のトーン指示(発言内容のみ・例「(いまは深夜。眠そうにしてよい)」・P7)
+  lowMoodHint?: string; // 落ち込み対応(③b): 現在の会話に落ち込みの cue がある時、明るい話題へ寄せる促し(発言内容のみ)
 }

@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { matchesInterest, interestBoost, cheerupBoost } from '../../src/memory/retriever';
-import {
-  INTEREST_AFFINITY_WEIGHT,
-  CHEERUP_WEIGHT,
-  USER_DOWN_THRESHOLD,
-} from '../../src/shared/constants';
+import { matchesInterest, interestBoost } from '../../src/memory/retriever';
+import { INTEREST_AFFINITY_WEIGHT } from '../../src/shared/constants';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
 
-// 想起の個性化(関心アフィニティ＋元気づけ)の純関数シナリオ。
+// 想起の個性化(関心アフィニティ)の純関数シナリオ。
 // 「回答が意図どおりか」を方向・符号で固定する(係数の大きさは別途・診断ハーネスで調律)。
 function mem(p: Partial<EpisodicMemory>): EpisodicMemory {
   return {
@@ -38,28 +34,5 @@ describe('関心アフィニティ(自分の関心事に飛びつく)', () => {
       INTEREST_AFFINITY_WEIGHT,
     );
     expect(interestBoost(mem({ tags: ['天気'] }), ['プログラミング'])).toBe(0);
-  });
-});
-
-describe('元気づけ(相手が落ち込み気味なら、楽しそうに語った話を引き上げる)', () => {
-  const down = USER_DOWN_THRESHOLD - 0.1; // 落ち込み気味
-  const calm = 0; // 平常
-
-  it('落ち込み気味のとき、相手が楽しそうに語った(正valence・user)記憶を加点(×valence)', () => {
-    expect(cheerupBoost(mem({ valence: 2, provenance: 'user' }), down)).toBe(CHEERUP_WEIGHT * 2);
-    expect(cheerupBoost(mem({ valence: 1, provenance: 'user' }), down)).toBe(CHEERUP_WEIGHT * 1);
-  });
-
-  it('落ち込んでいないときは加点しない(片方向)', () => {
-    expect(cheerupBoost(mem({ valence: 2, provenance: 'user' }), calm)).toBe(0);
-  });
-
-  it('負・中立 valence は元気づけに使わない(つらい話を浮かせない)', () => {
-    expect(cheerupBoost(mem({ valence: -2, provenance: 'user' }), down)).toBe(0);
-    expect(cheerupBoost(mem({ valence: 0, provenance: 'user' }), down)).toBe(0);
-  });
-
-  it('canon(トリミ自身の人生)は元気づけに使わない(相手が語った話だけ)', () => {
-    expect(cheerupBoost(mem({ valence: 2, provenance: 'self' }), down)).toBe(0);
   });
 });

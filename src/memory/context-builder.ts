@@ -3,7 +3,7 @@ import { getShortTerm } from './short-term';
 import { loadAllEpisodicFiles } from './episodic';
 import { loadLifeMemory } from './life-memory';
 import { retrieve, type RetrieverDeps } from './retriever';
-import { recentUserTone } from './user-tone';
+import { seemsDown, LOW_MOOD_HINT } from './mood-cues';
 import { deriveFamiliarityStage } from './familiarity';
 import {
   selectOpenLoops,
@@ -34,7 +34,7 @@ import type { ActiveCharacter } from '../shared/types/character';
 
 // MemoryContext の組み立て(設計書 §3.3 / task_15 / task_16)。
 // 長期(semantic)+ 短期(shortTerm)+ 関連する中期(retriever)を統合する。
-// 想起は Router 非依存(ユーザー発言が引き金)。相手の波長(recentUserTone)・関心(interests)・開示(familiarityStage)は deps で注入する。
+// 想起は Router 非依存(ユーザー発言が引き金)。関心(interests)・開示(familiarityStage)は deps で注入する。
 
 export async function buildMemoryContext(
   query: RetrievalQuery,
@@ -52,10 +52,9 @@ export async function buildMemoryContext(
  * 会話経路の記憶コンテキストを構築する(task_16 ＋ B-14a)。
  *
  * episodic(user)と canon を**1回だけ**ロードし、
- *  - 相手の波長(recentUserTone):直近の user episodic から導出(canon は含めない・元気づけ用)、
  *  - 開示(familiarityStage):active-character の関係の事実から導出、
  *  - 想起プール(recallPool):user ＋ canon を retriever へ直接渡す(再ロードさせない)、
- * の3つで使い回す。これにより、従来は相手の波長/開示の導出と retrieve(loadRecallPool)が別々に
+ * で使い回す。これにより、従来は開示の導出と retrieve(loadRecallPool)が別々に
  * 走らせていた loadAllEpisodicFiles を1回に削減する(レイテンシ・I/O の無駄取り)。
  *
  * now はここで確定(`Date.now()`)。テストは buildMemoryContext に deps を直接渡して決定化する。
@@ -77,7 +76,6 @@ export async function buildConversationMemory(
   ]);
   const stage = deriveFamiliarityStage(active.relationship, now);
   const deps: RetrieverDeps = {
-    recentUserTone: recentUserTone(userRecords, now), // 相手の波長(元気づけ用)
     interests: opts.interests ?? [], // 関心アフィニティ
     familiarityStage: stage,
     rng: Math.random,
@@ -85,6 +83,8 @@ export async function buildConversationMemory(
   };
   const result = await buildMemoryContext(query, deps);
   result.moment = await buildMoment(userRecords, result.semantic, active, stage, sessionTurnCount);
+  // 落ち込み対応(③b): 現在の発話に落ち込みの cue があれば、明るい話題へそっと寄せるヒントを載せる。
+  if (seemsDown(query.text)) result.moment.lowMoodHint = LOW_MOOD_HINT;
   logRecallDiag(stage, canon, result.relevantEpisodic);
   return result;
 }
