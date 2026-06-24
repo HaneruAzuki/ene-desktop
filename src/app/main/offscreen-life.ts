@@ -1,5 +1,6 @@
 import { nowLocalIso, currentIsoWeekParts, isoWeekParts } from '../../shared/datetime';
 import { log } from '../../shared/logger';
+import { detectAiSelfReference } from '../../shared/ai-self-check';
 import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
 import { readPresenceMemory } from '../../memory/presence-reads';
 import { saveAndIndexEpisodic } from '../../memory/episodic-write';
@@ -139,6 +140,13 @@ export async function generateOffscreenLife(
     const raw = await complete({ system: prompt.system, user: prompt.user, maxTokens: 256 });
     const greeting = parseGreeting(raw);
     if (!greeting) return null;
+
+    // AI自称検知(第2層): 喋られる起動挨拶は本会話の検知ゲートを通らない。
+    // 検知時は null=呼出側が定型挨拶へ倒す(第3層・再生成なし)。
+    if (detectAiSelfReference(greeting, charContext.identity.selfRecognition.neverCallsSelf).detected) {
+      log.warn('AI self-reference detected in greeting; falling back to templated');
+      return null;
+    }
 
     // 気にかけを挨拶で持ち出す機会を1回使った=履歴を保存(他経路と上限を共有・上限1で休眠)。
     if (loopSel.notes.length > 0) {

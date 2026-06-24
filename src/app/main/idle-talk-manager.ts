@@ -11,6 +11,7 @@ import {
   type IdleTalkState,
 } from '../../conversation/idle-talk';
 import { makeLlmComplete } from '../../conversation/client';
+import { detectAiSelfReference } from '../../shared/ai-self-check';
 import { speakResponse } from './voice-runtime';
 import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
 import { readPresenceMemory } from '../../memory/presence-reads';
@@ -137,6 +138,13 @@ export class IdleTalkManager {
 
     const msg = await this.generate(charContext.systemPrompt, apiKey, material);
     if (!msg) return;
+
+    // AI自称検知(第2層): 自発発話は本会話の検知ゲートを通らないため、ここで検査する。
+    // 検知時は「黙る」=自発発話は任意なので差し替えず出さない(発火カウント・気にかけ上限も消費しない)。
+    if (detectAiSelfReference(msg.message, charContext.identity.selfRecognition.neverCallsSelf).detected) {
+      log.warn('AI self-reference detected in idle talk; suppressed');
+      return;
+    }
 
     // 発火を記録(間隔・上限の更新)。
     this.lastIdleTalkMs = Date.now();
