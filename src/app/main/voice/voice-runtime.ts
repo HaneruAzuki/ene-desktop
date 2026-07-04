@@ -96,6 +96,7 @@ export async function streamVoiceChat(
     tts,
     voiceConfig,
     neverCallsSelf: charContext.identity.selfRecognition.neverCallsSelf,
+    selfRefTemplates: charContext.language.selfRefTemplates,
     signal,
     onAudio: (wav, text) => {
       if (!firstChunkLogged) {
@@ -153,6 +154,7 @@ export async function speakResponse(
       tts,
       voiceConfig,
       neverCallsSelf: [],
+      selfRefTemplates: [],
       // 非ストリーミングは文テキストを同梱しない(text/index 無し=吹き出しは別途・全文表示のまま)。
       onAudio: (wav) => {
         if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.VOICE_CHUNK, { wav });

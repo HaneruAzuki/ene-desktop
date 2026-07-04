@@ -23,6 +23,8 @@ export interface VoiceChatDeps {
   voiceConfig: VoiceConfig;
   /** identity.json の neverCallsSelf(自称検知語・ハードコード禁止・§5.4)。空なら検知しない。 */
   neverCallsSelf: string[];
+  /** language.json の selfRefTemplates(自称検知テンプレ・§4.5)。空なら検知しない。 */
+  selfRefTemplates: string[];
   /** 合成済み音声を再生キューへ(renderer 連携は呼出側)。text=この文の表示テキスト(再生同期の吹き出し用・呼出側は無視可)。 */
   onAudio: (wav: ArrayBuffer, text: string) => void;
   /** emotion 確定時に表情/スタイルへ反映(任意)。 */
@@ -67,7 +69,8 @@ export async function speakChunks(
     for (const s of chunk.sentences) {
       // ルビ(漢字《よみ》)は **表示・自称検知・記録は除去後**、**音声は読み下し**で扱う。
       const display = stripRuby(s);
-      if (detectAiSelfReference(display, deps.neverCallsSelf).detected) return done({ blockedBySelfCheck: true });
+      if (detectAiSelfReference(display, deps.neverCallsSelf, deps.selfRefTemplates).detected)
+        return done({ blockedBySelfCheck: true });
       // 中断(投機キャンセル)済みなら、この文は合成も発話もしない(音声を漏らさない)。
       if (deps.signal?.aborted) return done({ aborted: true });
       // signal を合成HTTPへ渡す=中断時に進行中の合成も即打ち切り(孤児リクエストを残さない=詰まり防止)。

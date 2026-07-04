@@ -26,6 +26,7 @@ export async function buildCharacterContext(): Promise<CharacterContext> {
 
   return {
     identity: profile.identity,
+    language: profile.language,
     background: profile.background,
     knowledgeDomains: profile.knowledgeDomains,
     fewshot: profile.fewshot,

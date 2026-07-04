@@ -17,6 +17,7 @@ import type { LlmComplete } from '../../src/memory/remember/extractor';
 const getUnextracted = vi.mocked(getUnextractedEntries);
 const extract = vi.mocked(extractFromShortTerm);
 const complete: LlmComplete = async () => '';
+const CUES = ['違う']; // language.json 由来の訂正合図(配線検証用・内容は本テストの挙動に影響しない)
 
 /** 未抽出 n 件を表す配列(スケジューラは .length しか見ない)。 */
 function unextracted(n: number): ShortTermEntry[] {
@@ -44,16 +45,16 @@ beforeEach(() => {
 describe('extraction-scheduler (B-01 / B-02)', () => {
   it('未抽出が閾値未満なら抽出しない(バッチ化)', async () => {
     getUnextracted.mockResolvedValue(unextracted(3));
-    await requestExtraction(complete);
+    await requestExtraction(complete, CUES);
     expect(extract).not.toHaveBeenCalled();
   });
 
   it('未抽出が閾値以上なら1回だけ overflow 抽出する', async () => {
     getUnextracted.mockResolvedValue(unextracted(8));
     extract.mockResolvedValue(undefined);
-    await requestExtraction(complete);
+    await requestExtraction(complete, CUES);
     expect(extract).toHaveBeenCalledTimes(1);
-    expect(extract).toHaveBeenCalledWith('overflow', complete);
+    expect(extract).toHaveBeenCalledWith('overflow', complete, CUES);
   });
 
   it('走行中の要求は coalesce され、追走は1回だけ(直列化ロック)', async () => {
@@ -61,8 +62,8 @@ describe('extraction-scheduler (B-01 / B-02)', () => {
     const gate = deferred();
     extract.mockImplementationOnce(() => gate.promise).mockResolvedValue(undefined);
 
-    const p1 = requestExtraction(complete); // サイクル開始・1回目は gate 待ち
-    requestExtraction(complete); // 走行中 → 追走を予約(pending)
+    const p1 = requestExtraction(complete, CUES); // サイクル開始・1回目は gate 待ち
+    requestExtraction(complete, CUES); // 走行中 → 追走を予約(pending)
 
     gate.resolve();
     await p1;
@@ -76,9 +77,9 @@ describe('extraction-scheduler (B-01 / B-02)', () => {
     const gate = deferred();
     extract.mockImplementationOnce(() => gate.promise).mockResolvedValue(undefined);
 
-    const p1 = requestExtraction(complete); // bg サイクル・1回目は gate 待ち
+    const p1 = requestExtraction(complete, CUES); // bg サイクル・1回目は gate 待ち
     let flushed = false;
-    const pf = flushExtraction(complete).then(() => {
+    const pf = flushExtraction(complete, CUES).then(() => {
       flushed = true;
     });
 
@@ -91,6 +92,6 @@ describe('extraction-scheduler (B-01 / B-02)', () => {
     await pf;
 
     expect(flushed).toBe(true);
-    expect(extract).toHaveBeenCalledWith('shutdown', complete);
+    expect(extract).toHaveBeenCalledWith('shutdown', complete, CUES);
   });
 });

@@ -30,9 +30,13 @@ let pending = false;
  * 返り値の Promise は「現在の抽出サイクルの完了」を表す。
  * 本番の会話経路は **await しない**(レイテンシに影響させない)。テストは await して観測する。
  */
-export function requestExtraction(complete: LlmComplete, isBusy?: () => boolean): Promise<void> {
+export function requestExtraction(
+  complete: LlmComplete,
+  correctionCues: string[], // language.json 由来(訂正リーチ拡張 P4)。呼出側が charContext から注入。
+  isBusy?: () => boolean,
+): Promise<void> {
   if (!inFlight) {
-    inFlight = runCycle(complete, isBusy);
+    inFlight = runCycle(complete, correctionCues, isBusy);
   } else {
     pending = true;
   }
@@ -47,18 +51,24 @@ export function requestExtraction(complete: LlmComplete, isBusy?: () => boolean)
  * 通常は閾値バッチ抽出が追いつくため到達しない。到達=抽出が大幅に遅延/失敗している異常時の安全網で、
  * このときだけ会話経路で意図的にレイテンシを払って上限を死守する(記憶は失わない)。
  */
-export async function enforceShortTermCap(complete: LlmComplete): Promise<void> {
+export async function enforceShortTermCap(
+  complete: LlmComplete,
+  correctionCues: string[],
+): Promise<void> {
   const unextracted = await getUnextractedEntries();
   if (unextracted.length < SHORT_TERM_HARD_MAX) return;
   log.warn(`short-term hard cap reached (${unextracted.length}); forcing synchronous extraction`);
-  await flushExtraction(complete);
+  await flushExtraction(complete, correctionCues);
 }
 
 /**
  * 走行中の抽出を待ってから、残った未抽出を**閾値に関係なく全て**抽出する。
  * アプリ終了時・起動時の孤児回収で使う(呼出後に短期記憶を削除してよい状態にする)。
  */
-export async function flushExtraction(complete: LlmComplete): Promise<void> {
+export async function flushExtraction(
+  complete: LlmComplete,
+  correctionCues: string[],
+): Promise<void> {
   if (inFlight) {
     try {
       await inFlight;
@@ -67,14 +77,18 @@ export async function flushExtraction(complete: LlmComplete): Promise<void> {
     }
   }
   // 終了時は閾値を無視して残り全部を抽出する(reason=shutdown)。
-  await extractFromShortTerm('shutdown', complete);
+  await extractFromShortTerm('shutdown', complete, correctionCues);
 }
 
 /**
  * 1サイクル = 「閾値を満たす限り抽出を繰り返す」。
  * ただし1回の抽出ごとに pending を見て、外から来た追走要求がなければ抜ける。
  */
-async function runCycle(complete: LlmComplete, isBusy?: () => boolean): Promise<void> {
+async function runCycle(
+  complete: LlmComplete,
+  correctionCues: string[],
+  isBusy?: () => boolean,
+): Promise<void> {
   try {
     do {
       pending = false;
@@ -84,7 +98,7 @@ async function runCycle(complete: LlmComplete, isBusy?: () => boolean): Promise<
       if (unextracted.length < EXTRACTION_BATCH_THRESHOLD) break;
       // 計測:抽出にかかった ms を残す。これは**会話の total には乗らない**(背景・B-01)ことを示す。
       const t = performance.now();
-      await extractFromShortTerm('overflow', complete);
+      await extractFromShortTerm('overflow', complete, correctionCues);
       log.info(`background extraction done in ${Math.round(performance.now() - t)}ms (off critical path)`);
     } while (pending);
   } finally {

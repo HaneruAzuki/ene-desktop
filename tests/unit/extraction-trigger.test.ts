@@ -18,6 +18,7 @@ vi.mock('../../src/shared/node/paths', () => ({
 }));
 
 import { extractFromShortTerm } from '../../src/memory/remember/extraction-trigger';
+import language from '../../ene/language.json'; // 訂正合図(§4.5 外出し)。実データで配線を検証。
 import { getShortTerm } from '../../src/memory/core/short-term';
 import { getSemantic } from '../../src/memory/core/semantic';
 import { loadAllEpisodicFiles } from '../../src/memory/core/episodic';
@@ -38,7 +39,7 @@ describe('extraction-trigger (設計書 §3.3)', () => {
     ];
     await writeJson(`${h.memDir}/short-term.json`, seeded);
     const complete = vi.fn(async () => '{}');
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
     expect(complete).not.toHaveBeenCalled();
   });
 
@@ -56,7 +57,7 @@ describe('extraction-trigger (設計書 §3.3)', () => {
       }),
     );
 
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
 
     expect(complete).toHaveBeenCalledOnce();
     const eps = await loadAllEpisodicFiles();
@@ -75,7 +76,7 @@ describe('extraction-trigger (設計書 §3.3)', () => {
     await writeJson(`${h.memDir}/short-term.json`, seeded);
     const complete = vi.fn(async () => JSON.stringify({ semanticPatch: { userName: 'ゆうや' } }));
 
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
 
     expect((await getSemantic()).userName).toBe('ゆうや');
   });
@@ -92,7 +93,7 @@ describe('extraction-trigger (設計書 §3.3)', () => {
       JSON.stringify({ semanticPatch: { userName: 'まりこ', preferences: { 色: '青' } } }),
     );
 
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
 
     const sem = await getSemantic();
     expect(sem.userName).toBe('ゆうや'); // 主人の名前は不変

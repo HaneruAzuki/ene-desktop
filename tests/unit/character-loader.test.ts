@@ -68,6 +68,10 @@ describe('character loader (設計書 §3.1)', () => {
       path.join(dir, 'fewshot.json'),
       JSON.stringify({ characterId: 'ene', examples: {} }),
     );
+    await fs.writeFile(
+      path.join(dir, 'language.json'),
+      JSON.stringify({ characterId: 'ene', selfRefTemplates: [], correctionCues: [] }),
+    );
     h.appPath = base;
     await expect(loadCharacterProfile('ene')).rejects.toThrow(/characterId/);
   });

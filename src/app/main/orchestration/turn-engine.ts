@@ -145,9 +145,10 @@ export async function commitTurn(
     const id = runtime.charContext?.identity;
     const hint = id ? buildNameMishearHint(id.selfRecognition.callsSelf, id.sttAliases ?? []) : '';
     const complete = withNameMishearHint(makeLlmComplete(apiKey), hint);
-    await enforceShortTermCap(complete);
+    const correctionCues = runtime.charContext?.language.correctionCues ?? []; // 訂正リーチ拡張 P4(言語依存)
+    await enforceShortTermCap(complete, correctionCues);
     // 会話生成中は抽出を見送る(穴D・API輻輳の best-effort 回避)。
-    requestExtraction(complete, () => Boolean(runtime.generating));
+    requestExtraction(complete, correctionCues, () => Boolean(runtime.generating));
   }
 
   // 6. 誕生日当日に「おめでとう」等で触れられたら、祝われた事実を記録(設計書 §3.1 / §5.4)。

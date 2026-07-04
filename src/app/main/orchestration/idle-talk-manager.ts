@@ -141,7 +141,13 @@ export class IdleTalkManager {
 
     // AI自称検知(第2層): 自発発話は本会話の検知ゲートを通らないため、ここで検査する。
     // 検知時は「黙る」=自発発話は任意なので差し替えず出さない(発火カウント・気にかけ上限も消費しない)。
-    if (detectAiSelfReference(msg.message, charContext.identity.selfRecognition.neverCallsSelf).detected) {
+    if (
+      detectAiSelfReference(
+        msg.message,
+        charContext.identity.selfRecognition.neverCallsSelf,
+        charContext.language.selfRefTemplates,
+      ).detected
+    ) {
       log.warn('AI self-reference detected in idle talk; suppressed');
       return;
     }

@@ -23,6 +23,7 @@ import { saveEpisodic, loadEpisodicById, episodicId } from '../../src/memory/cor
 import { indexEpisodic, queryInverted } from '../../src/memory/core/index-inverted';
 import { retrieve } from '../../src/memory/recall/retriever';
 import { extractFromShortTerm } from '../../src/memory/remember/extraction-trigger';
+import language from '../../ene/language.json'; // 訂正合図(§4.5 外出し)。実データで配線を検証。
 import { writeJson } from '../../src/shared/node/json-store';
 import type { EpisodicMemory, ShortTermEntry } from '../../src/shared/types/memory';
 
@@ -74,7 +75,7 @@ describe('結合: 記憶更新(supersede)ショーケース', () => {
       }),
     );
 
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
 
     // 旧記録は物理削除されず supersededBy を持つ(非破壊)。
     const old = await loadEpisodicById(oldId);
@@ -105,7 +106,7 @@ describe('結合: 人物の取り違え(reattribute)ショーケース', () => {
       }),
     );
 
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
 
     // 対象だけ佐藤に、もう一方の田中は不変。
     expect((await loadEpisodicById(targetId))?.entities).toEqual(['佐藤']);
@@ -127,7 +128,7 @@ describe('結合: 確信が無ければ更新しない(自動上書き禁止)', 
       JSON.stringify({ episodic: null, corrections: [] }),
     );
 
-    await extractFromShortTerm('shutdown', complete);
+    await extractFromShortTerm('shutdown', complete, language.correctionCues);
 
     const old = await loadEpisodicById(oldId);
     expect(old?.summary).toBe('元のまま');

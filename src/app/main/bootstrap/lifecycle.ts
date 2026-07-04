@@ -138,7 +138,11 @@ export async function runStartupSequence(
   const orphaned = await getUnextractedEntries();
   if (orphaned.length > 0) {
     try {
-      await extractFromShortTerm('shutdown', withNameMishearHint(makeLlmComplete(apiKey), nameHint));
+      await extractFromShortTerm(
+        'shutdown',
+        withNameMishearHint(makeLlmComplete(apiKey), nameHint),
+        charContext.language.correctionCues,
+      );
       await clearShortTerm();
       log.info(`recovered ${orphaned.length} orphaned short-term entries`);
     } catch (e) {

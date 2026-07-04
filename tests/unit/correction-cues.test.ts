@@ -2,18 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { hasCorrectionCue, augmentWithRecent } from '../../src/memory/remember/correction-cues';
 import type { EpisodicMemory, EpisodicRecord } from '../../src/shared/types/memory';
 
-// 訂正リーチの拡張(P4)の純関数検証。
+// 訂正リーチの拡張(P4)の純関数検証。合図語は language.json 由来(§4.5)。テストは明示的に渡す。
+const CUES = ['違う', 'そうじゃ', '勘違い', '訂正', '本当は'];
 
 describe('correction-cues — hasCorrectionCue', () => {
   it('訂正・否定・記憶違いの合図を検出する', () => {
-    expect(hasCorrectionCue('それ違うよ、本当は…')).toBe(true);
-    expect(hasCorrectionCue('そうじゃなくて、こうだよ')).toBe(true);
-    expect(hasCorrectionCue('勘違いしてるって')).toBe(true);
-    expect(hasCorrectionCue('それ訂正させて')).toBe(true);
+    expect(hasCorrectionCue('それ違うよ、本当は…', CUES)).toBe(true);
+    expect(hasCorrectionCue('そうじゃなくて、こうだよ', CUES)).toBe(true);
+    expect(hasCorrectionCue('勘違いしてるって', CUES)).toBe(true);
+    expect(hasCorrectionCue('それ訂正させて', CUES)).toBe(true);
   });
   it('合図が無ければ false', () => {
-    expect(hasCorrectionCue('今日はいい天気だね')).toBe(false);
-    expect(hasCorrectionCue('ラーメン食べたい')).toBe(false);
+    expect(hasCorrectionCue('今日はいい天気だね', CUES)).toBe(false);
+    expect(hasCorrectionCue('ラーメン食べたい', CUES)).toBe(false);
+  });
+  it('合図語リストが空なら常に false', () => {
+    expect(hasCorrectionCue('それ違うよ', [])).toBe(false);
   });
 });
 

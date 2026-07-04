@@ -3,6 +3,7 @@ import { getCharacterDir, getCurrentStatePath } from '../shared/node/paths';
 import { readJson } from '../shared/node/json-store';
 import type {
   CharacterIdentity,
+  CharacterLanguage,
   CharacterBackground,
   CharacterKnowledgeDomains,
   CharacterFewshot,
@@ -15,6 +16,7 @@ import type {
 
 export interface LoadedCharacterProfile {
   identity: CharacterIdentity;
+  language: CharacterLanguage;
   background: CharacterBackground;
   knowledgeDomains: CharacterKnowledgeDomains;
   fewshot: CharacterFewshot;
@@ -28,20 +30,29 @@ interface HasCharacterId {
 export async function loadCharacterProfile(characterId: string): Promise<LoadedCharacterProfile> {
   const dir = getCharacterDir(characterId);
 
-  const [identity, background, knowledgeDomains, fewshot] = await Promise.all([
+  const [identity, language, background, knowledgeDomains, fewshot] = await Promise.all([
     readJson<CharacterIdentity>(join(dir, 'identity.json')),
+    readJson<CharacterLanguage>(join(dir, 'language.json')),
     readJson<CharacterBackground>(join(dir, 'background.json')),
     readJson<CharacterKnowledgeDomains>(join(dir, 'knowledge_domains.json')),
     readJson<CharacterFewshot>(join(dir, 'fewshot.json')),
   ]);
 
-  // いずれかが欠けていたら致命的エラー
+  // いずれかが欠けていたら致命的エラー(language.json 欠落は AI自称検知=§5.4 最重要機構を無効化するため必須扱い)
   const missing: string[] = [];
   if (!identity) missing.push('identity.json');
+  if (!language) missing.push('language.json');
   if (!background) missing.push('background.json');
   if (!knowledgeDomains) missing.push('knowledge_domains.json');
   if (!fewshot) missing.push('fewshot.json');
-  if (missing.length > 0 || !identity || !background || !knowledgeDomains || !fewshot) {
+  if (
+    missing.length > 0 ||
+    !identity ||
+    !language ||
+    !background ||
+    !knowledgeDomains ||
+    !fewshot
+  ) {
     throw new Error(
       `キャラクター定義が不完全です(${characterId}): ${missing.join(', ')} が見つかりません`,
     );
@@ -50,6 +61,7 @@ export async function loadCharacterProfile(characterId: string): Promise<LoadedC
   // characterId フィールドが引数と一致すること
   const files: Array<[string, HasCharacterId]> = [
     ['identity.json', identity],
+    ['language.json', language],
     ['background.json', background],
     ['knowledge_domains.json', knowledgeDomains],
     ['fewshot.json', fewshot],
@@ -67,6 +79,7 @@ export async function loadCharacterProfile(characterId: string): Promise<LoadedC
 
   return {
     identity,
+    language,
     background,
     knowledgeDomains,
     fewshot,

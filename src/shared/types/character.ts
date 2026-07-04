@@ -34,6 +34,19 @@ export interface CharacterIdentity {
   unintelligiblePrompts?: string[];
 }
 
+/**
+ * language.json: 言語処理パターン(§4.5 外出し・キャラの言語に依存する検出設定)。
+ * 「誰か(identity)」ではなく「どの言語で話す/聞くか」の設定。コアを特定言語にロックしないための外出し。
+ * neverCallsSelf(自分を何と呼ばないか=自己概念)は identity 側に残し、ここは検出「パターン」を持つ。
+ */
+export interface CharacterLanguage {
+  characterId: string;
+  /** AI自称検知のテンプレ(§3.4 第2層)。{w} に identity.neverCallsSelf を当てて自称パターンを生成する。 */
+  selfRefTemplates: string[];
+  /** 訂正の合図語(相手の言語・訂正リーチ拡張 P4)。会話文にこれが含まれる時だけ想起の窓を広げる。 */
+  correctionCues: string[];
+}
+
 /** background.json: 背景設定 */
 export interface CharacterBackground {
   characterId: string;
@@ -131,6 +144,7 @@ export interface CurrentState {
 /** レイヤー間で受け渡す統合コンテキスト */
 export interface CharacterContext {
   identity: CharacterIdentity;
+  language: CharacterLanguage;
   background: CharacterBackground;
   knowledgeDomains: CharacterKnowledgeDomains;
   fewshot: CharacterFewshot;

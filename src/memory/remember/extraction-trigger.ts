@@ -61,6 +61,7 @@ async function saveOrMergeEpisodic(
 export async function extractFromShortTerm(
   reason: 'overflow' | 'shutdown',
   complete: LlmComplete,
+  correctionCues: string[], // language.json 由来の訂正合図語(P4・訂正リーチ拡張)。呼出側が charContext から注入。
 ): Promise<void> {
   const unextracted = await getUnextractedEntries();
   if (unextracted.length === 0) return;
@@ -81,7 +82,7 @@ export async function extractFromShortTerm(
 
   // P4: 訂正の合図があれば、関連記憶の窓を広げ(limit↑)、直近の言及も差し込む。
   //     話題から外れた訂正でも対象記憶が抽出器の視界に入るようにする。
-  const correcting = hasCorrectionCue(conversationText);
+  const correcting = hasCorrectionCue(conversationText, correctionCues);
   const relevantLimit = correcting ? RELEVANT_MEMORIES_CORRECTION_LIMIT : undefined;
   let relevantMemories = await retrieveRecords(
     { text: conversationText, limit: relevantLimit },

@@ -231,6 +231,7 @@ export async function chat(
 ): Promise<ConversationResponse> {
   const { callModel, onAuthError } = resolveDeps(apiKey, deps, model, signal);
   const neverCallsSelf = charContext.identity.selfRecognition.neverCallsSelf;
+  const selfRefTemplates = charContext.language.selfRefTemplates; // 自称検知テンプレ(language.json・§4.5)
 
   // 第1防御: プロンプトに neverCallsSelf を明示(buildPrompt 内)
   const prompt = buildPrompt(charContext, memoryContext, routerResult, userText);
@@ -252,7 +253,7 @@ export async function chat(
 
   // 第2防御: AI自称検知 → 検知時は第3防御=フォールバック(再生成はしない)。
   // 発話済みを取り消せないストリーミング経路(文単位 C2)と防御を統一する(非対称な再生成を撤去・2026-06-23)。
-  const check = detectAiSelfReference(parsed.message, neverCallsSelf);
+  const check = detectAiSelfReference(parsed.message, neverCallsSelf, selfRefTemplates);
   if (check.detected) {
     log.warn(`AI self-reference detected: pattern=${check.matchedPattern ?? ''}`);
     return fallbackResponse();

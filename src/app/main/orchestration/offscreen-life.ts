@@ -98,7 +98,13 @@ export async function generateOffscreenLife(
 
     // AI自称検知(第2層): 喋られる起動挨拶は本会話の検知ゲートを通らない。
     // 検知時は null=呼出側が定型挨拶へ倒す(第3層・再生成なし)。
-    if (detectAiSelfReference(greeting, charContext.identity.selfRecognition.neverCallsSelf).detected) {
+    if (
+      detectAiSelfReference(
+        greeting,
+        charContext.identity.selfRecognition.neverCallsSelf,
+        charContext.language.selfRefTemplates,
+      ).detected
+    ) {
       log.warn('AI self-reference detected in greeting; falling back to templated');
       return null;
     }

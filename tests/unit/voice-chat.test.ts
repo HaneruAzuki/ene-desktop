@@ -44,6 +44,7 @@ describe('speakChunks', () => {
       tts,
       voiceConfig: config,
       neverCallsSelf: ['AI'],
+      selfRefTemplates: ['私は{w}'],
       onAudio,
       onEmotion,
     });
@@ -64,7 +65,7 @@ describe('speakChunks', () => {
     const onEmotion = vi.fn();
     const r = await speakChunks(
       sourceOf([{ emotion: 'joy', sentences: ['やあ。'] }, { sentences: ['元気？'] }]),
-      { tts, voiceConfig: config, neverCallsSelf: [], onAudio: () => {}, onEmotion },
+      { tts, voiceConfig: config, neverCallsSelf: [], selfRefTemplates: [], onAudio: () => {}, onEmotion },
     );
     expect(calls.map((c) => c.text)).toEqual(['やあ。', '元気？']);
     expect(r.emotion).toBe('joy');
@@ -79,6 +80,7 @@ describe('speakChunks', () => {
       tts,
       voiceConfig: config,
       neverCallsSelf: ['AI'],
+      selfRefTemplates: ['私は{w}'],
       onAudio,
     });
 
@@ -94,6 +96,7 @@ describe('speakChunks', () => {
       tts,
       voiceConfig: config,
       neverCallsSelf: [],
+      selfRefTemplates: [],
       onAudio: () => {},
     });
     expect(r.emotion).toBe('neutral');

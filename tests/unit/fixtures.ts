@@ -29,6 +29,11 @@ export function makeCharContext(over: Partial<CharacterContext> = {}): Character
         aiQuestionHandling: 'ツンデレ調ではぐらかす',
       },
     },
+    language: {
+      characterId: 'ene',
+      selfRefTemplates: ['私は{w}', '{w}として', '{w}なので'],
+      correctionCues: ['違う', 'そうじゃ', '訂正'],
+    },
     background: {
       characterId: 'ene',
       birthplace: '都内某所',
