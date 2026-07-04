@@ -22,5 +22,3 @@ export interface CharacterViewState {
   emotion: EmotionLabel;
   pose: CharacterPose;
 }
-
-// PNG 立ち絵フォールバック(アニメ・フレーム差し替え)の型は 2026-06 に撤去した(表示は VRM 一本)。

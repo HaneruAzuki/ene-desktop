@@ -3,7 +3,7 @@
 
 import type { VrmDisplayParams } from './vrm';
 
-/** 自発発話(アイドル時)の設定。する/しない の2択(2026-06: 頻度の段階は廃止。離席中は別途自動でしない)。 */
+/** 自発発話(アイドル時)の設定。する/しない の2択(離席中は別途自動でしない)。 */
 export type IdleTalkMode = 'off' | 'on';
 
 export interface AppSettings {

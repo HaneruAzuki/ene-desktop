@@ -21,7 +21,7 @@ async function saveSemantic(memory: SemanticMemory): Promise<void> {
 }
 
 /**
- * 主人の名前の硬いロック(主人固定・2026-06)。
+ * 主人の名前の硬いロック(主人固定)。
  *
  * 主人(あるじ)=一生そばにいる決まった相手は一人。その名前(userName)は **一度確定したら会話/抽出では変えない**。
  * まだ覚えていない(currentUserName が空)ときだけ、patch.userName で初代主人を確定できる。

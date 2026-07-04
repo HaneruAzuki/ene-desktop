@@ -5,9 +5,8 @@
 // リアルタイム判定は完全ローカル・純粋ロジック(Claude/ネットワークを置かない・task_18 設計の憲法)。
 
 /**
- * 相槌の型。**現行は continuer のみ出力する**(韻律トーン判定 Lv2=surprise 等の打ち分けは
- * 2026-06-10 に撤去。docs/archive/design-revision-backchannel-prosody-lv2.md)。
- * 型の他値・cues スキーマは将来の多型相槌復活に備えて温存している。
+ * 相槌の型。現行は continuer のみ出力する。他の値・cues スキーマは将来の多型相槌復活に備えて温存する
+ * (設計は docs/archive/design-revision-backchannel-prosody-lv2.md)。
  */
 export type BackchannelCue = 'continuer' | 'understanding' | 'surprise' | 'empathy';
 
@@ -25,7 +24,6 @@ export interface BackchannelPoolData {
 /**
  * リアルタイム・エンジンが「今うつ」と判断したときの出力(聞くターンの相槌)。
  * 実際の語の選択は selectBackchannel(語プール)で行う。
- * 韻律(F0/エネルギー比)の調律フィールドは Lv2 撤去に伴い削除した(2026-06-10)。
  */
 export interface BackchannelDecision {
   kind: 'backchannel';
