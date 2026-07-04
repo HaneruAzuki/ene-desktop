@@ -6,7 +6,7 @@ import {
   VAD_MIN_SPEECH_MS,
   VAD_BARGE_IN_MIN_SPEECH_MS,
   STT_SAMPLE_RATE,
-} from '../shared/constants';
+} from '../../shared/constants';
 
 // 発話確率の列 → speech-start / speech-end イベント化(task_17 Phase C)。
 // ヒステリシス(上/下しきい値)＋最小発話(開始デバウンス)＋最小無音(終了判定)。

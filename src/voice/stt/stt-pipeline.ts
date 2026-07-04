@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { STT_LANGUAGE, STT_SAMPLE_RATE } from '../shared/constants';
+import { STT_LANGUAGE, STT_SAMPLE_RATE } from '../../shared/constants';
 
 // STT パイプラインの**純粋コア**(Electron 非依存・N-REL-5)。
 // in-process(stt-transcriber.ts・main)とワーカー(stt-worker.ts・utilityProcess)の両方から使う。

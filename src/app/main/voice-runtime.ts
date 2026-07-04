@@ -1,10 +1,10 @@
 import type { BrowserWindow } from 'electron';
 import { performance } from 'node:perf_hooks';
 import { log } from '../../shared/logger';
-import { loadVoiceConfig } from '../../voice/voice-loader';
-import { AivisSpeechTtsEngine } from '../../voice/aivisspeech-tts';
-import { reconcileVoiceConfig } from '../../voice/voice-provisioner';
-import { speakChunks, type SpeakChunk } from '../../voice/voice-chat';
+import { loadVoiceConfig } from '../../voice/tts/voice-loader';
+import { AivisSpeechTtsEngine } from '../../voice/tts/aivisspeech-tts';
+import { reconcileVoiceConfig } from '../../voice/tts/voice-provisioner';
+import { speakChunks, type SpeakChunk } from '../../voice/tts/voice-chat';
 import { createJsonStreamParser } from '../../conversation/json-stream-parser';
 import { splitSentences } from '../../conversation/sentence-splitter';
 import { buildPrompt } from '../../conversation/prompt-builder';

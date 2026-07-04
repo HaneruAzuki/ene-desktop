@@ -1,6 +1,6 @@
-import { log } from '../shared/logger';
-import { getVadModelPath } from '../shared/node/paths';
-import { VAD_FRAME_SIZE } from '../shared/constants';
+import { log } from '../../shared/logger';
+import { getVadModelPath } from '../../shared/node/paths';
+import { VAD_FRAME_SIZE } from '../../shared/constants';
 
 // Silero VAD v4 ランナー(onnxruntime-node・main・task_17 Phase C)。
 //

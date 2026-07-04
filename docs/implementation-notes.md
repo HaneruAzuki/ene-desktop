@@ -1075,6 +1075,12 @@
 - **保留(次段)**: voice(9)/conversation(13 に増)の内部サブフォルダ化と、app/main フラット26の整理は別タスク。相槌 pool/loader を conversation にした選択は「A:サンプル基準で厳密分割」(ユーザー決定)。
 - **検証**: typecheck(exit 0)/ eslint 緑 / lint:deps(**違反0**・164 modules)/ **541 テスト** 全グリーン。SSOT(03_design §2)反映済み。
 
+### N-ARCH-8 🟢 voice の内部サブフォルダ化(パイプライン別・2026-07-04)
+- N-ARCH-7 後、voice は9ファイル。パイプライン(pipeline)別に層化=`voice/tts`(発声4)/`voice/stt`(認識2)/`voice/vad`(発話活動検出＋イベント導出3)。
+- `backchannel-engine` は `vad/` に同居:発話確率列→イベントで VadSegmenter の兄弟(コードにも明記)。「相槌の語彙」は N-ARCH-7 で conversation へ出したので、voice に残る相槌は**タイミング(音声信号)だけ**。
+- 内部凝集は極小(voice-chat→voice-loader は同 tts 内、stt-transcriber→stt-pipeline は同 stt 内で不変)。dependency-cruiser ルール不要(同一 voice ドメイン内)。
+- **検証**: typecheck / eslint / lint:deps(違反0) / **541テスト** 全緑。SSOT(03_design §2)反映。
+
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。
 - **E2②(非原子的 save)**: `app-settings.ts` の4 save が read-modify-write で、設定パネルの素早い複数トグルで後勝ち取りこぼしの縁。`updateSettings` で promise チェーン直列化(短期記憶 withWriteLock と同方針)。

@@ -4,7 +4,7 @@
 //   塞がない=発話直後でも UI/クリックがもっさりしない・「応答なし」を防ぐ。
 // Electron app には依存しない(utilityProcess に app は無い)。モデル置き場は init で main から絶対パスを受け取る。
 
-import { loadAsrPipeline, runTranscribe, runWarm, type AsrPipeline } from '../../voice/stt-pipeline';
+import { loadAsrPipeline, runTranscribe, runWarm, type AsrPipeline } from '../../voice/stt/stt-pipeline';
 
 type InMsg =
   | { type: 'init'; modelsDir: string; modelDir: string }

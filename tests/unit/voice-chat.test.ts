@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { speakChunks, type SpeakChunk } from '../../src/voice/voice-chat';
+import { speakChunks, type SpeakChunk } from '../../src/voice/tts/voice-chat';
 import type { TtsEngine, TtsOptions, VoiceConfig } from '../../src/shared/types/voice';
 
 // 音声合成の唯一の消費器 speakChunks(C2 自称検知・ルビ読み下し・文単位合成・中断)の検証。

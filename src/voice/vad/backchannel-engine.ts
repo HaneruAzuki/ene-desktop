@@ -7,8 +7,8 @@ import {
   BACKCHANNEL_MIN_SPEECH_MS,
   BACKCHANNEL_MIN_INTERVAL_MS,
   BACKCHANNEL_PAUSE_TRIGGER_MS,
-} from '../shared/constants';
-import type { BackchannelDecision } from '../shared/types/backchannel';
+} from '../../shared/constants';
+import type { BackchannelDecision } from '../../shared/types/backchannel';
 
 // 相槌タイミングのリアルタイム判定(task_18 Phase A・聞くターン)。
 // 既存 VadSegmenter と同じく「発話確率列 → イベント」の純粋ロジック(I/O も乱数も持たない=単体テスト対象)。

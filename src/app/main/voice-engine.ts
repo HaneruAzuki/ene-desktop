@@ -14,7 +14,7 @@ import {
   VOICE_ENGINE_HEALTH_INTERVAL_MS,
   VOICE_ENGINE_STOP_GRACE_MS,
 } from '../../shared/constants';
-import { loadVoiceConfig } from '../../voice/voice-loader';
+import { loadVoiceConfig } from '../../voice/tts/voice-loader';
 import { prepareEngineUserData, engineOfflineEnv } from '../../shared/node/engine-userdata';
 import { writeEngineLock, clearEngineLock, reconcileOrphanedEngine } from './voice-engine-orphan';
 

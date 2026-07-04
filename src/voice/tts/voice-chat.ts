@@ -1,8 +1,8 @@
-import { detectAiSelfReference } from '../shared/ai-self-check';
-import { stripRuby, rubyToReading } from '../shared/ruby';
+import { detectAiSelfReference } from '../../shared/ai-self-check';
+import { stripRuby, rubyToReading } from '../../shared/ruby';
 import { resolveStyle } from './voice-loader';
-import type { EmotionLabel } from '../shared/types/animation';
-import type { TtsEngine, VoiceConfig } from '../shared/types/voice';
+import type { EmotionLabel } from '../../shared/types/animation';
+import type { TtsEngine, VoiceConfig } from '../../shared/types/voice';
 
 // 音声合成の唯一の消費器(task_17 C1/C2 / design-revision-voice §2,§3)。
 //

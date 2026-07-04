@@ -1,8 +1,8 @@
-import { getVoiceConfigPath } from '../shared/node/paths';
-import { readJson } from '../shared/node/json-store';
-import { log } from '../shared/logger';
-import type { EmotionLabel } from '../shared/types/animation';
-import type { EqBand, TtsOptions, VoiceConfig, VoiceStyleParams } from '../shared/types/voice';
+import { getVoiceConfigPath } from '../../shared/node/paths';
+import { readJson } from '../../shared/node/json-store';
+import { log } from '../../shared/logger';
+import type { EmotionLabel } from '../../shared/types/animation';
+import type { EqBand, TtsOptions, VoiceConfig, VoiceStyleParams } from '../../shared/types/voice';
 
 // 音声設定(voice.json)のロード(task_17 / design-revision-voice §4.2)。
 // emotion→スタイル/パラメータは {id}/voice.json に外出し(§4.5・ハードコード禁止)。

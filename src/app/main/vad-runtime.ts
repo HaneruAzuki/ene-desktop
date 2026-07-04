@@ -3,9 +3,9 @@
 import type { BrowserWindow } from 'electron';
 import { performance } from 'node:perf_hooks';
 import { log } from '../../shared/logger';
-import { SileroVad } from '../../voice/silero-vad';
-import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../../voice/vad-segmenter';
-import { isSttModelAvailable } from '../../voice/stt-transcriber';
+import { SileroVad } from '../../voice/vad/silero-vad';
+import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../../voice/vad/vad-segmenter';
+import { isSttModelAvailable } from '../../voice/stt/stt-transcriber';
 import { transcribeViaWorker } from './stt-worker-client';
 import { turnNodStrength } from '../../shared/turn-nod';
 import type { BackchannelController } from './backchannel-controller';

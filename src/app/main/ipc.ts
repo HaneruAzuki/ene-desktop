@@ -22,7 +22,7 @@ import { showCharacterContextMenu } from './character-context-menu';
 import { VadRuntime, type CoalesceHooks } from './vad-runtime';
 import { VoiceTurnCoordinator } from './voice-turn-coordinator';
 import { BackchannelController } from './backchannel-controller';
-import { isSttModelAvailable } from '../../voice/stt-transcriber';
+import { isSttModelAvailable } from '../../voice/stt/stt-transcriber';
 import { transcribeViaWorker } from './stt-worker-client';
 import { generateResponse, commitTurn, handleSendMessage } from './turn-engine';
 import { speakResponse } from './voice-runtime';

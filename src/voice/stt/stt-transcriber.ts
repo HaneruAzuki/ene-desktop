@@ -1,8 +1,8 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { log } from '../shared/logger';
-import { getModelsDir } from '../shared/node/paths';
-import { STT_MODEL_DIR, STT_MODEL_DIR_ENV } from '../shared/constants';
+import { log } from '../../shared/logger';
+import { getModelsDir } from '../../shared/node/paths';
+import { STT_MODEL_DIR, STT_MODEL_DIR_ENV } from '../../shared/constants';
 import { loadAsrPipeline, runTranscribe, runWarm, type AsrPipeline } from './stt-pipeline';
 
 // ローカル音声認識(kotoba-whisper-v2.2・ONNX・task_17 Phase B / N-LAT-6)の **in-process 実装**。

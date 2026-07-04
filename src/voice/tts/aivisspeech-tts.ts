@@ -1,4 +1,4 @@
-import type { TtsEngine, TtsOptions, TtsStyle } from '../shared/types/voice';
+import type { TtsEngine, TtsOptions, TtsStyle } from '../../shared/types/voice';
 
 // AivisSpeech(VOICEVOX互換ローカルAPI)への TtsEngine 実装(task_17 / design-revision-voice §4.1)。
 // localhost のサイドカーへ HTTP で問い合わせる(端末内=外部通信ではない・§4.2維持)。

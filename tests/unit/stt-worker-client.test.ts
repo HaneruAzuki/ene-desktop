@@ -9,7 +9,7 @@ vi.mock('electron', () => ({
 
 // in-process フォールバック先をモック(実モデルをロードしない)。
 const inProcess = vi.fn(async (s: Float32Array) => `in-process:${s.length}`);
-vi.mock('../../src/voice/stt-transcriber', () => ({
+vi.mock('../../src/voice/stt/stt-transcriber', () => ({
   transcribe: (s: Float32Array) => inProcess(s),
   warmStt: vi.fn(async () => undefined),
   sttModelDir: (): string => 'm',

@@ -4,10 +4,10 @@ import {
   BACKCHANNEL_VOLUME_SCALE,
   BACKCHANNEL_VOICE_RATIO,
 } from '../../shared/constants';
-import { BackchannelEngine } from '../../voice/backchannel-engine';
+import { BackchannelEngine } from '../../voice/vad/backchannel-engine';
 import { selectBackchannel } from '../../conversation/backchannel-pool';
 import { loadBackchannelPool } from '../../conversation/backchannel-loader';
-import { resolveStyle } from '../../voice/voice-loader';
+import { resolveStyle } from '../../voice/tts/voice-loader';
 import { resolveVoice } from './app-runtime';
 import type { BackchannelPoolData } from '../../shared/types/backchannel';
 import type { TtsEngine, VoiceConfig } from '../../shared/types/voice';

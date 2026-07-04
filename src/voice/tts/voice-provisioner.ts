@@ -1,5 +1,5 @@
-import { type EmotionLabel } from '../shared/types/animation';
-import type { TtsStyle, VoiceConfig, VoiceStyleParams } from '../shared/types/voice';
+import { type EmotionLabel } from '../../shared/types/animation';
+import type { TtsStyle, VoiceConfig, VoiceStyleParams } from '../../shared/types/voice';
 
 // 音声の自動プロビジョニング(task_17 / design-revision-voice §4.3)。
 //
