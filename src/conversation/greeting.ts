@@ -1,4 +1,4 @@
-import { nowLocalIso } from '../shared/datetime';
+import { todayLocalYmdString } from '../shared/datetime';
 import { elapsedDays } from '../shared/moment';
 import { LONG_ABSENCE_DAYS } from '../shared/constants';
 import type { ActiveCharacter, CharacterContext, FewshotExample } from '../shared/types/character';
@@ -16,7 +16,7 @@ function randomChoice<T>(arr: T[]): T {
 
 /** 前回会話からの経過に応じた挨拶セットを選ぶ(空のセットは normalGreeting に倒す)。 */
 function pickByElapsed(fewshot: CharacterContext['fewshot'], lastDate: string | undefined): FewshotExample[] | null {
-  const today = nowLocalIso().slice(0, 10);
+  const today = todayLocalYmdString();
   const days = elapsedDays(lastDate, today);
   if (days === 0 && fewshot.sameDayGreeting?.length) return fewshot.sameDayGreeting;
   if (days != null && days >= LONG_ABSENCE_DAYS && fewshot.longAbsenceGreeting?.length) {

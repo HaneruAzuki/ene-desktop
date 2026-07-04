@@ -1,4 +1,4 @@
-import { screen, type BrowserWindow } from 'electron';
+import { screen } from 'electron';
 import { getWindowPositionPath } from '../../../shared/node/paths';
 import { readJson, writeJson } from '../../../shared/node/json-store';
 import { WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_EDGE_MARGIN } from '../../../shared/constants';
@@ -68,11 +68,4 @@ export async function saveWindowPosition(x: number, y: number): Promise<void> {
 
 export async function loadWindowPosition(): Promise<Position | null> {
   return readJson<Position>(getWindowPositionPath());
-}
-
-/** キャラ右クリック「位置をリセット」で呼ぶ(既定の右下へ戻す)。 */
-export function resetToDefaultPosition(window: BrowserWindow): void {
-  const pos = getDefaultPosition();
-  window.setBounds({ x: pos.x, y: pos.y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
-  void saveWindowPosition(pos.x, pos.y);
 }

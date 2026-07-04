@@ -4,7 +4,7 @@ import { log, initLogger } from '../../../shared/logger';
 import { getUserDataDir, getLogsDir } from '../../../shared/node/paths';
 import { isCloudSyncFolder } from '../../../shared/node/cloud-warning';
 import { loadAndDecryptApiKey } from '../../../shared/node/encryption';
-import { todayLocalYmd, nowLocalIso } from '../../../shared/datetime';
+import { todayLocalYmd, todayLocalYmdString } from '../../../shared/datetime';
 import {
   loadOrCreateActiveCharacter,
   markFirstLaunchCompleted,
@@ -229,8 +229,8 @@ export async function runStartupSequence(
   // get-initial-greeting が最大 GREETING_GENERATION_TIMEOUT_MS 待って差し替える(P3・N-PRES-3)。
   runtime.initialGreeting = generateGreeting(active, charContext);
   if (active.firstLaunchCompleted) {
-    const today = nowLocalIso().slice(0, 10);
-    const elapsedLabel = describeElapsed(active.relationship?.lastConversationDate, today);
+    const todayStr = todayLocalYmdString();
+    const elapsedLabel = describeElapsed(active.relationship?.lastConversationDate, todayStr);
     const timeOfDay = timeOfDayLabel(new Date().getHours());
     runtime.greetingPromise = generateOffscreenLife(
       charContext,

@@ -48,6 +48,12 @@ export function todayLocalYmd(): { year: number; month: number; day: number } {
   return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
 }
 
+/** ローカル日付の「今日」を YYYY-MM-DD 文字列で返す(経過表示・日次キー用)。§5.6 の TZ 規約に従う。 */
+export function todayLocalYmdString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /**
  * 指定した年月日時のローカル ISO 8601 + TZ オフセットを返す(忘却サマリの合成日付など)。
  * 例: localIsoFromParts(2026, 5, 15) → "2026-05-15T00:00:00+09:00"。

@@ -1,6 +1,6 @@
 import { powerMonitor, type BrowserWindow } from 'electron';
 import { log } from '../../../shared/logger';
-import { nowLocalIso } from '../../../shared/datetime';
+import { nowLocalIso, todayLocalYmdString } from '../../../shared/datetime';
 import { timeOfDayLabel } from '../../../shared/moment';
 import { normalizeEmotion } from '../../../shared/llm-parse';
 import { IDLE_TALK_CHECK_INTERVAL_MS } from '../../../shared/constants';
@@ -90,7 +90,7 @@ export class IdleTalkManager {
 
       const now = Date.now();
       const d = new Date();
-      const todayYmd = nowLocalIso().slice(0, 10);
+      const todayYmd = todayLocalYmdString();
       this.rollDate(todayYmd);
 
       const base: Omit<IdleTalkState, 'hasMaterial'> = {
