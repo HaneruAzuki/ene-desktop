@@ -68,7 +68,6 @@
 | 埋め込みモデル ruri-v3-310m (cl-nagoya) | Apache-2.0 | ◎ | 約316MB・`data/models/` |
 | 音声認識 Whisper small (onnx-community) | MIT | ◎ | OpenAI Whisper 由来 |
 | 発話区間検出 Silero VAD **v4** | MIT | ◎ | `resources/` に同梱(約1.8MB)。v5は技術的理由で不可(N-17-9) |
-| 終話判定 Smart Turn v3(将来) | BSD | ◎ | **未同梱・ロードマップのみ** |
 
 ### 2.4 音声エンジン・声素材(サイドカー / **ポータブル配布で同梱**)
 

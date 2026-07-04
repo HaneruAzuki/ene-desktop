@@ -14,7 +14,7 @@ TTS は**差し替え可能インターフェース**で構え、まず**寛容�
 `docs/00_philosophy.md` ロードマップ **MVP 0.3「声と耳」**。
 - **双方向だが"間のあるENE"を保持**:リアルタイム性=B は追わない(§命題・L174)。barge-in は「被せない/聞き終わる」礼儀であって速度競争ではない。
 - 声・口・表情(③人間/キャラ天井):**TTS＋振幅ドリブンのリップシンク**(task_13 の時間ベース口パクを差し替え)。
-- ターンテイキング(③人間天井):**Silero VAD＋Smart Turn v3.2＋barge-in**。
+- ターンテイキング(③人間天井):**Silero VAD＋適応無音窓＋投機生成＋barge-in**(意味的終話判定=Smart Turn は見送り・N-TURN-1)。
 
 ## 依存タスク(すべて✅完了)
 
@@ -32,7 +32,7 @@ TTS は**差し替え可能インターフェース**で構え、まず**寛容�
 ## アーキテクチャ(turn-based cascade)
 
 ```
-🎤mic ─▶ VAD(Silero) ─▶ 終話判定(Smart Turn v3.2) ─▶ STT(Whisper/非ストリーミング)
+🎤mic ─▶ VAD(Silero) ─▶ 終話判定(適応無音窓) ─▶ STT(Whisper/非ストリーミング)
                                                               │ 確定テキスト
                                                               ▼
                                                        Claude(ストリーミング)
@@ -52,7 +52,7 @@ TTS は**差し替え可能インターフェース**で構え、まず**寛容�
 | **0 設計・承認** | C1/C2 再設計の設計、新規ライブラリ承認(§2.3＋設計書§1.2/§2/§4 更新案)、STT/VAD/Turn/TTS の実行配置・IPC契約、ビジョン整合確認 | — |
 | **A 出力(TTS)先行** | `TtsEngine` IF＋寛容声 in-process 実装/声params JSON/文単位TTS再生キュー(C3)/Conversation のストリーミング化(C1前半)/振幅ドリブンのリップシンク(F-ANIM-05差し替え) | リップシンクのみ |
 | **B 入力(STT)** ✅実装 | mic取得(`getUserMedia`/16kHz)/STT=**main+onnxruntime-node+whisper-large-v3-turbo**(embedder同型・ローカル)/push-to-talk→既存`sendMessage`/`download:stt-model`/`media`権限のみ許可。**実機スモーク済**(`npm run stt:smoke`・CPU等倍・日本語良好)。詳細 N-17-8。残=実マイク発話の手動確認 | 不要 |
-| **C 双方向・ターン** ✅実装 | **Silero VAD v4**(main+onnxruntime-node・★v5はnode誤計算でv4採用=N-17-9)/沈黙でターン終了→Whisper/確定テキスト→既存sendMessage/**barge-in**(speech-start中はTTS停止・echoCancellation)/listening-recording-thinking-talking 状態機械＋🎧トグル。Smart Turn は沈黙タイムアウトで代替(将来upgrade)。**セグメンタ単体테스트8件**。残=実マイク手動確認(AECの効き) | 不要 |
+| **C 双方向・ターン** ✅実装 | **Silero VAD v4**(main+onnxruntime-node・★v5はnode誤計算でv4採用=N-17-9)/沈黙でターン終了→Whisper/確定テキスト→既存sendMessage/**barge-in**(speech-start中はTTS停止・echoCancellation)/listening-recording-thinking-talking 状態機械＋🎧トグル。終話は沈黙タイムアウト(適応窓)で判定(意味的終話判定=Smart Turn は見送り・N-TURN-1)。**セグメンタ単体테스트8件**。残=実マイク手動確認(AECの効き) | 不要 |
 | **D 仕上げ・受入** | 声の試聴・確定(人間判定)/レイテンシ実測/受入チェックリスト | — |
 
 **段階の狙い**:**A(片方向TTS)で「声が出る」を最小達成**しつつ最難関のストリーミング再設計を地ならし → B → C で全二重へ。
@@ -66,7 +66,7 @@ TTS は**差し替え可能インターフェース**で構え、まず**寛容�
 
 | # | 論点 | 候補 |
 |---|---|---|
-| 1 | **STTエンジン構成** | (a) **sherpa-onnx-node**(Apache・Node binding・プリビルド)で STT(Whisper)＋VAD(Silero)を一本化【ただし自前 onnxruntime を持ち**既存 onnxruntime-node と重複**】 vs (b) **既存 onnxruntime-node 再利用**＋個別モデル(whisper/silero/smart-turn)＋TTSは kokoro-js |
+| 1 | **STTエンジン構成** | (a) **sherpa-onnx-node**(Apache・Node binding・プリビルド)で STT(Whisper)＋VAD(Silero)を一本化【ただし自前 onnxruntime を持ち**既存 onnxruntime-node と重複**】 vs (b) **既存 onnxruntime-node 再利用**＋個別モデル(whisper/silero)＋TTSは kokoro-js |
 | 2 | **TTSエンジン同梱方式** | TTS=**AivisSpeech確定**(VOICEVOX互換HTTP・localhost:10101・LGPL)。重い(torch・GB級)ため **(a)engine初回DL同梱 vs (b)ユーザー各自インストール** を選択。声モデル=**つくよみちゃん採用 vs 自作AIVM**(Anneli除外) |
 | 3 | **実行配置** | mic/VAD/再生=renderer、Whisper STT=main(要確定) |
 | 4 | **モデル容量・初回DL** | Whisper(small≈466MB等)＋TTS(≈80MB)＋VAD/Turn(数MB)→ コア<100MB のため初回DL |
@@ -74,7 +74,7 @@ TTS は**差し替え可能インターフェース**で構え、まず**寛容�
 
 ## 承認必須(§2.3 / §14・着手前)
 
-- 新規ライブラリ:`sherpa-onnx`(or `kokoro-js`/whisper binding/Silero/Smart Turn v3.2)→ **設計書§1.2 更新**
+- 新規ライブラリ:`sherpa-onnx`(or `kokoro-js`/whisper binding/Silero)→ **設計書§1.2 更新**
 - 新リソース配置(音声モデル置き場・声設定JSON)→ **§2 更新**
 - 音声IPC/イベント契約 → **§4 更新**
 - **§4.2(外部送信はClaudeのみ)は維持=逸脱なし**(音声はローカル処理、テキストのみClaudeへ)
@@ -82,7 +82,7 @@ TTS は**差し替え可能インターフェース**で構え、まず**寛容�
 ## ライセンス制約(同梱の鉄則)
 
 - 出力モデルの再配布可否は **「エンジン license × 種(seed) license」の両方**で決まる。**種は寛容側から取る**。
-- **採用可(寛容)**:Kokoro/MeloTTS/Parler の出力(Apache/MIT)、つくよみちゃんコーパス(商用・再配布OK)、JVNV(CC BY-SA)、Whisper(MIT)、sherpa-onnx(Apache)、Silero VAD、Smart Turn v3.2(BSD)。
+- **採用可(寛容)**:Kokoro/MeloTTS/Parler の出力(Apache/MIT)、つくよみちゃんコーパス(商用・再配布OK)、JVNV(CC BY-SA)、Whisper(MIT)、sherpa-onnx(Apache)、Silero VAD。
 - **回避(無料配布に使えない/懸念)**:Fish-Speech(CC-BY-NC)、XTTS(CPML)、**SenseVoice(商用ライセンスに懸念・規約4.2)**、VOICEVOXキャラ声を種にしたクローン(規約)、Style-Bert-VITS2 直接同梱(AGPL→AivisSpeech経由ならLGPL)、**AivisSpeech既定音声Anneli(声優の無断クローン・2025-09公開停止・AivisHub無期限閉鎖)**。
 
 ## やってはいけないこと
