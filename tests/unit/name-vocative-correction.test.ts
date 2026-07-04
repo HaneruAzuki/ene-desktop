@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { correctVocativeName } from '../../src/conversation/prompt-builder';
+import { correctVocativeName } from '../../src/conversation/name-mishear';
 
 // STT が固有名「トリミ」を同音異字(鳥見等)へ誤変換した分を、呼びかけ位置に限って決定論的に戻す。
 const A = ['鳥見', '取り見', 'とりみ'];

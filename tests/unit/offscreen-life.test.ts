@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildOffscreenLifePrompt, parseGreeting } from '../../src/app/main/orchestration/offscreen-life';
+import { buildOffscreenLifePrompt, parseGreeting } from '../../src/conversation/offscreen-life-prompt';
 
 // P3: オフスクリーンライフの挨拶生成プロンプト/パース(純粋部分・パック駆動・単機能化後)。
 

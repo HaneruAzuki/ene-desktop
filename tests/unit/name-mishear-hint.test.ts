@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildNameMishearHint, withNameMishearHint } from '../../src/conversation/prompt-builder';
+import { buildNameMishearHint, withNameMishearHint } from '../../src/conversation/name-mishear';
 
 // STT 同音異字の読み替え指示(機械置換は廃止し、Claude に文脈で読み替えさせる)。
 // キャラ名はハードコードせず汎用の架空値で検証する(§5.1 配慮)。

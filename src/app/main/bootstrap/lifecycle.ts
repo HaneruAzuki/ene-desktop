@@ -18,7 +18,7 @@ import { warmEmbedder } from '../../../shared/node/embedder';
 import { warmSttWorker } from '../voice/stt-worker-client';
 import { warmLocalRouter } from '../../../knowledge/local-classifier';
 import { makeLlmComplete } from '../../../conversation/client';
-import { buildNameMishearHint, withNameMishearHint } from '../../../conversation/prompt-builder';
+import { buildNameMishearHint, withNameMishearHint } from '../../../conversation/name-mishear';
 import { generateOffscreenLife } from '../orchestration/offscreen-life';
 import { describeElapsed, timeOfDayLabel } from '../../../shared/moment';
 import { openApiKeyDialog } from '../api-key/api-key-dialog';
