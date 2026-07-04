@@ -31,11 +31,11 @@ function emptyIndex(): VectorIndex {
   return { dim: EMBEDDING_DIM, entries: [] };
 }
 
-// メモリ常駐キャッシュ(段階1・D2)。索引は派生キャッシュで真実の源は episodic 本体だが、
-//   想起ごとに数MBのベクトルJSONを毎回 parse していた(変化が無いターンでも)。書き手はこのモジュールだけ
-//   (syncVectorIndex / pruneVectorIndex → saveVectorIndex)なので、自分の書込でキャッシュを最新化すれば
-//   整合が閉じる。**パスをキー**にすることで、テストの一時ディレクトリ切替では自然に miss し(本番はパス固定で
-//   ヒット)、テスト側の改変もキャッシュリセットも不要。手動編集(可搬性 §6.1)は再起動で反映。
+// メモリ常駐キャッシュ(段階1・D2)。索引は派生キャッシュで真実の源は episodic 本体。想起ごとに数MBの
+//   ベクトルJSONを都度 parse するのを避ける。書き手はこのモジュールだけ(syncVectorIndex / pruneVectorIndex
+//   → saveVectorIndex)なので、自分の書込でキャッシュを最新化すれば整合が閉じる。**パスをキー**にすることで、
+//   テストの一時ディレクトリ切替では自然に miss し(本番はパス固定でヒット)、テスト側の改変もキャッシュ
+//   リセットも不要。手動編集(可搬性 §6.1)は再起動で反映。
 let cache: { path: string; index: VectorIndex } | null = null;
 
 export async function loadVectorIndex(): Promise<VectorIndex> {
@@ -143,8 +143,8 @@ export async function pruneVectorIndex(validIds: Set<string>): Promise<void> {
   }
 }
 
-// コサイン類似度は共有実装(shared/vector-math)へ集約(E2③・二重定義の解消)。
-// 後方互換のため index-vector からも再エクスポート(searchVectors の内部利用＋テストが import)。
+// コサイン類似度は共有実装(shared/vector-math)へ集約(二重定義を避ける)。
+// 再エクスポートは searchVectors の内部利用＋テストが index-vector から import するため。
 export { cosineSimilarity };
 
 /** クエリベクトルに近い順に上位 topK の ID を返す。 */

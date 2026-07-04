@@ -59,7 +59,7 @@ export async function buildMoment(
     let changed = false;
 
     // 相手の気にかけ(user・6h)とトリミ自身の気がかり(self・SELF_LOOP_COOLDOWN_HOURS=長め)は
-    // **別クールダウン**。「不安」はデレと同じで薄く効かせる=self は user より稀に漏れる(案1)。
+    // **別クールダウン**。「不安」はデレと同じで薄く効かせる=self は user より稀に漏れる。
     const includeUser = cooled(state.lastOpenLoopAt, OPEN_LOOP_GLOBAL_COOLDOWN_HOURS);
     const includeSelf = cooled(state.lastSelfLoopAt, SELF_LOOP_COOLDOWN_HOURS);
     if (includeUser || includeSelf) {

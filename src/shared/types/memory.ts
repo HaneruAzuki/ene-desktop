@@ -12,8 +12,7 @@ export interface ShortTermEntry {
 /**
  * 中期記憶(Episodic): 会話から抽出された出来事・事実の要約。
  *
- * v2(MVP 0.3)で +entities/+supersededBy/+extra/+schemaVersion を追加。
- * すべて optional ＝ 旧記録(v1)を書き換えずに読める後方互換(design-revision-memory-v2 §0)。
+ * entities/supersededBy/extra/schemaVersion はすべて optional ＝ 既存記録を書き換えずに読める後方互換。
  * eneStance(ENEの立場)・provenance(出所)は専用フィールドを設けず summary に文章で織り込む
  * (中立記述・ベクトル検索の対象になる)。
  */
@@ -134,7 +133,7 @@ export interface ConversationMoment {
   timeOfDay: string; // 朝/昼/夕方/夜/深夜(P1)
   elapsedLabel?: string; // 前回会話からの経過の言葉(例「3日ぶり」)。同日・初回は undefined(P1)
   openLoops?: string[]; // 気にかけている事柄の覚書(相手の未解決事=provenance:user・最大 OPEN_LOOP_SURFACE_MAX 件・P4)
-  // トリミ自身の気がかり(自分の予定・結果待ち=provenance:self の open loop・案1「意思と不安のにじみ」)。
+  // トリミ自身の気がかり(自分の予定・結果待ち=provenance:self の open loop)。
   // 相手の気にかけ(openLoops)とは提示文を分ける=「自分のこと」を相手に「どうなった?」と尋ねる取り違えを防ぐ。
   selfOpenLoops?: string[];
   knowledgeGaps?: string[]; // まだ知らない相手の属性ラベル(最大 KNOWLEDGE_GAP_SURFACE_MAX 件・親密度ゲート済・P5)
