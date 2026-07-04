@@ -2,7 +2,7 @@ import {
   TURN_NOD_LONG_THRESHOLD_MS,
   TURN_NOD_STRENGTH_SHORT,
   TURN_NOD_STRENGTH_LONG,
-} from '../shared/constants';
+} from './constants';
 
 // ターン終端うなずきの深さ算出(2026-06-12・ターンテイキングの視覚信号)。
 // 無音窓終端(VAD endTurn)で1回うなずく深さを、直前の発話の長さ(ms)から決める純粋関数。

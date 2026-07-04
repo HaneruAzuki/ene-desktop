@@ -7,7 +7,7 @@ import { SileroVad } from '../../voice/silero-vad';
 import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../../voice/vad-segmenter';
 import { isSttModelAvailable } from '../../voice/stt-transcriber';
 import { transcribeViaWorker } from './stt-worker-client';
-import { turnNodStrength } from '../../voice/turn-nod';
+import { turnNodStrength } from '../../shared/turn-nod';
 import type { BackchannelController } from './backchannel-controller';
 import {
   VAD_FRAME_SIZE,

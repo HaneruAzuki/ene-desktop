@@ -1066,6 +1066,15 @@
 - **実装手法**: import 相対パス書換は決定論スクリプト(各 import を「移動後の位置から見た正しい相対」に再計算)→ `git mv` → `tsc` を真実源に検証。`vi.mock()` のパス文字列(from/import 構文でない)は別途手当て。
 - **検証**: typecheck(exit 0)/ eslint 緑 / lint:deps(**違反0**・164 modules・614 deps)/ **541 テスト** 全グリーン。SSOT(03_design §2 ツリー)反映済み。
 
+### N-ARCH-7 🟢 voice/conversation の境界を「音声サンプル vs テキスト」で再定義(2026-07-04)
+- **問題**: 「voice と conversation の区別がつかない」(ユーザー)。voice が audio I/O だけでなく相槌/フィラー/文分割/stream解釈など**言語系**も抱え、名前が実態の半分しか指さず境界が曖昧だった。
+- **決めた不変条件**: `voice = 音声サンプル(Float32Array)に触れるもの / conversation = テキストに触れるもの`。機械判定可能で、旧「言葉 vs 声」の曖昧さを排す。
+- **鍵の観察**: 「相槌」は2つの独立モジュール(互いに import せず app/main が配線)。`backchannel-engine` は発話確率列＋フレーム RMS を食う=**VAD の兄弟(音声信号)** → voice 据置。`backchannel-pool`(語選択)/`backchannel-loader`(語彙 I/O)は**言語** → conversation。`thinking-filler` は難易度＋テキスト駆動 → conversation。
+- **移動(6)**: `json-stream-parser`・`sentence-splitter`・`backchannel-pool`・`backchannel-loader`・`thinking-filler` を voice→conversation、`turn-nod`(main 側の純関数・renderer には置けない=プロセス境界)を voice→shared へ。turn-nod は「音声サンプルに触れない」ため voice から退去(所作)。
+- **越境0で成立した理由**: voice と conversation は元々互いに import せず app/main 配線経由。相槌も engine と pool/loader が独立なので割っても裂けない(memory の教訓と整合)。voice↔conversation は同深度ゆえ移動ファイル本体の import はほぼ無変更、turn-nod のみ `../shared/constants`→`./constants`。
+- **保留(次段)**: voice(9)/conversation(13 に増)の内部サブフォルダ化と、app/main フラット26の整理は別タスク。相槌 pool/loader を conversation にした選択は「A:サンプル基準で厳密分割」(ユーザー決定)。
+- **検証**: typecheck(exit 0)/ eslint 緑 / lint:deps(**違反0**・164 modules)/ **541 テスト** 全グリーン。SSOT(03_design §2)反映済み。
+
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。
 - **E2②(非原子的 save)**: `app-settings.ts` の4 save が read-modify-write で、設定パネルの素早い複数トグルで後勝ち取りこぼしの縁。`updateSettings` で promise チェーン直列化(短期記憶 withWriteLock と同方針)。

@@ -5,8 +5,8 @@ import {
   BACKCHANNEL_VOICE_RATIO,
 } from '../../shared/constants';
 import { BackchannelEngine } from '../../voice/backchannel-engine';
-import { selectBackchannel } from '../../voice/backchannel-pool';
-import { loadBackchannelPool } from '../../voice/backchannel-loader';
+import { selectBackchannel } from '../../conversation/backchannel-pool';
+import { loadBackchannelPool } from '../../conversation/backchannel-loader';
 import { resolveStyle } from '../../voice/voice-loader';
 import { resolveVoice } from './app-runtime';
 import type { BackchannelPoolData } from '../../shared/types/backchannel';

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 // loadBackchannelPool(I/O)だけをモックし、コントローラの「準備→発火→送信」配線を検証する。
 // タイミング判定は backchannel-engine.test、語選択は backchannel-pool.test で個別に検証済み。
-vi.mock('../../src/voice/backchannel-loader', () => ({
+vi.mock('../../src/conversation/backchannel-loader', () => ({
   loadBackchannelPool: vi.fn(async () => ({
     version: 1,
     cues: { continuer: ['うん', 'うんうん'] },

@@ -344,7 +344,7 @@ ene-desktop/
 │   │   ├── pack.ts                ← 季節/常緑パックのロード(I/O 窓口・旧 memory/offscreen-life-pack)
 │   │   └── select.ts             ← 週次 beat の選択(純粋・electron 非依存・旧 memory/offscreen-life-select)
 │   │
-│   ├── conversation/              ← あり方④:語り口=言葉(Conversation Layer)
+│   ├── conversation/              ← あり方④:語り口=言葉(テキスト・言語・対話の振る舞い)。2026-07 に voice から言語系を再分類
 │   │   ├── client.ts              ← Claude APIクライアント(chat / makeLlmComplete)
 │   │   ├── birthday-checker.ts    ← 誕生日判定(結果 birthdayHint は挨拶/プロンプトへ・旧 character/・N-ARCH-6)
 │   │   ├── prompt-builder.ts      ← 統合プロンプト構築(出力形式付与・交互列正規化)
@@ -352,24 +352,23 @@ ene-desktop/
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
 │   │   ├── greeting.ts            ← 起動挨拶生成(firstLaunch/forgotten/normal)
 │   │   ├── idle-talk.ts           ← 自発発話の文面生成(話しかけ・存在感P)
-│   │   └── model-selector.ts      ← 二段生成のモデル選択(雑談=Haiku/難題=Sonnet・B-15b・既定オフ)
+│   │   ├── model-selector.ts      ← 二段生成のモデル選択(雑談=Haiku/難題=Sonnet・B-15b・既定オフ)
+│   │   ├── json-stream-parser.ts  ← LLM応答のストリーミング解釈(旧 voice/・2026-07 境界再分類)
+│   │   ├── sentence-splitter.ts   ← 応答テキストの文分割(TTS配信用・純粋・旧 voice/)
+│   │   ├── backchannel-pool.ts    ← 相槌の語選択(語彙=言語・純粋・RNG注入・旧 voice/)
+│   │   ├── backchannel-loader.ts  ← 相槌語彙(backchannels.json)のロード(旧 voice/)
+│   │   └── thinking-filler.ts     ← 思考フィラー発火判定(難易度＋テキスト駆動・旧 voice/)
 │   │
-│   ├── voice/                     ← あり方④:語り口=声(TTS/STT/VAD・task_17/18)
+│   ├── voice/                     ← あり方④:語り口=声(音声信号 I/O)。判定基準=「音声サンプル(Float32Array)に触れるもの」(2026-07 境界再定義)
 │   │   ├── voice-loader.ts        ← voice.json ロード・emotion→スタイル解決(task_17)
 │   │   ├── aivisspeech-tts.ts     ← AivisSpeech HTTPクライアント(TtsEngine 実装・task_17)
 │   │   ├── voice-provisioner.ts   ← 声設定の整合(/speakers で実 styleId 解決・task_17)
-│   │   ├── voice-chat.ts          ← 音声合成の唯一の消費器 speakChunks(文単位 C2ゲート・ストリーム/確定文 共通・task_17/2026-06-23)
-│   │   ├── json-stream-parser.ts  ← JSON応答のストリーミング解釈(C1・B-06)
-│   │   ├── sentence-splitter.ts   ← 日本語の文単位分割(純粋ロジック・task_17)
+│   │   ├── voice-chat.ts          ← 音声合成の唯一の消費器 speakChunks(文単位 C2ゲート・task_17)
 │   │   ├── stt-transcriber.ts     ← Whisper STT の in-process 実装/フォールバック(task_17・N-REL-5)
-│   │   ├── stt-pipeline.ts        ← STT パイプラインの純粋コア(Electron非依存・in-process と worker が共用・N-REL-5)
+│   │   ├── stt-pipeline.ts        ← STT パイプラインの純粋コア(Electron非依存・N-REL-5)
 │   │   ├── silero-vad.ts          ← Silero VAD v4 ランナー(onnxruntime-node・task_17)
 │   │   ├── vad-segmenter.ts       ← 発話区間セグメンタ(無音でターン終了・barge-in判定・task_17)
-│   │   ├── backchannel-engine.ts  ← 相槌タイミングのリアルタイム判定(純粋ロジック・task_18)
-│   │   ├── backchannel-pool.ts    ← 相槌の語選択(純粋ロジック・RNG 注入・task_18)
-│   │   ├── backchannel-loader.ts  ← 相槌語彙(backchannels.json)のロード(task_18)
-│   │   ├── thinking-filler.ts     ← 思考フィラー「うーん…」の発火判定(task_18 Phase C)
-│   │   └── turn-nod.ts            ← ターン終端うなずきの深さ算出(純粋関数・N-VRM-3)
+│   │   └── backchannel-engine.ts  ← 相槌タイミングのリアルタイム判定(発話確率列→イベント=音声信号・task_18)
 │   │
 │   └── shared/                    ← 土台:共有型・ユーティリティ(プロセス非依存)
 │       ├── types/
@@ -396,6 +395,7 @@ ene-desktop/
 │       ├── api-key-error-messages.ts ← エラー種別→ユーザ表示文言(§3.7)
 │       ├── ai-self-check.ts     ← AI自称検知(3層防御 第2層・純粋・旧 conversation/・N-ARCH-5)
 │       ├── ruby.ts              ← 青空文庫式ルビの解決(純粋・旧 voice/・N-ARCH-5)
+│       ├── turn-nod.ts          ← ターン終端うなずきの深さ算出(純粋関数・main側・音声非依存・旧 voice/・2026-07)
 │       └── node/                  ← Node(main プロセス)専用の基盤
 │           ├── paths.ts           ← パス管理(characterId キャッシュ)
 │           ├── json-store.ts      ← 平文JSONファイル操作

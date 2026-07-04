@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createJsonStreamParser } from '../../src/voice/json-stream-parser';
+import { createJsonStreamParser } from '../../src/conversation/json-stream-parser';
 import type { EmotionLabel } from '../../src/shared/types/animation';
 
 // JSON応答のストリーミング解釈(C1・B-06)。

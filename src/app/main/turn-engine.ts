@@ -10,7 +10,7 @@ import { classifyTopicLocal } from '../../knowledge/local-classifier';
 import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../conversation/client';
 import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
 import { chooseModelTier } from '../../conversation/model-selector';
-import { shouldPlayThinkingFiller } from '../../voice/thinking-filler';
+import { shouldPlayThinkingFiller } from '../../conversation/thinking-filler';
 import {
   recordBirthdayCelebrated,
   recordConversationTurn,
