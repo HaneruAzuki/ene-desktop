@@ -6,7 +6,7 @@ import type { RelationshipFacts } from '../../shared/types/character';
 // 「親しさ」は**感情スカラー(好感度)ではなく接触の事実**から導出する(§5.3 適合)。
 //  - 経過日数 AND 会話実日数 AND ターン累計の **全部** が閾値を満たした最大段(1..5)。
 //  - 事実は単調増加なので段も**単調非減少**(知り合った仲は戻らない=ドゥームループ無縁)。
-//  - 保存スカラーは持たない。事実(active-character.json の relationship)から毎回導出する。
+//  - 保存スカラーは持たない。事実(character-state.json の relationship)から毎回導出する。
 
 /**
  * 関係の事実から familiarityStage(1..5)を導出する。now は注入(テスト決定化)。

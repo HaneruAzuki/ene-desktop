@@ -5,7 +5,7 @@ import { stopBackchannel } from './backchannel-player';
 import { VoiceMic } from './voice-conversation';
 import { startRecording, type Recorder } from './mic-capture';
 import { STT_SAMPLE_RATE } from '../../shared/constants';
-import type { CharacterState } from '../../shared/types/animation';
+import type { CharacterViewState } from '../../shared/types/animation';
 
 // 音声入力ステートマシン(マイク単一ハイブリッド・PTT・ハンズフリー・barge-in)を App から切り出したフック。
 // マイクは単一ハイブリッド: 短タップ=ハンズフリーON/OFF、長押し=押している間 PTT。
@@ -30,7 +30,7 @@ export interface VoiceInputDeps {
   /** 吹き出し文の差し替え(null で消す)。 */
   setBubble: (text: string | null) => void;
   /** キャラ状態(activity/emotion/pose)の更新。 */
-  setCharState: Dispatch<SetStateAction<CharacterState>>;
+  setCharState: Dispatch<SetStateAction<CharacterViewState>>;
   /** ストリーミングで「聞かせた文」を貯める ref(barge-in 時に main へ報告)。App の再生同期と共有。 */
   spokenRef: MutableRefObject<string[]>;
   /** 口パク終了タイマー ref(barge-in で talking→idle に戻すため触る)。App の応答フローと共有。 */

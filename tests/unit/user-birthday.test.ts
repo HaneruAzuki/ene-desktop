@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { isUserBirthdayToday } from '../../src/memory/readout/user-birthday';
-import type { ActiveCharacter } from '../../src/shared/types/character';
+import type { CharacterState } from '../../src/shared/types/character';
 
 // P5: 相手(ユーザー)の誕生日判定(キャラ誕生日 birthday-checker の鏡像)。
 
-const baseActive: ActiveCharacter = {
+const baseActive: CharacterState = {
   version: 1,
   characterId: 'ene',
-  selectedAt: '2026-01-01T00:00:00+09:00',
+  createdAt: '2026-01-01T00:00:00+09:00',
   birthdayHistory: [],
   firstLaunchCompleted: true,
 };
@@ -25,14 +25,14 @@ describe('isUserBirthdayToday (P5)', () => {
     expect(isUserBirthdayToday({ month: 8, day: 11 }, baseActive, today)).toBe(false);
   });
   it('今年すでに祝っていれば false(当日の繰り返しを防ぐ)', () => {
-    const active: ActiveCharacter = {
+    const active: CharacterState = {
       ...baseActive,
       userBirthdayHistory: [{ year: 2026, celebrated: true }],
     };
     expect(isUserBirthdayToday({ month: 6, day: 12 }, active, today)).toBe(false);
   });
   it('昨年祝っていても、今年の誕生日はまた祝える', () => {
-    const active: ActiveCharacter = {
+    const active: CharacterState = {
       ...baseActive,
       userBirthdayHistory: [{ year: 2025, celebrated: true }],
     };

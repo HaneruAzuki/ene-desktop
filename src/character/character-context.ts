@@ -1,6 +1,6 @@
-import { setActiveCharacterId } from '../shared/node/paths';
+import { setCharacterId } from '../shared/node/paths';
 import { loadCharacterProfile } from './loader';
-import { loadOrCreateActiveCharacter } from './active-character';
+import { loadOrCreateCharacterState } from './character-state';
 import { buildSystemPrompt } from './system-prompt-builder';
 import type { CharacterContext } from '../shared/types/character';
 
@@ -10,10 +10,10 @@ import type { CharacterContext } from '../shared/types/character';
 // 起動フロー(app/main/lifecycle)が checkBirthday(conversation/)で設定する(重複計算の解消・N-ARCH-6)。
 
 export async function buildCharacterContext(): Promise<CharacterContext> {
-  const active = await loadOrCreateActiveCharacter();
+  const active = await loadOrCreateCharacterState();
 
   // 記憶系パス(paths.ts)が同じ active キャラを指すようキャッシュを同期する。
-  setActiveCharacterId(active.characterId);
+  setCharacterId(active.characterId);
 
   const profile = await loadCharacterProfile(active.characterId);
 

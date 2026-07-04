@@ -86,7 +86,7 @@ export interface CharacterFewshot {
   longAbsenceGreeting?: FewshotExample[];
 }
 
-// --- active-character.json(設計書 §5.4・最小状態管理) ---
+// --- character-state.json(設計書 §5.4・最小状態管理=キャラの永続状態/関係の記録) ---
 
 export interface BirthdayHistoryEntry {
   year: number; // 西暦
@@ -105,10 +105,10 @@ export interface RelationshipFacts {
   totalTurns: number; // 累計やりとり回数
 }
 
-export interface ActiveCharacter {
+export interface CharacterState {
   version: number; // スキーマバージョン(MVPは 1)
-  characterId: string; // 現在使用中のキャラ ID
-  selectedAt: string; // 切り替えた日時(ローカルTZ込み ISO 8601)
+  characterId: string; // キャラ ID
+  createdAt: string; // このレコードを初めて作成した日時(ローカルTZ込み ISO 8601)
   birthdayHistory: BirthdayHistoryEntry[];
   /** 相手(ユーザー)の誕生日を祝った事実(P5・キャラ誕生日 birthdayHistory の鏡像)。同年に祝い直しを繰り返さないため。 */
   userBirthdayHistory?: BirthdayHistoryEntry[];

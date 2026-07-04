@@ -19,7 +19,7 @@ vi.mock('../../../src/shared/node/paths', () => ({
   getVectorIndexPath: (): string => `${h.base}/index/vectors.json`,
   getModelsDir: (): string => `${h.base}/models`,
   getLifeMemoryPath: (id: string): string => `${h.base}/${id}/life-memory.json`,
-  getActiveCharacterId: (): string => 'ene',
+  getCharacterId: (): string => 'ene',
 }));
 
 import { updateSemantic } from '../../../src/memory/core/semantic';

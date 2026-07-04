@@ -6,10 +6,11 @@ import { promises as fs } from 'node:fs';
 // paths をモック: active-character.json は tmp、キャラ定義は実物(cwd 直下の {id}/)を使う。
 const h = vi.hoisted(() => ({ acPath: '', dir: '' }));
 vi.mock('../../src/shared/node/paths', () => ({
-  getActiveCharacterPath: (): string => h.acPath,
+  getCharacterStatePath: (): string => h.acPath,
+  getLegacyCharacterStatePath: (): string => `${h.acPath}.legacy`, // 存在しない=移行はスキップ
   getCharacterDir: (id: string): string => `${process.cwd()}/${id}`,
   getCurrentStatePath: (id: string): string => `${process.cwd()}/${id}/current-state.json`,
-  setActiveCharacterId: vi.fn(),
+  setCharacterId: vi.fn(),
 }));
 
 import { buildCharacterContext } from '../../src/character/character-context';

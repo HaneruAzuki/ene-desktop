@@ -6,9 +6,9 @@ import { isCloudSyncFolder } from '../../../shared/node/cloud-warning';
 import { loadAndDecryptApiKey } from '../../../shared/node/encryption';
 import { todayLocalYmd, todayLocalYmdString } from '../../../shared/datetime';
 import {
-  loadOrCreateActiveCharacter,
+  loadOrCreateCharacterState,
   markFirstLaunchCompleted,
-} from '../../../character/active-character';
+} from '../../../character/character-state';
 import { buildCharacterContext } from '../../../character/character-context';
 import { checkBirthday } from '../../../conversation/birthday-checker';
 import { getUnextractedEntries, clearShortTerm } from '../../../memory/core/short-term';
@@ -38,7 +38,7 @@ import {
   clampPositionToScreen,
   saveWindowPosition,
 } from '../window/window-position';
-import type { CharacterContext, ActiveCharacter } from '../../../shared/types/character';
+import type { CharacterContext, CharacterState } from '../../../shared/types/character';
 import { IPC } from '../../../shared/ipc-channels';
 
 // 起動シーケンス(設計書 §7.1 の11ステップ)。
@@ -46,7 +46,7 @@ import { IPC } from '../../../shared/ipc-channels';
 
 export async function runStartupSequence(
   runtime: AppRuntime,
-): Promise<{ mainWindow: BrowserWindow; active: ActiveCharacter }> {
+): Promise<{ mainWindow: BrowserWindow; active: CharacterState }> {
   // Step 2: app ready
   await app.whenReady();
   initLogger(getLogsDir());
@@ -109,11 +109,11 @@ export async function runStartupSequence(
   }
   runtime.apiKey = apiKey;
 
-  // Step 6: active-character.json
-  const active = await loadOrCreateActiveCharacter();
+  // Step 6: character-state.json(キャラの永続状態=関係の記録)
+  const active = await loadOrCreateCharacterState();
   log.info(`active character: ${active.characterId}`);
 
-  // Step 7: キャラクタープロファイル(setActiveCharacterId も内部で実施)
+  // Step 7: キャラクタープロファイル(setCharacterId も内部で実施)
   let charContext: CharacterContext;
   try {
     charContext = await buildCharacterContext();

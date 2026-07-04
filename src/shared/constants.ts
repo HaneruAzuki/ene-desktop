@@ -8,7 +8,7 @@ export const DAY_MS = 86_400_000;
 
 /** 同梱キャラの ID(ブートストラップ時の初期 active キャラ・SSOT)。キャラ属性のハードコードではなく初期値。
  *  ここ(import 無しの leaf)に置くことで、paths をモックするテストでも値が消えない(層結合も避ける)。 */
-export const DEFAULT_CHARACTER_ID = 'ene';
+export const CHARACTER_ID = 'ene';
 
 // --- 記憶レイヤー ---
 /**

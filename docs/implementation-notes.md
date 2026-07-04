@@ -75,10 +75,10 @@
 
 ## task_01(Storage Layer)
 
-### N-01-1 🟡 `getMemoryDir()` 同期シグネチャ と active-character.json の非同期読込の矛盾
-- **該当**: 設計書 §3.6 / §5.5(`getMemoryDir(): string` が active-character.json を参照)
-- **内容**: §3.6 はパス関数を同期(`: string`)で定義しつつ「active-character.json の characterId を参照して動的に返す」とするが、ファイル読込は非同期 I/O(同期 I/O は CLAUDE §12 で禁止)。
-- **判断**: characterId をモジュール内にキャッシュし、`refreshActiveCharacterId()`(非同期)で更新、`getMemoryDir()` 等の getter は同期でキャッシュ値を返す構成にした。`setActiveCharacterId()` も提供。
+### N-01-1 🟡 `getMemoryDir()` 同期シグネチャ と character-state.json の非同期読込の矛盾
+- **該当**: 設計書 §3.6 / §5.5(`getMemoryDir(): string` が character-state.json を参照)
+- **内容**: §3.6 はパス関数を同期(`: string`)で定義しつつ「character-state.json の characterId を参照して動的に返す」とするが、ファイル読込は非同期 I/O(同期 I/O は CLAUDE §12 で禁止)。
+- **判断**: characterId をモジュール内にキャッシュし、`refreshCharacterId()`(非同期)で更新、`getMemoryDir()` 等の getter は同期でキャッシュ値を返す構成にした。`setCharacterId()` も提供。
 - **反映**: §3.6 に「characterId はキャッシュし、起動時に非同期で読み込んで反映、getter は同期」と実装方針を明記。
 
 ---
@@ -435,7 +435,7 @@
 ### N-10-6 ⚪ before-quit で非同期終了処理(preventDefault + isQuitting ガード)
 - **該当**: task_10 §6/§7 / 設計書 §7.2
 - **内容**: `app.on('before-quit')` で preventDefault → runShutdownSequence(記憶抽出 + 短期記憶クリア)→ `app.quit()`。再入防止の isQuitting フラグ。runtime.apiKey がある時のみ実行。
-- **検証メモ**: 起動シーケンス(書込検証・APIキー・キャラ・記憶ディレクトリ・誕生日・ウィンドウ・挨拶)は実機で app starting→active character→app ready とエラー無しを確認。**graceful 終了時の抽出・短期記憶削除、初回起動挨拶(active-character.json 削除時)、誕生日反応、クラウド警告**はユーザの手動確認に委ねる(実操作が必要)。
+- **検証メモ**: 起動シーケンス(書込検証・APIキー・キャラ・記憶ディレクトリ・誕生日・ウィンドウ・挨拶)は実機で app starting→active character→app ready とエラー無しを確認。**graceful 終了時の抽出・短期記憶削除、初回起動挨拶(character-state.json 削除時)、誕生日反応、クラウド警告**はユーザの手動確認に委ねる(実操作が必要)。
 
 ---
 
@@ -677,8 +677,8 @@
 - **反映**: §3.3(mood.ts)。design-revision-character-heart §3.2 の式に prior を補う改訂。
 
 ### N-16-9 🟢 familiarityStage=接触の事実3要素・連言・Lv5≈1年
-- **内容**: 経過日数 AND 会話実日数 AND ターン累計の**全部**が閾値を満たす最大段(`FAMILIARITY_THRESHOLDS`)。事実は `active-character.json` の `relationship`(firstMetAt/lastConversationDate/distinctConversationDays/totalTurns)に記録(誕生日履歴と同列の“事実”)。ユーザ決定:**Lv5≈1年**(365日/80会話日/800ターン)。`recordConversationTurn()` を user ターンで呼ぶ。
-- **反映**: §3.1/§5.4(ActiveCharacter に relationship)。§3.3(familiarity.ts)。
+- **内容**: 経過日数 AND 会話実日数 AND ターン累計の**全部**が閾値を満たす最大段(`FAMILIARITY_THRESHOLDS`)。事実は `character-state.json` の `relationship`(firstMetAt/lastConversationDate/distinctConversationDays/totalTurns)に記録(誕生日履歴と同列の“事実”)。ユーザ決定:**Lv5≈1年**(365日/80会話日/800ターン)。`recordConversationTurn()` を user ターンで呼ぶ。
+- **反映**: §3.1/§5.4(CharacterState に relationship)。§3.3(familiarity.ts)。
 
 ### N-16-10 🟢 canon は recall-pool で統合(索引含む)・mood/安全網は user のみ
 - **内容**: `loadRecallPool()` = user episodic ＋ canon(ID=`self/N`)。retriever・逆引き索引・ベクトル索引はこのプールを母集団に(canon も語彙/意味で引ける)。一方 **mood 導出と「直近×高importance」安全網は provenance:'user' のみ**(canon は直近の出来事ではない・想起を埋め尽くさない)。canon は supersede/保存/忘却の対象外。
@@ -820,7 +820,7 @@
 - **該当**: `context-builder.ts` / `retriever.ts` / `ipc.ts`
 - **変更**:
   - `RetrieverDeps` に `recallPool?: EpisodicRecord[]` を追加。`retrieveRecords` は `deps.recallPool ?? await loadRecallPool()`(未指定なら従来どおり=後方互換)。
-  - 新 `buildConversationMemory(query)`:`loadAllEpisodicFiles()`(user)・`loadLifeMemory()`(canon)・`loadOrCreateActiveCharacter()` を**1回だけ並列ロード**し、mood/familiarity 導出と recallPool で**使い回す**。従来 `buildHeartDeps` ＋ `retrieve(loadRecallPool)` で**2回**走っていた `loadAllEpisodicFiles` が1回に。
+  - 新 `buildConversationMemory(query)`:`loadAllEpisodicFiles()`(user)・`loadLifeMemory()`(canon)・`loadOrCreateCharacterState()` を**1回だけ並列ロード**し、mood/familiarity 導出と recallPool で**使い回す**。従来 `buildHeartDeps` ＋ `retrieve(loadRecallPool)` で**2回**走っていた `loadAllEpisodicFiles` が1回に。
   - `buildHeartDeps` 廃止(buildConversationMemory に内包)。`buildMemoryContext(query, deps)` は下位ビルダとして存続。
   - `ipc.ts` step2/3:独立な `classifyTopic`(Router)と `buildConversationMemory` を `Promise.all` で並列化(B-03b)。Router 往復(~800ms タイムアウト)を記憶構築に重ねて隠す。
 - **注意**: Router タイムアウトが実 Haiku 往復を下回り fallback=medium になる **B-03 本体(few-shot 不発)は未解決**(並列化で critical path から隠れただけ)。B-03 は backlog 残置。
@@ -1048,8 +1048,8 @@
   - `LlmComplete` port(`memory/extractor.ts` に同居)→ `shared/types/llm.ts`(ドメイン間の境界契約)→ conversation→memory の型依存が解消。memory は引き続き port を受け取るだけ(Claude を知らない)。
 - **`offscreen-life` を `app/main` へ**: LLM(conversation)×episodic 書込(memory)を跨ぐオーケストレーションは配線層が持つのが筋 → conversation→memory の具象依存(facade 呼び)が解消。
 - **同名ファイルの解消(④)**: `character/context-builder.ts` → `character-context.ts`、`knowledge/fallback.ts` → `domain-fallback.ts`(memory/context-builder・conversation/fallback と紛れない)。
-- **`memory→character` は意図的に残す**: `memory/context-builder` → `character/active-character`(関係の事実を読む)。character は他に依存しない leaf ゆえ循環リスク無し=良性の下向き依存。注入で消すより素直。
-- **機械強制(N-ARCH-2 の延長)**: `.dependency-cruiser.cjs` に `no-cross-domain`(error)を追加。`from` のドメインを `$1` で捕捉し `^src/$1/`(同一ドメイン)＋ `^src/character/active-character`(上記例外)のみ許可。**一時プローブ(memory が voice を import)で error を出すことを検証後に撤去**=ルールが実際に噛むことを確認。
+- **`memory→character` は意図的に残す**: `memory/context-builder` → `character/character-state`(関係の事実を読む)。character は他に依存しない leaf ゆえ循環リスク無し=良性の下向き依存。注入で消すより素直。
+- **機械強制(N-ARCH-2 の延長)**: `.dependency-cruiser.cjs` に `no-cross-domain`(error)を追加。`from` のドメインを `$1` で捕捉し `^src/$1/`(同一ドメイン)＋ `^src/character/character-state`(上記例外)のみ許可。**一時プローブ(memory が voice を import)で error を出すことを検証後に撤去**=ルールが実際に噛むことを確認。
 - **検証**: typecheck / eslint / lint:deps(違反0・152 modules)/ build / **491 テスト** 全グリーン。SSOT(03_design §2 ツリー・05_architecture §4)反映済み。
 
 ### N-ARCH-6 🟢 memory を能力で層化＋異物の退去(Screaming Architecture 深掘り・2026-07-04)
@@ -1089,6 +1089,13 @@
 - 越境なし(全て app 内)。dependency-cruiser ルール変更不要。
 - **検証**: typecheck / eslint / lint:deps(違反0) / **541テスト** / **build 成功**。SSOT(03_design §2)反映。
 - **補足**: app/main/voice(6)・orchestration(3)は「Electron/プロセス配線」または「複数ドメインの合成」ゆえ app が正しい(純粋ロジックは既に各ドメインへ抽出済=domain が中身・app が配線)。voice-turn-coordinator だけは純粋だったので conversation へ出した。
+
+### 公開前整理 🟢 デッドコード撤去・重複解消・純粋ロジック分離・命名整理(Tier1〜3＋命名・2026-07-04)
+- 8領域を並列深掘り監査(関数粒度)→ 検証済みのみ実施。tsc/eslint/lint:deps(違反0)/538テスト/build 各段緑。
+- **Tier1 デッド撤去**: `frameRms`(backchannel-engine・本番参照0)、右クリックメニュー連鎖(`showCharacterContextMenu`・UI改修で到達不能)＋派生の `resetToDefaultPosition`。
+- **Tier2 重複解消**: 自発発話5手の三重複→`app/main/voice/self-speech.ts`、`nowLocalIso().slice(0,10)`→`shared/datetime` の `todayLocalYmdString`、相槌 `stringList`→`toStringArray` 再利用、`ene-key:*` 生文字列→`ipc-channels` 定数。
+- **Tier3 純粋ロジック分離**: STT補正 `name-mishear.ts`・offscreen 挨拶 `offscreen-life-prompt.ts`(app→conversation)、`context-builder`→`moment-builder`、renderer の `mic-graph`/`audio-graph`。
+- **命名整理(N-ARCH-10)**: multi-character 時代の残滓を一掃。`ActiveCharacter`→`CharacterState`(表示状態は `CharacterViewState` に精密化=衝突先も適正名へ)、`active-character.{ts,json}`→`character-state.{ts,json}`(**移行付き**: 旧ファイルを `createdAt`(旧`selectedAt`)へ写して保存・旧撤去)、`DEFAULT_CHARACTER_ID`→`CHARACTER_ID`、`get/set/refreshActiveCharacterId`→`…CharacterId`、`getActiveCharacterPath`→`getCharacterStatePath`。id 抽象自体は §5.1 の意図(ハードコード排除・可逆性)ゆえ維持。dependency-cruiser の例外パスも追従。
 
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。

@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { generateGreeting } from '../../src/conversation/greeting';
 import { makeCharContext } from './fixtures';
-import type { ActiveCharacter, CharacterFewshot } from '../../src/shared/types/character';
+import type { CharacterState, CharacterFewshot } from '../../src/shared/types/character';
 
-function makeActive(over: Partial<ActiveCharacter> = {}): ActiveCharacter {
+function makeActive(over: Partial<CharacterState> = {}): CharacterState {
   return {
     version: 1,
     characterId: 'ene',
-    selectedAt: '2026-01-01T00:00:00+09:00',
+    createdAt: '2026-01-01T00:00:00+09:00',
     birthdayHistory: [],
     firstLaunchCompleted: true,
     ...over,

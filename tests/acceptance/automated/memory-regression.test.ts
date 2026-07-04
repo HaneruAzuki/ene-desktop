@@ -28,8 +28,8 @@ vi.mock('../../../src/shared/node/paths', () => ({
   getModelsDir: (): string => `${h.memDir}/models`, // 未配置=ベクトル想起スキップ(語彙のみ・決定論)
   getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
   getOpenLoopStatePath: (): string => `${h.memDir}/open-loop-state.json`,
-  getActiveCharacterPath: (): string => `${h.memDir}/active-character.json`,
-  getActiveCharacterId: (): string => 'ene',
+  getCharacterStatePath: (): string => `${h.memDir}/active-character.json`,
+  getCharacterId: (): string => 'ene',
 }));
 
 import { buildConversationMemory } from '../../../src/memory/readout/context-builder';
@@ -38,12 +38,12 @@ import { saveEpisodic } from '../../../src/memory/core/episodic';
 import { rebuildInvertedIndex } from '../../../src/memory/core/index-inverted';
 import { updateSemantic } from '../../../src/memory/core/semantic';
 import { appendShortTerm } from '../../../src/memory/core/short-term';
-import { saveActiveCharacter } from '../../../src/character/active-character';
+import { saveCharacterState } from '../../../src/character/character-state';
 import { makeCharContext, makeRouterResult, systemText, lastUserText } from '../../unit/fixtures';
 import { nowLocalIso } from '../../../src/shared/datetime';
 import { DAY_MS } from '../../../src/shared/constants';
 import type { EpisodicMemory } from '../../../src/shared/types/memory';
-import type { ActiveCharacter, RelationshipFacts } from '../../../src/shared/types/character';
+import type { CharacterState, RelationshipFacts } from '../../../src/shared/types/character';
 
 function isoDaysAgo(days: number): string {
   const now = nowLocalIso();
@@ -55,15 +55,15 @@ function isoDaysAgo(days: number): string {
 
 /** 関係の事実を書く(親しさ段階を制御する)。fresh=stage1 / deep=stage4以上。 */
 async function writeRelationship(rel: RelationshipFacts | undefined): Promise<void> {
-  const active: ActiveCharacter = {
+  const active: CharacterState = {
     version: 1,
     characterId: 'ene',
-    selectedAt: '2026-01-01T00:00:00+09:00',
+    createdAt: '2026-01-01T00:00:00+09:00',
     birthdayHistory: [],
     firstLaunchCompleted: true,
     ...(rel ? { relationship: rel } : {}),
   };
-  await saveActiveCharacter(active);
+  await saveCharacterState(active);
 }
 
 const FRESH: RelationshipFacts = {

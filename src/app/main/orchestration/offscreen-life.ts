@@ -9,7 +9,7 @@ import { loadOffscreenPacks } from '../../../offscreen-life/pack';
 import { selectWeeklyBeat, beatToEpisodic } from '../../../offscreen-life/select';
 import { buildOffscreenLifePrompt, parseGreeting } from '../../../conversation/offscreen-life-prompt';
 import type { LlmComplete } from '../../../shared/types/llm';
-import type { ActiveCharacter, CharacterContext } from '../../../shared/types/character';
+import type { CharacterState, CharacterContext } from '../../../shared/types/character';
 
 // オフスクリーンライフ(P3・N-PRES-3 / off-screen-life 本実装)。「会っていない間も生きている」を成立させる。
 //
@@ -33,7 +33,7 @@ import type { ActiveCharacter, CharacterContext } from '../../../shared/types/ch
  */
 export async function generateOffscreenLife(
   charContext: CharacterContext,
-  active: ActiveCharacter,
+  active: CharacterState,
   elapsedLabel: string | undefined,
   timeOfDay: string,
   complete: LlmComplete,

@@ -133,13 +133,13 @@
 
 | 事実 | 根拠 | 分類 |
 |---|---|---|
-| 単一固定キャラ。`DEFAULT_CHARACTER_ID='ene'`(唯一SSOT)。切替UIなし | `constants.ts:11`・`active-character.ts:14-28` | [静的確認済] |
+| 単一固定キャラ。`CHARACTER_ID='ene'`(唯一SSOT)。切替UIなし | `constants.ts:11`・`character-state.ts:14-28` | [静的確認済] |
 | プロファイルは4ファイル(identity/background/knowledge_domains/fewshot)を読込。欠損・characterId 不一致は例外(自動回復しない) | `loader.ts:28-75` | [静的確認済] |
 | `ene/` JSON 群:identity/background/knowledge_domains/fewshot/voice/vrm/current-state/backchannels/life-memory/off-screen-life。表示名 `name:"魚川トリミ"`、内部 characterId は `"ene"` | `ene/identity.json:2` 他 | [静的確認済] |
 | **キャラ依存値は JSON 外出し**(名前・口調・知識境界・Few-shot・声・VRM・関心キーワード)。system-prompt 構築コードにキャラ名/口調の直書きなし(変数展開のみ) | `system-prompt-builder.ts:30-84` | [静的確認済] |
 | **AI自称防止3層**:①プロンプト(`neverCallsSelf`明示)②応答後検知(非ストリーミング=メッセージ単位/ストリーミング=文単位C2)③検知時フォールバック(再生成なし)。検知語は identity.json 由来=ハードコードなし | `client.ts:233-260`・`voice-chat.ts:70`・`ai-self-check.ts:13-37` | [静的確認済] |
 | 誕生日は二値(today/forgotten)＋ `birthdayHistory` の celebrated フラグのみ。感情スカラーなし | `birthday-checker.ts:10-38` | [静的確認済] |
-| **保存される感情/好感度スカラーは型にもデータにも存在しない**(active-character.json は事実記録のみ) | `character.ts:108-117` | [静的確認済] |
+| **保存される感情/好感度スカラーは型にもデータにも存在しない**(character-state.json は事実記録のみ) | `character.ts:108-117` | [静的確認済] |
 
 **[部分逸脱]** エラー時キャラ口調文がコード直書き(`fallback.ts:8`・`ipc.ts:53,374,380`・`use-voice-input.ts:144`)=「100%外出し」とは言えない。`fallback.ts` 自身が外出し未完を TODO 化。
 **[スタコメント]** `ai-self-check.ts:1` ヘッダが「4層/第2層」のまま(実装は3層)。

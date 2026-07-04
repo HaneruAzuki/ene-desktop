@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateGreeting } from '../../src/conversation/greeting';
 import { makeCharContext } from './fixtures';
-import type { ActiveCharacter, CharacterFewshot, RelationshipFacts } from '../../src/shared/types/character';
+import type { CharacterState, CharacterFewshot, RelationshipFacts } from '../../src/shared/types/character';
 
 // P3: 起動挨拶の棚分けフォールバック(前回会話からの経過で同日/通常/長期不在を出し分ける)。
 
@@ -21,7 +21,7 @@ function ymd(offsetDays: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function activeWithLastDate(lastDate: string): ActiveCharacter {
+function activeWithLastDate(lastDate: string): CharacterState {
   const relationship: RelationshipFacts = {
     firstMetAt: '2026-01-01T00:00:00+09:00',
     lastConversationDate: lastDate,
@@ -31,7 +31,7 @@ function activeWithLastDate(lastDate: string): ActiveCharacter {
   return {
     version: 1,
     characterId: 'ene',
-    selectedAt: '2026-01-01T00:00:00+09:00',
+    createdAt: '2026-01-01T00:00:00+09:00',
     birthdayHistory: [],
     firstLaunchCompleted: true,
     relationship,

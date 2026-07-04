@@ -17,7 +17,7 @@ import {
   DAY_MS,
 } from '../../shared/constants';
 import type { EpisodicRecord, ConversationMoment, SemanticMemory } from '../../shared/types/memory';
-import type { ActiveCharacter } from '../../shared/types/character';
+import type { CharacterState } from '../../shared/types/character';
 
 // 「いま」の存在文脈(moment)の組み立て(P1/P4/P5/P7・N-PRES-*)。
 // context-builder(記憶の集約)から、能動提示のクールダウン状態機械を分離した(公開前整理)。
@@ -30,7 +30,7 @@ import type { ActiveCharacter } from '../../shared/types/character';
 export async function buildMoment(
   userRecords: EpisodicRecord[],
   semantic: SemanticMemory,
-  active: ActiveCharacter,
+  active: CharacterState,
   stage: number,
   sessionTurns: number,
 ): Promise<ConversationMoment> {

@@ -5,7 +5,7 @@ import { loadLifeMemory } from '../core/life-memory';
 import { retrieve, type RetrieverDeps } from '../recall/retriever';
 import { seemsDown, LOW_MOOD_HINT } from './mood-cues';
 import { deriveFamiliarityStage } from './familiarity';
-import { loadOrCreateActiveCharacter } from '../../character/active-character';
+import { loadOrCreateCharacterState } from '../../character/character-state';
 import { buildMoment, logRecallDiag } from './moment-builder';
 import type { MemoryContext, RetrievalQuery } from '../../shared/types/memory';
 
@@ -29,7 +29,7 @@ export async function buildMemoryContext(
  * 会話経路の記憶コンテキストを構築する(task_16 ＋ B-14a)。
  *
  * episodic(user)と canon を**1回だけ**ロードし、
- *  - 開示(familiarityStage):active-character の関係の事実から導出、
+ *  - 開示(familiarityStage):character-state の関係の事実から導出、
  *  - 想起プール(recallPool):user ＋ canon を retriever へ直接渡す(再ロードさせない)、
  * で使い回す。これにより、従来は開示の導出と retrieve(loadRecallPool)が別々に
  * 走らせていた loadAllEpisodicFiles を1回に削減する(レイテンシ・I/O の無駄取り)。
@@ -49,7 +49,7 @@ export async function buildConversationMemory(
   const [userRecords, canon, active] = await Promise.all([
     loadAllEpisodicFiles(),
     loadLifeMemory(),
-    loadOrCreateActiveCharacter(),
+    loadOrCreateCharacterState(),
   ]);
   const stage = deriveFamiliarityStage(active.relationship, now);
   const deps: RetrieverDeps = {

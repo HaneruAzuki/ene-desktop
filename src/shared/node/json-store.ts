@@ -47,6 +47,11 @@ export async function writeJson<T>(path: string, data: T): Promise<void> {
   }
 }
 
+/** JSON ファイルを削除する(存在しなければ何もしない)。移行後の旧ファイル撤去などに使う。 */
+export async function deleteJson(path: string): Promise<void> {
+  await fs.rm(path, { force: true });
+}
+
 /**
  * ディレクトリ直下の `.json` ファイル名(ディレクトリは除く)を返す。
  * - ディレクトリが存在しない場合は空配列を返す。

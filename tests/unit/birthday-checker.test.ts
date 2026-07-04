@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { checkBirthday } from '../../src/conversation/birthday-checker';
-import type { CharacterIdentity, ActiveCharacter } from '../../src/shared/types/character';
+import type { CharacterIdentity, CharacterState } from '../../src/shared/types/character';
 
 function makeIdentity(birthday?: { month: number; day: number }): CharacterIdentity {
   return {
@@ -14,11 +14,11 @@ function makeIdentity(birthday?: { month: number; day: number }): CharacterIdent
   };
 }
 
-function makeActive(history: ActiveCharacter['birthdayHistory'] = []): ActiveCharacter {
+function makeActive(history: CharacterState['birthdayHistory'] = []): CharacterState {
   return {
     version: 1,
     characterId: 'ene',
-    selectedAt: '2026-01-01T00:00:00+09:00',
+    createdAt: '2026-01-01T00:00:00+09:00',
     birthdayHistory: history,
     firstLaunchCompleted: true,
   };

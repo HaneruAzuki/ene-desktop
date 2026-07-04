@@ -1,7 +1,7 @@
 import { todayLocalYmdString } from '../shared/datetime';
 import { elapsedDays } from '../shared/moment';
 import { LONG_ABSENCE_DAYS } from '../shared/constants';
-import type { ActiveCharacter, CharacterContext, FewshotExample } from '../shared/types/character';
+import type { CharacterState, CharacterContext, FewshotExample } from '../shared/types/character';
 
 // 起動時のキャラ挨拶生成(設計書 §8.7)。
 // 文言はすべて fewshot.json 由来(キャラ口調をコードにハードコードしない・CLAUDE §5.4)。
@@ -25,7 +25,7 @@ function pickByElapsed(fewshot: CharacterContext['fewshot'], lastDate: string | 
   return fewshot.normalGreeting?.length ? fewshot.normalGreeting : null;
 }
 
-export function generateGreeting(active: ActiveCharacter, charContext: CharacterContext): string {
+export function generateGreeting(active: CharacterState, charContext: CharacterContext): string {
   const fewshot = charContext.fewshot;
 
   // 初回起動: 自己紹介 + 操作案内(firstLaunchGreeting)

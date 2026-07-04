@@ -136,7 +136,7 @@ handleSendMessage (turn-engine.ts:188)
  │   └─ chat() または streamVoiceChat()                client.ts:221 / voice-runtime … Claude＋4層防御
  └─ commitTurn(副作用)                                turn-engine.ts:120
      ├─ appendShortTerm(user, assistant)              short-term.ts
-     ├─ recordConversationTurn()                      active-character（関係の事実）
+     ├─ recordConversationTurn()                      character-state（関係の事実）
      ├─ enforceShortTermCap(complete)                 extraction-scheduler.ts:50   … 上限なら同期抽出
      ├─ requestExtraction(complete, isBusy)           extraction-scheduler.ts:33   … 背景抽出(await しない) F3
      └─ speakResponse()（非ストリーミング時のみ）         voice-runtime

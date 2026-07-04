@@ -1,4 +1,4 @@
-import type { CharacterIdentity, ActiveCharacter } from '../shared/types/character';
+import type { CharacterIdentity, CharacterState } from '../shared/types/character';
 
 // 誕生日判定(設計書 §3.1)。
 // 「不機嫌度」などの感情パラメータは持たず、「祝われた / 祝われていない」の
@@ -9,7 +9,7 @@ import type { CharacterIdentity, ActiveCharacter } from '../shared/types/charact
 
 export function checkBirthday(
   identity: CharacterIdentity,
-  active: ActiveCharacter,
+  active: CharacterState,
   todayLocal: { year: number; month: number; day: number },
 ): 'today' | 'forgotten' | null {
   const bday = identity.birthday;

@@ -183,7 +183,7 @@ v1.0 が提供するもの(ロードマップ・段階の全体像は `01_vision
 | F-BDAY-02 | 誕生日当日は、キャラ固有の特別反応(`celebrated`)を返せる |
 | F-BDAY-03 | 当日にユーザが触れずに過ぎた場合、翌日以降に「忘れられた」反応(`forgotten`)を返せる |
 | F-BDAY-04 | 反応の文言は Few-shot 例として実装する(感情パラメータの数値管理は行わない) |
-| F-BDAY-05 | 「祝われた / 祝われていない」の二値の事実のみ最小状態として記録する(`active-character.json`) |
+| F-BDAY-05 | 「祝われた / 祝われていない」の二値の事実のみ最小状態として記録する(`character-state.json`) |
 | F-BDAY-06 | 誕生日を持たないキャラクターも許容する(必須属性ではない) |
 | F-BDAY-07 | キャラクター自身は加齢しない(誕生日を迎えても年齢表現は変わらない) |
 
@@ -310,7 +310,7 @@ v1.0 が提供するもの(ロードマップ・段階の全体像は `01_vision
 | F-LIFE-04 | クラウド同期フォルダ配下の場合は警告(続行は可能) |
 | F-LIFE-05 | 開発時(`app.isPackaged === false`)はプロジェクトルートの `data/`、本番時は exe と同じディレクトリの `data/` を使用する |
 | F-LIFE-06 | 起動の準備完了ゲート:口(TTS)・記憶(埋め込み)・耳(STT)・判別器が立ってから挨拶する。各段は必ず resolve する(timeout＋best-effort) |
-| F-LIFE-07 | 初回起動時は ENE が自己紹介と操作方法をキャラ口調で説明する(チュートリアルダイアログは使わない)。初回完了フラグを `active-character.json` に最小状態として記録する |
+| F-LIFE-07 | 初回起動時は ENE が自己紹介と操作方法をキャラ口調で説明する(チュートリアルダイアログは使わない)。初回完了フラグを `character-state.json` に最小状態として記録する |
 | F-LIFE-08 | 2回目以降は通常の挨拶(「おかえり」等)を表示する |
 | F-LIFE-09 | 終了時に短期記憶から記憶抽出を行う。異常終了からの復旧時、可能な範囲で記憶を引き継ぐ |
 
@@ -426,7 +426,7 @@ install dir 隣の `data/` に置く(読取専用・更新で入替)。
 | `memory/{characterId}/short-term.json` | 短期記憶(キャラ別) | — |
 | `memory/{characterId}/semantic.json` | 長期記憶(性格・好み等) | — |
 | `memory/{characterId}/episodic/{year}/{category}/` | 中期記憶 | — |
-| `config/active-character.json` | キャラの最小状態(初回起動フラグ・誕生日の記録・接触の事実) | — |
+| `config/character-state.json` | キャラの最小状態(初回起動フラグ・誕生日の記録・接触の事実) | — |
 | `config/window-position.json` | ウィンドウ位置 | — |
 | `config/app-settings.json` | アプリ設定(マイク方式・話しかけ頻度等) | — |
 | `api-key.enc` | 暗号化 API キー | ✅ DPAPI |

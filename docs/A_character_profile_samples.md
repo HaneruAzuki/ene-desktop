@@ -316,7 +316,7 @@ ENE の知識範囲を5段階で定義する。
 ```
 
 これらのファイルは配布物に同梱され、初回起動時に
-`active-character.json` の `characterId: "ene"` を介して読み込まれる。
+`character-state.json` の `characterId: "ene"` を介して読み込まれる。
 （`life-memory.json` の中身計画は `docs/character-life-memory-canon-plan.md`、
 `current-state.json`/`voice.json` の構造は `docs/03_design.md` §2/§3 を参照。）
 

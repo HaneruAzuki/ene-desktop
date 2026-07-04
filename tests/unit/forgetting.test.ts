@@ -11,7 +11,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
-  getActiveCharacterId: (): string => 'ene',
+  getCharacterId: (): string => 'ene',
 }));
 
 import { runForgetting } from '../../src/memory/forget/forgetting';

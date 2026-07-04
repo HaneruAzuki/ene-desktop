@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import path from 'node:path';
 import os from 'node:os';
 
-// json-store/appPath をモックして refreshActiveCharacterId / getAppPath を制御
+// json-store/appPath をモックして refreshCharacterId / getAppPath を制御
 const h = vi.hoisted(() => ({ readJson: vi.fn(), appPath: process.cwd() }));
 
 // electron をモック(app.isPackaged / getPath / getAppPath)
@@ -25,12 +25,12 @@ import {
   getEpisodicDir,
   getSemanticPath,
   getShortTermPath,
-  getActiveCharacterPath,
+  getCharacterStatePath,
   getApiKeyPath,
   getMachineDataDir,
   getVadModelPath,
-  setActiveCharacterId,
-  refreshActiveCharacterId,
+  setCharacterId,
+  refreshCharacterId,
 } from '../../src/shared/node/paths';
 
 function setPackaged(v: boolean): void {
@@ -40,7 +40,7 @@ function setPackaged(v: boolean): void {
 beforeEach(() => {
   h.readJson.mockReset();
   h.appPath = process.cwd();
-  setActiveCharacterId('ene');
+  setCharacterId('ene');
   setPackaged(false);
 });
 
@@ -62,20 +62,20 @@ describe('paths (設計書 §3.6 / §5.5)', () => {
   });
 
   it('getMemoryDir は active キャラ ID を反映する', () => {
-    setActiveCharacterId('takeshi');
+    setCharacterId('takeshi');
     expect(getMemoryDir()).toBe(path.join(process.cwd(), 'data', 'memory', 'takeshi'));
   });
 
-  it('refreshActiveCharacterId は active-character.json の characterId を参照する', async () => {
+  it('refreshCharacterId は active-character.json の characterId を参照する', async () => {
     h.readJson.mockResolvedValue({ characterId: 'takeshi' });
-    const id = await refreshActiveCharacterId();
+    const id = await refreshCharacterId();
     expect(id).toBe('takeshi');
-    expect(h.readJson).toHaveBeenCalledWith(getActiveCharacterPath());
+    expect(h.readJson).toHaveBeenCalledWith(getCharacterStatePath());
     expect(getMemoryDir()).toContain(path.join('memory', 'takeshi'));
   });
 
   it('episodic/semantic/short-term は memory ディレクトリ配下に構築される', () => {
-    setActiveCharacterId('ene');
+    setCharacterId('ene');
     const base = path.join(process.cwd(), 'data', 'memory', 'ene');
     expect(getEpisodicDir(2026, 'health')).toBe(path.join(base, 'episodic', '2026', 'health'));
     expect(getSemanticPath()).toBe(path.join(base, 'semantic.json'));

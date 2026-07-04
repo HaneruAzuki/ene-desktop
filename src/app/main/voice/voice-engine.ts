@@ -4,7 +4,7 @@ import { log } from '../../../shared/logger';
 import {
   getVoiceEngineDir,
   getVoiceEngineExePath,
-  getActiveCharacterId,
+  getCharacterId,
 } from '../../../shared/node/paths';
 import {
   VOICE_ENGINE_BASE_URL,
@@ -115,7 +115,7 @@ export async function ensureVoiceEngine(): Promise<EnsureEngineResult> {
 
   // spawn 前に同梱 torimi＋BERT を %APPDATA% のエンジン dir へ直接配置(共存=UUID選択・N-REL-2)。
   // best-effort(prepare 内で握りつぶす)。配置は永続=アンインストール時に installer.nsh が除去する。
-  const voiceConfig = await loadVoiceConfig(getActiveCharacterId()).catch(() => null);
+  const voiceConfig = await loadVoiceConfig(getCharacterId()).catch(() => null);
   await prepareEngineUserData(voiceConfig?.uuid ?? null);
 
   const reachable = await probeVersion(baseUrl);

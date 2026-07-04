@@ -1,4 +1,4 @@
-import { getLifeMemoryPath, getActiveCharacterId } from '../../shared/node/paths';
+import { getLifeMemoryPath, getCharacterId } from '../../shared/node/paths';
 import { readJson } from '../../shared/node/json-store';
 import { migrateEpisodic } from './episodic';
 import type { EpisodicMemory, EpisodicRecord } from '../../shared/types/memory';
@@ -20,7 +20,7 @@ function canonId(index: number): string {
  * provenance は 'self' を強制(ファイル側の指定を信頼しつつ、欠落でも self に倒す)。
  */
 export async function loadLifeMemory(
-  characterId: string = getActiveCharacterId(),
+  characterId: string = getCharacterId(),
 ): Promise<EpisodicRecord[]> {
   const raw = await readJson<EpisodicMemory[]>(getLifeMemoryPath(characterId));
   if (!raw || !Array.isArray(raw)) return [];

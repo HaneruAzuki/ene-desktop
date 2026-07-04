@@ -14,7 +14,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,
   getModelsDir: (): string => `${h.memDir}/models`,
   getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
-  getActiveCharacterId: (): string => 'ene',
+  getCharacterId: (): string => 'ene',
 }));
 
 import { extractFromShortTerm } from '../../src/memory/remember/extraction-trigger';

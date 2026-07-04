@@ -15,8 +15,8 @@ import {
   recordBirthdayCelebrated,
   recordConversationTurn,
   recordUserBirthdayCelebrated,
-  loadOrCreateActiveCharacter,
-} from '../../../character/active-character';
+  loadOrCreateCharacterState,
+} from '../../../character/character-state';
 import { getSemantic } from '../../../memory/core/semantic';
 import { isUserBirthdayToday } from '../../../memory/readout/user-birthday';
 import { handleApiAuthError } from '../api-key/api-key-auto-recovery';
@@ -165,7 +165,7 @@ export async function commitTurn(
   try {
     const semantic = await getSemantic();
     if (semantic.userBirthday) {
-      const active = await loadOrCreateActiveCharacter();
+      const active = await loadOrCreateCharacterState();
       const today = todayLocalYmd();
       if (isUserBirthdayToday(semantic.userBirthday, active, today)) {
         await recordUserBirthdayCelebrated(today.year);

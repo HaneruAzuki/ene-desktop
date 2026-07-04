@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { enqueueAudio } from './audio-player';
 import { playBackchannel } from './backchannel-player';
 import { BACKCHANNEL_NOD_STRENGTH } from '../../shared/constants';
-import type { CharacterState } from '../../shared/types/animation';
+import type { CharacterViewState } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
 
 // main(ene)→ renderer のイベント購読を App から一手に引き受けるフック。
@@ -25,7 +25,7 @@ export interface EneEventsDeps {
   setYawnKey: Dispatch<SetStateAction<number>>;
   setIsListening: Dispatch<SetStateAction<boolean>>;
   setBubble: Dispatch<SetStateAction<string | null>>;
-  setCharState: Dispatch<SetStateAction<CharacterState>>;
+  setCharState: Dispatch<SetStateAction<CharacterViewState>>;
   /** ユーザー発話(音声認識テキスト)への応答フロー。 */
   respond: (text: string) => Promise<void>;
   /** 確定応答を UI(吹き出し/表情/口パク)へ反映(setBubbleToo=吹き出し全文表示の有無)。 */

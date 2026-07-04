@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VrmRenderer } from '../vrm-renderer';
 import { useWindowDrag } from '../use-window-drag';
-import type { CharacterState } from '../../../shared/types/animation';
+import type { CharacterViewState } from '../../../shared/types/animation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../../shared/types/vrm';
 
 // キャラ表示(VRM・three-vrm)＋ マウス操作判別(設計書 §8.2 / task_13 / F・3D化)。
@@ -11,7 +11,7 @@ import type { VrmRenderConfig, VrmDisplayParams } from '../../../shared/types/vr
 // クリックスルー判定は専用ヒットボックス(.character-hitbox)で行う(イベント駆動・use-interaction-routing.ts)。
 
 interface Props {
-  state: CharacterState;
+  state: CharacterViewState;
   /** 増えるたびに1回うなずく(相槌の非言語表現・task_18 Phase B)。 */
   nodKey?: number;
   /** うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け・2026-06-12)。未指定は 1.0。 */

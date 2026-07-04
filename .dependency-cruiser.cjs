@@ -62,7 +62,7 @@ module.exports = {
         path: '^src/(character|knowledge|memory|conversation|voice|offscreen-life)/',
         pathNot: [
           '^src/$1/', // 同一ドメイン内の依存は当然OK($1 は from で捕捉したドメイン名)
-          '^src/character/active-character', // 例外: memory→character(active-character)= 良性 leaf 依存
+          '^src/character/character-state', // 例外: memory→character(character-state)= 良性 leaf 依存
         ],
       },
     },

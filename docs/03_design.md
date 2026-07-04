@@ -301,7 +301,7 @@ ene-desktop/
 │   │   ├── loader.ts              ← Profileロード(loadCharacterProfile)
 │   │   ├── character-context.ts   ← CharacterContext 構築(旧 context-builder.ts・同名回避 N-ARCH-5)
 │   │   ├── system-prompt-builder.ts ← 人格システムプロンプト構築(N-02-2)
-│   │   ├── active-character.ts    ← active-character.json の読書(最小状態)
+│   │   ├── character-state.ts    ← character-state.json の読書(最小状態)
 │   │   └── vrm-loader.ts          ← vrm.json ロード(F)
 │   │
 │   ├── knowledge/                 ← あり方②:限られた知識(Knowledge Router)
@@ -474,7 +474,7 @@ ene-desktop/
 │       ├── logs/                  ← アプリ動作ログ(個人情報を含まないメタ情報のみ)
 │       ├── config/
 │       │   ├── window-position.json
-│       │   ├── active-character.json  ← 現在使用中キャラと最小状態
+│       │   ├── character-state.json  ← 現在使用中キャラと最小状態
 │       │   ├── app-settings.json      ← アプリ設定(マイク入力方式 等・平文JSON・task_17)
 │       │   └── backchannel-calibration.json ← 相槌キャリブレーション(継続学習・task_18 Lv2b)
 │       └── characters-custom/    ← (旧)ユーザ追加キャラ用。固定キャラ方針で未使用(2026-06)
@@ -631,7 +631,7 @@ export function buildCharacterContext(
 // todayLocal は §5.6 の todayLocalYmd()(1-indexed の月)を渡す。
 export function checkBirthday(
   identity: CharacterIdentity,
-  active: ActiveCharacter,
+  active: CharacterState,
   todayLocal: { year: number; month: number; day: number }
 ): "today" | "forgotten" | null;
 ```
@@ -651,7 +651,7 @@ export function checkBirthday(
 
 #### 状態の保存先
 
-最小状態は `active-character.json` の `birthdayHistory` フィールドに記録する
+最小状態は `character-state.json` の `birthdayHistory` フィールドに記録する
 (詳細は §5.4「キャラクター運用状態の管理」を参照)。
 
 ```json
@@ -1634,11 +1634,11 @@ export async function execute(cmd: OsCommand): Promise<OsCommandResult> {
 export function getPortableDataDir(): string;     // (exeディレクトリ)/data/
 
 // N-01-1: characterId はモジュール内にキャッシュする。読込は非同期(同期 I/O は CLAUDE §12 で禁止)
-//   なので、起動時に refreshActiveCharacterId() でキャッシュへ反映し、getter は同期で返す。
+//   なので、起動時に refreshCharacterId() でキャッシュへ反映し、getter は同期で返す。
 //   これにより Memory 層はキャラを意識せず同期的にパスを取得できる(疎結合)。
-export function getActiveCharacterId(): string;
-export function setActiveCharacterId(id: string): void;
-export function refreshActiveCharacterId(): Promise<string>;  // active-character.json を読みキャッシュ更新
+export function getCharacterId(): string;
+export function setCharacterId(id: string): void;
+export function refreshCharacterId(): Promise<string>;  // character-state.json を読みキャッシュ更新
 
 // 記憶関連(現在の active キャラに依存・getter は同期でキャッシュ値を返す)
 export function getMemoryDir(): string;            // data/memory/{activeCharId}/
@@ -1648,7 +1648,7 @@ export function getSemanticPath(): string;        // data/memory/{activeCharId}/
 export function getShortTermPath(): string;       // data/memory/{activeCharId}/short-term.json
 
 // キャラ運用状態関連(active キャラに依存しない・常に固定パス)
-export function getActiveCharacterPath(): string; // data/config/active-character.json
+export function getCharacterStatePath(): string; // data/config/character-state.json
 
 // その他のポータブルデータ
 export function getLogsDir(): string;              // data/logs/(アプリ動作ログ・PII含めない)
@@ -1669,7 +1669,7 @@ export async function writeJson<T>(path: string, data: T): Promise<void>;
 export async function listJsonFiles(dir: string): Promise<string[]>;
 ```
 
-> 📌 **設計判断**:記憶パス関数は `active-character.json` を参照して動的に
+> 📌 **設計判断**:記憶パス関数は `character-state.json` を参照して動的に
 > パスを返す。これにより Memory Layer のロジック自体はキャラを意識せずに動作する
 > (キャラ切替が Memory Layer に影響しない疎結合構造)。
 
@@ -2054,14 +2054,18 @@ data/memory/{characterId}/episodic/2026/health/2026-05-10T17-30-00.json
 - Semantic Memory: 単一ファイル `data/memory/{characterId}/semantic.json`
 - Short-term Memory: 単一ファイル `data/memory/{characterId}/short-term.json`(セッション中のみ)
 
-### 5.4 キャラクター運用状態の管理(`active-character.json`)
+### 5.4 キャラクター運用状態の管理(`character-state.json`)
 
-現在使用中のキャラクターを示し、最小限の運用状態を記録するファイル。
-**ハードコードを避け**、キャラ切替を可能にし、**誕生日機能等の最小状態を管理する**
-中核ファイルとなる。
+キャラの**永続状態(関係の記録)**を保持するファイル。**キャラ ID をコードに埋め込まず外出しする**
+ことで工学的クリーンさ・可逆性を保ちつつ(§5.1)、**誕生日機能等の最小状態を管理する**中核ファイル。
+(単一固定キャラだが、id 抽象は意図的に維持する。)
+
+> **移行(N-ARCH-10・2026-07)**:旧名 `active-character.json` から改名。起動時に旧ファイルがあれば
+> `createdAt`(旧 `selectedAt`)へ写して `character-state.json` へ保存し、旧ファイルを撤去する
+> (既存ユーザーの関係記録を失わない)。`ActiveCharacter` 型は `CharacterState` に改名(表示状態は `CharacterViewState`)。
 
 #### 保存先
-`data/config/active-character.json`(ポータブルデータ)
+`data/config/character-state.json`(ポータブルデータ)
 
 #### スキーマ
 
@@ -2074,10 +2078,10 @@ export interface BirthdayHistoryEntry {
   celebratedAt?: string;         // 触れられた日時(ISO 8601)
 }
 
-export interface ActiveCharacter {
+export interface CharacterState {
   version: number;               // スキーマバージョン(MVPは 1)
   characterId: string;           // 現在使用中のキャラID(/{id}/ を参照)
-  selectedAt: string;            // このキャラに切り替えた日時(ISO 8601)
+  createdAt: string;            // このキャラに切り替えた日時(ISO 8601)
   birthdayHistory: BirthdayHistoryEntry[];
   firstLaunchCompleted: boolean; // 初回起動の操作案内表示済みフラグ(§8.7)
   // 将来、他の最小状態を追加できる構造
@@ -2090,7 +2094,7 @@ export interface ActiveCharacter {
 {
   "version": 1,
   "characterId": "ene",
-  "selectedAt": "2026-05-29T19:00:00+09:00",
+  "createdAt": "2026-05-29T19:00:00+09:00",
   "birthdayHistory": [
     { "year": 2026, "celebrated": true, "celebratedAt": "2026-08-15T20:30:00+09:00" }
   ],
@@ -2099,7 +2103,7 @@ export interface ActiveCharacter {
 ```
 
 #### 初回起動時の挙動
-- `active-character.json` が存在しなければ、デフォルト値で生成する
+- `character-state.json` が存在しなければ、デフォルト値で生成する
   - `characterId: "ene"`(ビルド時に同梱されているキャラ)
   - `birthdayHistory: []`
   - `firstLaunchCompleted: false`(初回案内表示後に true に更新される)
@@ -2166,12 +2170,12 @@ export function getSemanticPath(): string;
 export function getShortTermPath(): string;
   // → data/memory/{activeCharacterId}/short-term.json
 
-// active-character.json 関連
-export function getActiveCharacterPath(): string;
-  // → data/config/active-character.json
+// character-state.json 関連
+export function getCharacterStatePath(): string;
+  // → data/config/character-state.json
 ```
 
-これらの関数は `active-character.json` の `characterId` を参照して
+これらの関数は `character-state.json` の `characterId` を参照して
 動的にパスを返す。これにより、Memory Layer のロジック自体は
 キャラを意識せずに動作する(疎結合の維持)。
 
@@ -2203,7 +2207,7 @@ export function getActiveCharacterPath(): string;
 |--------|----|
 | Episodic Memory の `date` | `"2026-05-10T17:30:00+09:00"` |
 | 誕生日履歴の `celebratedAt` | `"2026-08-15T20:30:00+09:00"` |
-| active-character.json の `selectedAt` | `"2026-05-29T19:00:00+09:00"` |
+| character-state.json の `createdAt` | `"2026-05-29T19:00:00+09:00"` |
 | ファイル命名(Episodic) | `2026-05-10T17-30-00.json`(ファイル名に使えない `:` を `-` に置換、TZ省略) |
 | アプリ動作ログのタイムスタンプ | electron-log のデフォルト(ローカル時刻)を採用 |
 
@@ -2316,8 +2320,8 @@ export function todayLocalYmd(): { year: number; month: number; day: number } {
    ├─ なし → セットアップダイアログ表示
    └─ あり → 復号化してメモリ保持
    ↓
-6. active-character.json の読み込み
-   ├─ data/config/active-character.json を確認
+6. character-state.json の読み込み
+   ├─ data/config/character-state.json を確認
    ├─ 存在しない(初回起動) → デフォルト値(characterId: "ene")で生成
    └─ characterId を取得(以降の処理で使用)
    ↓
@@ -2331,7 +2335,7 @@ export function todayLocalYmd(): { year: number; month: number; day: number } {
    └─ 短期記憶ファイルが残っていれば未抽出エントリの抽出を試みる
    ↓
 9. 誕生日チェック
-   ├─ active-character.json の birthdayHistory を確認
+   ├─ character-state.json の birthdayHistory を確認
    ├─ 今日が誕生日 → "today" 状態を Character Context に反映
    ├─ 今年の誕生日が過ぎていて未祝福 → "forgotten" 状態を反映
    └─ 該当なし → 通常モード
@@ -2641,7 +2645,7 @@ ipcMain.handle("ene:set-ignore-mouse-events", (event, ignore: boolean) => {
 
 #### 判定ロジック
 
-`active-character.json`(スキーマは §5.4 を参照)の `firstLaunchCompleted: boolean`
+`character-state.json`(スキーマは §5.4 を参照)の `firstLaunchCompleted: boolean`
 フィールドを使って、初回起動を判定する。
 
 ```typescript
@@ -2654,7 +2658,7 @@ ipcMain.handle("ene:set-ignore-mouse-events", (event, ignore: boolean) => {
 ```typescript
 // 起動完了時のキャラ挨拶生成(疑似コード)
 
-function generateGreeting(active: ActiveCharacter, charContext: CharacterContext): string {
+function generateGreeting(active: CharacterState, charContext: CharacterContext): string {
   if (!active.firstLaunchCompleted) {
     // 初回起動:ENE が自己紹介 + 操作説明
     // few-shot の firstLaunchGreeting カテゴリから選択
@@ -2672,7 +2676,7 @@ function generateGreeting(active: ActiveCharacter, charContext: CharacterContext
 // 挨拶表示後、初回フラグを true に更新
 if (!active.firstLaunchCompleted) {
   active.firstLaunchCompleted = true;
-  await saveActiveCharacter(active);
+  await saveCharacterState(active);
 }
 ```
 

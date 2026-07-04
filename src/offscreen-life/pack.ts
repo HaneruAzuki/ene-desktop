@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { getOffscreenLifeDir, getActiveCharacterId } from '../shared/node/paths';
+import { getOffscreenLifeDir, getCharacterId } from '../shared/node/paths';
 import { listJsonFiles, readJson } from '../shared/node/json-store';
 import { log } from '../shared/logger';
 import type { OffscreenLifePack } from '../shared/types/offscreen-life';
@@ -26,7 +26,7 @@ function isValidPack(p: OffscreenLifePack | null): p is OffscreenLifePack {
  * 不在(パックを持たないキャラ)は空配列(後方互換)。壊れたファイルはスキップしてログのみ。
  */
 export async function loadOffscreenPacks(
-  characterId: string = getActiveCharacterId(),
+  characterId: string = getCharacterId(),
 ): Promise<OffscreenLifePack[]> {
   const dir = getOffscreenLifeDir(characterId);
   const files = await listJsonFiles(dir);

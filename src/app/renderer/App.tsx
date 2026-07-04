@@ -29,7 +29,7 @@ import {
   THINKING_WATCHDOG_MS,
 } from './constants';
 import type { CharacterInfo } from '../../shared/types/ipc';
-import type { CharacterState } from '../../shared/types/animation';
+import type { CharacterViewState } from '../../shared/types/animation';
 import type { ConversationResponse } from '../../shared/types/conversation';
 import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
 
@@ -61,7 +61,7 @@ export function App(): React.ReactElement | null {
   const [nodStrength, setNodStrength] = useState(1); // うなずきの深さ(相槌=1.0 / ターン終端=発話長で出し分け)
   const [yawnKey, setYawnKey] = useState(0); // あくび(増えるたびに1回・長時間傾聴・listening-mode)
   const [isListening, setIsListening] = useState(false); // 傾聴モード中(少し首をかしげる・listening-mode)
-  const [charState, setCharState] = useState<CharacterState>({
+  const [charState, setCharState] = useState<CharacterViewState>({
     activity: 'idle',
     emotion: 'neutral',
     pose: 'stand',
@@ -263,7 +263,7 @@ export function App(): React.ReactElement | null {
   useEffect(() => {
     const isDev = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
     if (!isDev) return;
-    const map: Record<string, CharacterState['emotion']> = {
+    const map: Record<string, CharacterViewState['emotion']> = {
       '1': 'neutral',
       '2': 'joy',
       '3': 'anger',

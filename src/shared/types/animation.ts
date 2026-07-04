@@ -17,7 +17,7 @@ export type CharacterActivity = 'idle' | 'thinking' | 'talking';
 export type CharacterPose = 'stand' | 'sofa';
 
 /** Renderer が保持する単一の表示状態(数値の感情蓄積は持たない・§5.3)。 */
-export interface CharacterState {
+export interface CharacterViewState {
   activity: CharacterActivity;
   emotion: EmotionLabel;
   pose: CharacterPose;

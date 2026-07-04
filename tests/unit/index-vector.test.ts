@@ -8,7 +8,7 @@ const h = vi.hoisted(() => ({ memDir: '' }));
 vi.mock('../../src/shared/node/paths', () => ({
   getMemoryDir: (): string => h.memDir,
   getLifeMemoryPath: (id: string): string => `${h.memDir}/${id}/life-memory.json`,
-  getActiveCharacterId: (): string => 'ene',
+  getCharacterId: (): string => 'ene',
   getEpisodicDir: (year: number, category: string): string =>
     `${h.memDir}/episodic/${year}/${category}`,
   getVectorIndexPath: (): string => `${h.memDir}/index/vectors.json`,

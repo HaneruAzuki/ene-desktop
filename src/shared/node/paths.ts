@@ -7,7 +7,7 @@ import {
   VOICE_ENGINE_EXE,
   VOICE_ENGINE_USERDATA_DIRNAME,
   VOICE_ENGINE_PORTABLE_USERDATA,
-  DEFAULT_CHARACTER_ID,
+  CHARACTER_ID,
 } from '../constants';
 
 // ファイルパスの統一管理(設計書 §3.6 / §5.5)。
@@ -16,35 +16,34 @@ import {
 // - 同梱アセット(モデル/音声エンジン・読取専用・更新で入れ替わる)= getPortableDataDir()
 // - ユーザーデータ(記憶/設定/APIキー/ログ・更新を跨いで残す) = getUserDataDir()
 //
-// 記憶系パスは「現在使用中キャラの characterId」に依存して動的に変わる。
-// characterId の読込(active-character.json)は非同期 I/O のため、起動時に
-// refreshActiveCharacterId() でモジュール内キャッシュへ反映し、getter は同期で返す。
+// 記憶系パスは characterId に依存して動的に変わる。characterId の読込(character-state.json)は
+// 非同期 I/O のため、起動時に refreshCharacterId() でモジュール内キャッシュへ反映し、getter は同期で返す。
 // これにより Memory Layer 等はキャラを意識せず同期的にパスを取得できる(疎結合)。
 
-let activeCharacterId = DEFAULT_CHARACTER_ID;
+let cachedCharacterId = CHARACTER_ID;
 
-/** 現在キャッシュしている active キャラ ID を返す。 */
-export function getActiveCharacterId(): string {
-  return activeCharacterId;
+/** 現在キャッシュしているキャラ ID を返す。 */
+export function getCharacterId(): string {
+  return cachedCharacterId;
 }
 
-/** active キャラ ID を明示的に設定する(キャラ切替時など)。 */
-export function setActiveCharacterId(id: string): void {
+/** キャラ ID を明示的に設定する(起動時に character-state.json の値をキャッシュへ反映する)。 */
+export function setCharacterId(id: string): void {
   if (id) {
-    activeCharacterId = id;
+    cachedCharacterId = id;
   }
 }
 
 /**
- * active-character.json を読み、characterId をキャッシュに反映する。
+ * character-state.json を読み、characterId をキャッシュに反映する。
  * ファイルが無い・characterId が無い場合は既存のキャッシュ値を維持する。
  */
-export async function refreshActiveCharacterId(): Promise<string> {
-  const data = await readJson<{ characterId?: string }>(getActiveCharacterPath());
+export async function refreshCharacterId(): Promise<string> {
+  const data = await readJson<{ characterId?: string }>(getCharacterStatePath());
   if (data?.characterId) {
-    activeCharacterId = data.characterId;
+    cachedCharacterId = data.characterId;
   }
-  return activeCharacterId;
+  return cachedCharacterId;
 }
 
 // --- データ配置(N-REL-2: NSIS 化でユーザーデータと同梱アセットを分離) ---
@@ -114,8 +113,13 @@ export function getPortableEngineUserDataDir(): string {
   return path.join(getVoiceDir(), VOICE_ENGINE_PORTABLE_USERDATA);
 }
 
-/** data/config/active-character.json(active キャラに依存しない固定パス)。 */
-export function getActiveCharacterPath(): string {
+/** data/config/character-state.json(キャラの永続状態=関係の記録。固定パス)。 */
+export function getCharacterStatePath(): string {
+  return path.join(getConfigDir(), 'character-state.json');
+}
+
+/** 旧名 data/config/active-character.json(移行専用・character-state.json へ改名する前の記録)。 */
+export function getLegacyCharacterStatePath(): string {
   return path.join(getConfigDir(), 'active-character.json');
 }
 
@@ -136,49 +140,49 @@ export function getLogsDir(): string {
 
 // --- 記憶系(active キャラ ID に依存) ---
 
-/** {userData}/memory/{activeCharacterId}/ */
+/** {userData}/memory/{cachedCharacterId}/ */
 export function getMemoryDir(): string {
-  return path.join(getUserDataDir(), 'memory', activeCharacterId);
+  return path.join(getUserDataDir(), 'memory', cachedCharacterId);
 }
 
-/** data/memory/{activeCharacterId}/episodic/{year}/{category}/ */
+/** data/memory/{cachedCharacterId}/episodic/{year}/{category}/ */
 export function getEpisodicDir(year: number, category: string): string {
   return path.join(getMemoryDir(), 'episodic', String(year), category);
 }
 
-/** data/memory/{activeCharacterId}/semantic.json */
+/** data/memory/{cachedCharacterId}/semantic.json */
 export function getSemanticPath(): string {
   return path.join(getMemoryDir(), 'semantic.json');
 }
 
-/** data/memory/{activeCharacterId}/short-term.json */
+/** data/memory/{cachedCharacterId}/short-term.json */
 export function getShortTermPath(): string {
   return path.join(getMemoryDir(), 'short-term.json');
 }
 
-/** data/memory/{activeCharacterId}/consolidation-state.json(忘却機構の最終実行記録・§11.6)。 */
+/** data/memory/{cachedCharacterId}/consolidation-state.json(忘却機構の最終実行記録・§11.6)。 */
 export function getConsolidationStatePath(): string {
   return path.join(getMemoryDir(), 'consolidation-state.json');
 }
 
-/** data/memory/{activeCharacterId}/open-loop-state.json(気にかけの能動提示済み集合＋提示頻度の記録・P4・派生状態)。 */
+/** data/memory/{cachedCharacterId}/open-loop-state.json(気にかけの能動提示済み集合＋提示頻度の記録・P4・派生状態)。 */
 export function getOpenLoopStatePath(): string {
   return path.join(getMemoryDir(), 'open-loop-state.json');
 }
 
 // --- 派生キャッシュ(真実の源ではない・JSON から再生成可能・design-revision-memory-v2 §1.3) ---
 
-/** data/memory/{activeCharacterId}/index/(逆引き・ベクトル索引の置き場)。 */
+/** data/memory/{cachedCharacterId}/index/(逆引き・ベクトル索引の置き場)。 */
 export function getMemoryIndexDir(): string {
   return path.join(getMemoryDir(), 'index');
 }
 
-/** data/memory/{activeCharacterId}/index/inverted.json(entity/keyword 逆引き)。 */
+/** data/memory/{cachedCharacterId}/index/inverted.json(entity/keyword 逆引き)。 */
 export function getInvertedIndexPath(): string {
   return path.join(getMemoryIndexDir(), 'inverted.json');
 }
 
-/** data/memory/{activeCharacterId}/index/vectors.json(意味検索ベクトル・Phase B)。 */
+/** data/memory/{cachedCharacterId}/index/vectors.json(意味検索ベクトル・Phase B)。 */
 export function getVectorIndexPath(): string {
   return path.join(getMemoryIndexDir(), 'vectors.json');
 }

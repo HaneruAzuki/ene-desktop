@@ -6,14 +6,15 @@ import { promises as fs } from 'node:fs';
 // active-character.json の保存先のみ差し替える(json-store は実物を使う)。
 const h = vi.hoisted(() => ({ acPath: '', dir: '' }));
 vi.mock('../../src/shared/node/paths', () => ({
-  getActiveCharacterPath: (): string => h.acPath,
+  getCharacterStatePath: (): string => h.acPath,
+  getLegacyCharacterStatePath: (): string => `${h.acPath}.legacy`, // 存在しない=移行はスキップ
 }));
 
 import {
-  loadOrCreateActiveCharacter,
+  loadOrCreateCharacterState,
   markFirstLaunchCompleted,
   recordBirthdayCelebrated,
-} from '../../src/character/active-character';
+} from '../../src/character/character-state';
 
 beforeEach(async () => {
   h.dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-active-'));
@@ -25,26 +26,26 @@ afterEach(async () => {
 
 describe('active-character (設計書 §5.4)', () => {
   it('初回はデフォルト値を生成して保存する', async () => {
-    const a = await loadOrCreateActiveCharacter();
+    const a = await loadOrCreateCharacterState();
     expect(a.version).toBe(1);
     expect(a.characterId).toBe('ene');
     expect(a.firstLaunchCompleted).toBe(false);
     expect(a.birthdayHistory).toEqual([]);
-    // 永続化され、2回目は同じ内容(同じ selectedAt)を読む
-    const again = await loadOrCreateActiveCharacter();
-    expect(again.selectedAt).toBe(a.selectedAt);
+    // 永続化され、2回目は同じ内容(同じ createdAt)を読む
+    const again = await loadOrCreateCharacterState();
+    expect(again.createdAt).toBe(a.createdAt);
   });
 
   it('markFirstLaunchCompleted で firstLaunchCompleted が true になる', async () => {
-    await loadOrCreateActiveCharacter();
+    await loadOrCreateCharacterState();
     await markFirstLaunchCompleted();
-    const a = await loadOrCreateActiveCharacter();
+    const a = await loadOrCreateCharacterState();
     expect(a.firstLaunchCompleted).toBe(true);
   });
 
   it('recordBirthdayCelebrated で該当年が celebrated になる', async () => {
     await recordBirthdayCelebrated(2026);
-    const a = await loadOrCreateActiveCharacter();
+    const a = await loadOrCreateCharacterState();
     const entry = a.birthdayHistory.find((e) => e.year === 2026);
     expect(entry?.celebrated).toBe(true);
     expect(entry?.celebratedAt).toBeDefined();
