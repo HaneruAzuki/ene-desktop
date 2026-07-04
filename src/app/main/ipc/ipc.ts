@@ -24,7 +24,7 @@ import { BackchannelController } from '../voice/backchannel-controller';
 import { isSttModelAvailable } from '../../../voice/stt/stt-transcriber';
 import { transcribeViaWorker } from '../voice/stt-worker-client';
 import { generateResponse, commitTurn, handleSendMessage } from '../orchestration/turn-engine';
-import { speakResponse } from '../voice/voice-runtime';
+import { speakSelfInitiated } from '../voice/self-speech';
 import type { ConversationResponse } from '../../../shared/types/conversation';
 import type { CharacterInfo } from '../../../shared/types/ipc';
 import type { TranscribeResult } from '../../../shared/types/stt';
@@ -151,11 +151,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.PROACTIVE_MESSAGE, response);
     const voice = resolveVoice(runtime.tts, runtime.voiceConfig);
     if (!voice) return; // 音声無効=吹き出しのみ(従来挙動)
-    runtime.selfSpeech?.abort();
-    const ctrl = new AbortController();
-    runtime.selfSpeech = ctrl;
-    runtime.setResponseActive?.(true); // 聞き返しも barge-in で止められる(自発発話と同じ)
-    void speakResponse(message, 'neutral', voice.tts, voice.voiceConfig, mainWindow, ctrl.signal);
+    speakSelfInitiated(runtime, mainWindow, voice, message, 'neutral');
   };
   // 起動ゲートで耳(VAD)も事前ロードさせる=「ちょっと待って」完了時点で耳まで ready(初回マイクに遅延を出さない)。
   runtime.warmVad = (): Promise<void> => vad.warm();
@@ -329,12 +325,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
       // tts/voiceConfig が揃っている時だけ(オフライン/エンジン未配置なら従来どおり無音テキスト)。emotion は neutral。
       const voice = resolveVoice(runtime.tts, runtime.voiceConfig);
       if (voice) {
-        // 起動挨拶も barge-in で止められるよう中断ハンドルを張り替えて signal を渡し、barge-in 窓を開く(穴A)。
-        runtime.selfSpeech?.abort();
-        const ctrl = new AbortController();
-        runtime.selfSpeech = ctrl;
-        runtime.setResponseActive?.(true);
-        void speakResponse(greeting, 'neutral', voice.tts, voice.voiceConfig, mainWindow, ctrl.signal);
+        speakSelfInitiated(runtime, mainWindow, voice, greeting, 'neutral');
       }
     }
     return greeting;

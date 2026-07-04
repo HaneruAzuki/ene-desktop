@@ -3,6 +3,7 @@ import { BrowserWindow, ipcMain, shell } from 'electron';
 import { log } from '../../../shared/logger';
 import { encryptAndSaveApiKey } from '../../../shared/node/encryption';
 import { testApiKey } from './api-key-tester';
+import { IPC } from '../../../shared/ipc-channels';
 import type { PingResult } from '../../../shared/types/api-key';
 
 // APIキー管理ダイアログ(設計書 §3.7)。
@@ -21,11 +22,11 @@ function ensureHandlers(): void {
   if (handlersReady) return;
   handlersReady = true;
 
-  ipcMain.handle('ene-key:test', async (_event, key: string): Promise<PingResult> => {
+  ipcMain.handle(IPC.API_KEY_TEST, async (_event, key: string): Promise<PingResult> => {
     return testApiKey(key);
   });
 
-  ipcMain.handle('ene-key:save', async (_event, key: string): Promise<void> => {
+  ipcMain.handle(IPC.API_KEY_SAVE, async (_event, key: string): Promise<void> => {
     // 保存前にもう一度疎通テスト(疎通未確認のキーは保存しない・§3.7)。
     const result = await testApiKey(key);
     if (!result.ok) {
@@ -37,11 +38,11 @@ function ensureHandlers(): void {
     currentOnSaved?.(key);
   });
 
-  ipcMain.handle('ene-key:open-console', async (): Promise<void> => {
+  ipcMain.handle(IPC.API_KEY_OPEN_CONSOLE, async (): Promise<void> => {
     await shell.openExternal(ANTHROPIC_CONSOLE_URL);
   });
 
-  ipcMain.handle('ene-key:close', async (_event, ok: boolean): Promise<void> => {
+  ipcMain.handle(IPC.API_KEY_CLOSE, async (_event, ok: boolean): Promise<void> => {
     saveResult = ok;
     dialogWindow?.close();
   });

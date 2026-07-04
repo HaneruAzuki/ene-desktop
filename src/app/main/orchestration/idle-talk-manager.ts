@@ -12,7 +12,7 @@ import {
 } from '../../../conversation/idle-talk';
 import { makeLlmComplete } from '../../../conversation/client';
 import { detectAiSelfReference } from '../../../shared/ai-self-check';
-import { speakResponse } from '../voice/voice-runtime';
+import { speakSelfInitiated } from '../voice/self-speech';
 import { loadOpenLoopState, saveOpenLoopState } from '../../../memory/open-loops';
 import { readPresenceMemory } from '../../../memory/readout/presence-reads';
 import { appendShortTerm } from '../../../memory/core/short-term';
@@ -178,11 +178,7 @@ export class IdleTalkManager {
     // 自発発話も barge-in で止められるよう、中断ハンドルを張り替えて signal を渡す(穴A)。
     const voice = resolveVoice(tts, voiceConfig);
     if (voice) {
-      this.runtime.selfSpeech?.abort();
-      const ctrl = new AbortController();
-      this.runtime.selfSpeech = ctrl;
-      this.runtime.setResponseActive?.(true); // 自発発話中も barge-in で止められるよう窓を開く
-      void speakResponse(msg.message, emotion, voice.tts, voice.voiceConfig, this.mainWindow, ctrl.signal);
+      speakSelfInitiated(this.runtime, this.mainWindow, voice, msg.message, emotion);
     }
     log.info('idle talk emitted');
   }

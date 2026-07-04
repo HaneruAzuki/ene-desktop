@@ -1,6 +1,7 @@
 import { getBackchannelPoolPath } from '../shared/node/paths';
 import { readJson } from '../shared/node/json-store';
 import { log } from '../shared/logger';
+import { toStringArray } from '../shared/llm-parse';
 import type { BackchannelCue, BackchannelPoolData } from '../shared/types/backchannel';
 
 // 相槌の語彙(backchannels.json)のロード(task_18 Phase B)。
@@ -9,10 +10,9 @@ import type { BackchannelCue, BackchannelPoolData } from '../shared/types/backch
 
 const CUES: BackchannelCue[] = ['continuer', 'understanding', 'surprise', 'empathy'];
 
-/** 文字列配列から空でない文字列のみを取り出す。 */
+/** 文字列配列から空でない文字列のみを取り出す(型ガードは shared の toStringArray を再利用)。 */
 function stringList(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((w): w is string => typeof w === 'string' && w.length > 0);
+  return toStringArray(raw).filter((w) => w.length > 0);
 }
 
 /** backchannels.json を検証して正規化する。continuer が空なら null(フォールバック先が無い)。 */

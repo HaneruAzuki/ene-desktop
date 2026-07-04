@@ -8,6 +8,10 @@
 // 値は `ene:<kebab-case>` 形式。新しいチャネルはここに追加してから両側で参照すること。
 
 export const IPC = {
+  API_KEY_TEST: 'ene-key:test',
+  API_KEY_SAVE: 'ene-key:save',
+  API_KEY_OPEN_CONSOLE: 'ene-key:open-console',
+  API_KEY_CLOSE: 'ene-key:close',
   APP_READY: 'ene:app-ready',
   BACKCHANNEL: 'ene:backchannel',
   EXPORT_MEMORY: 'ene:export-memory',
