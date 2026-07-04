@@ -1,14 +1,14 @@
-import { nowLocalIso, currentIsoWeekParts, isoWeekParts } from '../../shared/datetime';
-import { log } from '../../shared/logger';
-import { detectAiSelfReference } from '../../shared/ai-self-check';
-import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
-import { readPresenceMemory } from '../../memory/readout/presence-reads';
-import { saveAndIndexEpisodic } from '../../memory/remember/episodic-write';
-import { deriveFamiliarityStage } from '../../memory/readout/familiarity';
-import { loadOffscreenPacks } from '../../offscreen-life/pack';
-import { selectWeeklyBeat, beatToEpisodic } from '../../offscreen-life/select';
-import type { LlmComplete } from '../../shared/types/llm';
-import type { ActiveCharacter, CharacterContext } from '../../shared/types/character';
+import { nowLocalIso, currentIsoWeekParts, isoWeekParts } from '../../../shared/datetime';
+import { log } from '../../../shared/logger';
+import { detectAiSelfReference } from '../../../shared/ai-self-check';
+import { loadOpenLoopState, saveOpenLoopState } from '../../../memory/open-loops';
+import { readPresenceMemory } from '../../../memory/readout/presence-reads';
+import { saveAndIndexEpisodic } from '../../../memory/remember/episodic-write';
+import { deriveFamiliarityStage } from '../../../memory/readout/familiarity';
+import { loadOffscreenPacks } from '../../../offscreen-life/pack';
+import { selectWeeklyBeat, beatToEpisodic } from '../../../offscreen-life/select';
+import type { LlmComplete } from '../../../shared/types/llm';
+import type { ActiveCharacter, CharacterContext } from '../../../shared/types/character';
 
 // オフスクリーンライフ(P3・N-PRES-3 / off-screen-life 本実装)。「会っていない間も生きている」を成立させる。
 //

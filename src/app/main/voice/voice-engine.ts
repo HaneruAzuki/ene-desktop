@@ -1,11 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { log } from '../../shared/logger';
+import { log } from '../../../shared/logger';
 import {
   getVoiceEngineDir,
   getVoiceEngineExePath,
   getActiveCharacterId,
-} from '../../shared/node/paths';
+} from '../../../shared/node/paths';
 import {
   VOICE_ENGINE_BASE_URL,
   VOICE_ENGINE_HOST,
@@ -13,9 +13,9 @@ import {
   VOICE_ENGINE_HEALTH_TIMEOUT_MS,
   VOICE_ENGINE_HEALTH_INTERVAL_MS,
   VOICE_ENGINE_STOP_GRACE_MS,
-} from '../../shared/constants';
-import { loadVoiceConfig } from '../../voice/tts/voice-loader';
-import { prepareEngineUserData, engineOfflineEnv } from '../../shared/node/engine-userdata';
+} from '../../../shared/constants';
+import { loadVoiceConfig } from '../../../voice/tts/voice-loader';
+import { prepareEngineUserData, engineOfflineEnv } from '../../../shared/node/engine-userdata';
 import { writeEngineLock, clearEngineLock, reconcileOrphanedEngine } from './voice-engine-orphan';
 
 // AivisSpeech サイドカーのライフサイクル管理(task_17 / N-17-6・N-17-12・N-17-13)。

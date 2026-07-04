@@ -1,45 +1,45 @@
 import { promises as fs, constants as fsConstants } from 'node:fs';
 import { app, dialog, type BrowserWindow } from 'electron';
-import { log, initLogger } from '../../shared/logger';
-import { getUserDataDir, getLogsDir } from '../../shared/node/paths';
-import { isCloudSyncFolder } from '../../shared/node/cloud-warning';
-import { loadAndDecryptApiKey } from '../../shared/node/encryption';
-import { todayLocalYmd, nowLocalIso } from '../../shared/datetime';
+import { log, initLogger } from '../../../shared/logger';
+import { getUserDataDir, getLogsDir } from '../../../shared/node/paths';
+import { isCloudSyncFolder } from '../../../shared/node/cloud-warning';
+import { loadAndDecryptApiKey } from '../../../shared/node/encryption';
+import { todayLocalYmd, nowLocalIso } from '../../../shared/datetime';
 import {
   loadOrCreateActiveCharacter,
   markFirstLaunchCompleted,
-} from '../../character/active-character';
-import { buildCharacterContext } from '../../character/character-context';
-import { checkBirthday } from '../../conversation/birthday-checker';
-import { getUnextractedEntries, clearShortTerm } from '../../memory/core/short-term';
-import { extractFromShortTerm } from '../../memory/remember/extraction-trigger';
-import { requestForgetting } from '../../memory/forget/forgetting';
-import { warmEmbedder } from '../../shared/node/embedder';
-import { warmSttWorker } from './stt-worker-client';
-import { warmLocalRouter } from '../../knowledge/local-classifier';
-import { makeLlmComplete } from '../../conversation/client';
-import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
-import { generateOffscreenLife } from './offscreen-life';
-import { describeElapsed, timeOfDayLabel } from '../../shared/moment';
-import { openApiKeyDialog } from './api-key-dialog';
+} from '../../../character/active-character';
+import { buildCharacterContext } from '../../../character/character-context';
+import { checkBirthday } from '../../../conversation/birthday-checker';
+import { getUnextractedEntries, clearShortTerm } from '../../../memory/core/short-term';
+import { extractFromShortTerm } from '../../../memory/remember/extraction-trigger';
+import { requestForgetting } from '../../../memory/forget/forgetting';
+import { warmEmbedder } from '../../../shared/node/embedder';
+import { warmSttWorker } from '../voice/stt-worker-client';
+import { warmLocalRouter } from '../../../knowledge/local-classifier';
+import { makeLlmComplete } from '../../../conversation/client';
+import { buildNameMishearHint, withNameMishearHint } from '../../../conversation/prompt-builder';
+import { generateOffscreenLife } from '../orchestration/offscreen-life';
+import { describeElapsed, timeOfDayLabel } from '../../../shared/moment';
+import { openApiKeyDialog } from '../api-key/api-key-dialog';
 import { ensureMemoryDirectories } from './init-directories';
-import { createMainWindow } from './window';
-import { registerIpcHandlers } from './ipc';
-import { registerSettingsIpc } from './settings-ipc';
-import { IdleTalkManager } from './idle-talk-manager';
+import { createMainWindow } from '../window/window';
+import { registerIpcHandlers } from '../ipc/ipc';
+import { registerSettingsIpc } from '../ipc/settings-ipc';
+import { IdleTalkManager } from '../orchestration/idle-talk-manager';
 import type { AppRuntime } from './app-runtime';
-import { initVoice } from './voice-runtime';
-import { ensureVoiceEngine } from './voice-engine';
+import { initVoice } from '../voice/voice-runtime';
+import { ensureVoiceEngine } from '../voice/voice-engine';
 import { checkUpdateFlow } from './auto-update';
-import { generateGreeting } from '../../conversation/greeting';
+import { generateGreeting } from '../../../conversation/greeting';
 import {
   loadWindowPosition,
   getDefaultPosition,
   clampPositionToScreen,
   saveWindowPosition,
-} from './window-position';
-import type { CharacterContext, ActiveCharacter } from '../../shared/types/character';
-import { IPC } from '../../shared/ipc-channels';
+} from '../window/window-position';
+import type { CharacterContext, ActiveCharacter } from '../../../shared/types/character';
+import { IPC } from '../../../shared/ipc-channels';
 
 // 起動シーケンス(設計書 §7.1 の11ステップ)。
 // runtime(実行時状態)を埋め、メインウィンドウを返す。

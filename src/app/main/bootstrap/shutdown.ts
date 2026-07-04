@@ -1,9 +1,9 @@
-import { log } from '../../shared/logger';
-import { flushExtraction } from '../../memory/remember/extraction-scheduler';
-import { clearShortTerm } from '../../memory/core/short-term';
-import { makeLlmComplete } from '../../conversation/client';
-import { stopVoiceEngine } from './voice-engine';
-import { killSttWorker } from './stt-worker-client';
+import { log } from '../../../shared/logger';
+import { flushExtraction } from '../../../memory/remember/extraction-scheduler';
+import { clearShortTerm } from '../../../memory/core/short-term';
+import { makeLlmComplete } from '../../../conversation/client';
+import { stopVoiceEngine } from '../voice/voice-engine';
+import { killSttWorker } from '../voice/stt-worker-client';
 import type { AppRuntime } from './app-runtime';
 
 // 終了シーケンス(設計書 §7.2)。

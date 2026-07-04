@@ -1,7 +1,7 @@
 import { app, dialog, type BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import { log } from '../../shared/logger';
-import { UPDATE_CHECK_TIMEOUT_MS } from '../../shared/constants';
+import { log } from '../../../shared/logger';
+import { UPDATE_CHECK_TIMEOUT_MS } from '../../../shared/constants';
 
 // 自動更新(electron-updater・N-REL-2)。NSIS インストーラ＋GitHub Releases がバックエンド。
 //

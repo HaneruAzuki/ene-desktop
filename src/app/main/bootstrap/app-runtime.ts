@@ -1,5 +1,5 @@
-import type { CharacterContext } from '../../shared/types/character';
-import type { TtsEngine, VoiceConfig } from '../../shared/types/voice';
+import type { CharacterContext } from '../../../shared/types/character';
+import type { TtsEngine, VoiceConfig } from '../../../shared/types/voice';
 
 // 起動時に構築され、main 各所(ipc ハンドラ・ターンエンジン・右クリックメニュー・起動/終了シーケンス)
 // から共有参照される実行時状態。型を独立モジュールに置くことで ipc.ts への逆依存(循環)を避ける。

@@ -1,9 +1,9 @@
 import { join } from 'node:path';
 import { BrowserWindow, ipcMain, shell } from 'electron';
-import { log } from '../../shared/logger';
-import { encryptAndSaveApiKey } from '../../shared/node/encryption';
+import { log } from '../../../shared/logger';
+import { encryptAndSaveApiKey } from '../../../shared/node/encryption';
 import { testApiKey } from './api-key-tester';
-import type { PingResult } from '../../shared/types/api-key';
+import type { PingResult } from '../../../shared/types/api-key';
 
 // APIキー管理ダイアログ(設計書 §3.7)。
 // 専用の BrowserWindow + 専用 preload(window.eneApiKey)で実装する。

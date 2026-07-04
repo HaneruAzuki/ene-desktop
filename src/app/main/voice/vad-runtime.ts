@@ -2,12 +2,12 @@
    DI 化済でユニットテストあり(vad-runtime.test.ts)。凝集を優先する例外(§8.5)。 */
 import type { BrowserWindow } from 'electron';
 import { performance } from 'node:perf_hooks';
-import { log } from '../../shared/logger';
-import { SileroVad } from '../../voice/vad/silero-vad';
-import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../../voice/vad/vad-segmenter';
-import { isSttModelAvailable } from '../../voice/stt/stt-transcriber';
+import { log } from '../../../shared/logger';
+import { SileroVad } from '../../../voice/vad/silero-vad';
+import { VadSegmenter, DEFAULT_VAD_CONFIG } from '../../../voice/vad/vad-segmenter';
+import { isSttModelAvailable } from '../../../voice/stt/stt-transcriber';
 import { transcribeViaWorker } from './stt-worker-client';
-import { turnNodStrength } from '../../shared/turn-nod';
+import { turnNodStrength } from '../../../shared/turn-nod';
 import type { BackchannelController } from './backchannel-controller';
 import {
   VAD_FRAME_SIZE,
@@ -16,8 +16,8 @@ import {
   VAD_MIN_SILENCE_MS,
   STT_SAMPLE_RATE,
   COALESCE_WINDOW_MAX_MS,
-} from '../../shared/constants';
-import { IPC } from '../../shared/ipc-channels';
+} from '../../../shared/constants';
+import { IPC } from '../../../shared/ipc-channels';
 
 /**
  * コアレッシング(投機生成＋連結・段階①)の配線。ON のとき、話終わりを**暫定**扱いにし、

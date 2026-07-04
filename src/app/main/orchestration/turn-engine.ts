@@ -1,29 +1,29 @@
 import { type BrowserWindow } from 'electron';
 import { performance } from 'node:perf_hooks';
-import { nowLocalIso, todayLocalYmd } from '../../shared/datetime';
-import { log } from '../../shared/logger';
-import { VOICE_STREAMING_ENABLED_ENV, TWO_TIER_ENABLED_ENV } from '../../shared/constants';
-import { appendShortTerm } from '../../memory/core/short-term';
-import { buildConversationMemory } from '../../memory/readout/context-builder';
-import { requestExtraction, enforceShortTermCap } from '../../memory/remember/extraction-scheduler';
-import { classifyTopicLocal } from '../../knowledge/local-classifier';
-import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../conversation/client';
-import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
-import { chooseModelTier } from '../../conversation/model-selector';
-import { shouldPlayThinkingFiller } from '../../conversation/thinking-filler';
+import { nowLocalIso, todayLocalYmd } from '../../../shared/datetime';
+import { log } from '../../../shared/logger';
+import { VOICE_STREAMING_ENABLED_ENV, TWO_TIER_ENABLED_ENV } from '../../../shared/constants';
+import { appendShortTerm } from '../../../memory/core/short-term';
+import { buildConversationMemory } from '../../../memory/readout/context-builder';
+import { requestExtraction, enforceShortTermCap } from '../../../memory/remember/extraction-scheduler';
+import { classifyTopicLocal } from '../../../knowledge/local-classifier';
+import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../../conversation/client';
+import { buildNameMishearHint, withNameMishearHint } from '../../../conversation/prompt-builder';
+import { chooseModelTier } from '../../../conversation/model-selector';
+import { shouldPlayThinkingFiller } from '../../../conversation/thinking-filler';
 import {
   recordBirthdayCelebrated,
   recordConversationTurn,
   recordUserBirthdayCelebrated,
   loadOrCreateActiveCharacter,
-} from '../../character/active-character';
-import { getSemantic } from '../../memory/core/semantic';
-import { isUserBirthdayToday } from '../../memory/readout/user-birthday';
-import { handleApiAuthError } from './api-key-auto-recovery';
-import { speakResponse, streamVoiceChat } from './voice-runtime';
-import type { ConversationResponse } from '../../shared/types/conversation';
-import type { EmotionLabel } from '../../shared/types/animation';
-import { resolveVoice, type AppRuntime } from './app-runtime';
+} from '../../../character/active-character';
+import { getSemantic } from '../../../memory/core/semantic';
+import { isUserBirthdayToday } from '../../../memory/readout/user-birthday';
+import { handleApiAuthError } from '../api-key/api-key-auto-recovery';
+import { speakResponse, streamVoiceChat } from '../voice/voice-runtime';
+import type { ConversationResponse } from '../../../shared/types/conversation';
+import type { EmotionLabel } from '../../../shared/types/animation';
+import { resolveVoice, type AppRuntime } from '../bootstrap/app-runtime';
 
 // ターンエンジン(1ターンの司令塔)。send-message オーケストレーションの中核を ipc 配線から分離する。
 //   generateResponse(副作用なし=投機可)→ commitTurn(副作用)→ handleSendMessage(直列の統合フロー)。

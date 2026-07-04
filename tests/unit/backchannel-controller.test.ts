@@ -8,7 +8,7 @@ vi.mock('../../src/conversation/backchannel-loader', () => ({
     cues: { continuer: ['うん', 'うんうん'] },
   })),
 }));
-import { BackchannelController } from '../../src/app/main/backchannel-controller';
+import { BackchannelController } from '../../src/app/main/voice/backchannel-controller';
 import type { TtsEngine, VoiceConfig } from '../../src/shared/types/voice';
 
 const VOICE: VoiceConfig = { engine: 'test', baseUrl: 'x', styles: { neutral: { styleId: 0 } } };

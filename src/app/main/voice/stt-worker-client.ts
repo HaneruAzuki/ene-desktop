@@ -1,12 +1,12 @@
 import { utilityProcess, type UtilityProcess } from 'electron';
 import { join } from 'node:path';
-import { log } from '../../shared/logger';
-import { getModelsDir } from '../../shared/node/paths';
+import { log } from '../../../shared/logger';
+import { getModelsDir } from '../../../shared/node/paths';
 import {
   transcribe as transcribeInProcess,
   warmStt as warmInProcess,
   sttModelDir,
-} from '../../voice/stt/stt-transcriber';
+} from '../../../voice/stt/stt-transcriber';
 
 // 重い STT を utilityProcess へ逃がす経路(N-REL-5)。既定 off(ENE_STT_WORKER=1 で有効化)。
 // 目的: STT 推論(~1.8s + transformers の JS 前後処理)を main から隔離し、発話直後の UI もっさり/

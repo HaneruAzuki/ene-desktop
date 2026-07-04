@@ -1,8 +1,8 @@
 import { Menu, app, dialog, type BrowserWindow } from 'electron';
 import { resetToDefaultPosition } from './window-position';
-import { openApiKeyDialog } from './api-key-dialog';
-import type { AppRuntime } from './app-runtime';
-import { IPC } from '../../shared/ipc-channels';
+import { openApiKeyDialog } from '../api-key/api-key-dialog';
+import type { AppRuntime } from '../bootstrap/app-runtime';
+import { IPC } from '../../../shared/ipc-channels';
 
 // キャラ右クリックメニュー(設計書 §8.8)。
 // 終了文言などキャラ依存の文字列は MVP ではコード内。将来 identity.json へ移行余地あり。

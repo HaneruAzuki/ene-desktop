@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { getConfigDir, getLogsDir, getMemoryDir } from '../../shared/node/paths';
+import { getConfigDir, getLogsDir, getMemoryDir } from '../../../shared/node/paths';
 
 // 記憶・設定・ログ用ディレクトリを起動時に用意する(設計書 §7.1 ステップ8)。
 // 置き場の正本は paths.ts。root をこのファイルで再導出せず必ず getter を使う

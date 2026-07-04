@@ -1,14 +1,14 @@
 import { ipcMain, dialog, shell, app, type BrowserWindow } from 'electron';
-import { loadAppSettings, saveIdleTalk, saveAutoLaunch } from '../../shared/node/app-settings';
-import { openApiKeyDialog } from './api-key-dialog';
-import { getUserDataDir } from '../../shared/node/paths';
-import { exportUserData, importUserData, looksLikeBackup } from '../../shared/node/user-data-backup';
-import { log } from '../../shared/logger';
-import { getSemantic, updateSemantic } from '../../memory/core/semantic';
-import type { IdleTalkMode } from '../../shared/types/settings';
-import type { OwnerName } from '../../shared/types/ipc';
-import type { AppRuntime } from './app-runtime';
-import { IPC } from '../../shared/ipc-channels';
+import { loadAppSettings, saveIdleTalk, saveAutoLaunch } from '../../../shared/node/app-settings';
+import { openApiKeyDialog } from '../api-key/api-key-dialog';
+import { getUserDataDir } from '../../../shared/node/paths';
+import { exportUserData, importUserData, looksLikeBackup } from '../../../shared/node/user-data-backup';
+import { log } from '../../../shared/logger';
+import { getSemantic, updateSemantic } from '../../../memory/core/semantic';
+import type { IdleTalkMode } from '../../../shared/types/settings';
+import type { OwnerName } from '../../../shared/types/ipc';
+import type { AppRuntime } from '../bootstrap/app-runtime';
+import { IPC } from '../../../shared/ipc-channels';
 
 // 設定パネル(UI改修 段階6・⚙ボタン)関連の IPC。
 // ipc.ts ではなく独立モジュールに置く(並行作業=listening mode と ipc.ts が同居中のため切り分け)。

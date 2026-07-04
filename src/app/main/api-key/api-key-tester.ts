@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ANTHROPIC_BASE_URL } from '../../conversation/client';
-import type { PingResult } from '../../shared/types/api-key';
+import { ANTHROPIC_BASE_URL } from '../../../conversation/client';
+import type { PingResult } from '../../../shared/types/api-key';
 
 // APIキーの形式検証と疎通テスト(設計書 §3.7「バリデーションの3段階」)。
 

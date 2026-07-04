@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- IPC ハンドラ登録・配線の集約点(ターン司令塔は turn-engine、設定系は
    settings-ipc へ分離済)。残りは宣言的な配線の列挙でまとまりを保つ例外(§8.5)。 */
 import { ipcMain, type BrowserWindow } from 'electron';
-import { log } from '../../shared/logger';
+import { log } from '../../../shared/logger';
 import {
   WINDOW_WIDTH,
   WINDOW_HEIGHT,
@@ -10,29 +10,29 @@ import {
   VAD_PROVISIONAL_SILENCE_MS,
   GREETING_GENERATION_TIMEOUT_MS,
   TURN_TIMEOUT_MS,
-} from '../../shared/constants';
-import { replaceLastAssistantText, appendShortTerm } from '../../memory/core/short-term';
-import { nowLocalIso } from '../../shared/datetime';
-import { getSemantic } from '../../memory/core/semantic';
-import { warmPromptCache } from '../../conversation/client';
-import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../character/vrm-loader';
-import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../shared/node/app-settings';
-import { saveWindowPosition } from './window-position';
-import { showCharacterContextMenu } from './character-context-menu';
-import { VadRuntime, type CoalesceHooks } from './vad-runtime';
-import { VoiceTurnCoordinator } from './voice-turn-coordinator';
-import { BackchannelController } from './backchannel-controller';
-import { isSttModelAvailable } from '../../voice/stt/stt-transcriber';
-import { transcribeViaWorker } from './stt-worker-client';
-import { generateResponse, commitTurn, handleSendMessage } from './turn-engine';
-import { speakResponse } from './voice-runtime';
-import type { ConversationResponse } from '../../shared/types/conversation';
-import type { CharacterInfo } from '../../shared/types/ipc';
-import type { TranscribeResult } from '../../shared/types/stt';
-import type { VrmRenderConfig, VrmDisplayParams } from '../../shared/types/vrm';
-import type { EqBand } from '../../shared/types/voice';
-import { resolveVoice, type AppRuntime } from './app-runtime';
-import { IPC } from '../../shared/ipc-channels';
+} from '../../../shared/constants';
+import { replaceLastAssistantText, appendShortTerm } from '../../../memory/core/short-term';
+import { nowLocalIso } from '../../../shared/datetime';
+import { getSemantic } from '../../../memory/core/semantic';
+import { warmPromptCache } from '../../../conversation/client';
+import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../../character/vrm-loader';
+import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../../shared/node/app-settings';
+import { saveWindowPosition } from '../window/window-position';
+import { showCharacterContextMenu } from '../window/character-context-menu';
+import { VadRuntime, type CoalesceHooks } from '../voice/vad-runtime';
+import { VoiceTurnCoordinator } from '../voice-turn-coordinator';
+import { BackchannelController } from '../voice/backchannel-controller';
+import { isSttModelAvailable } from '../../../voice/stt/stt-transcriber';
+import { transcribeViaWorker } from '../voice/stt-worker-client';
+import { generateResponse, commitTurn, handleSendMessage } from '../orchestration/turn-engine';
+import { speakResponse } from '../voice/voice-runtime';
+import type { ConversationResponse } from '../../../shared/types/conversation';
+import type { CharacterInfo } from '../../../shared/types/ipc';
+import type { TranscribeResult } from '../../../shared/types/stt';
+import type { VrmRenderConfig, VrmDisplayParams } from '../../../shared/types/vrm';
+import type { EqBand } from '../../../shared/types/voice';
+import { resolveVoice, type AppRuntime } from '../bootstrap/app-runtime';
+import { IPC } from '../../../shared/ipc-channels';
 
 // IPC ハンドラ集約(設計書 §4)。ターンの司令塔(generateResponse/commitTurn/handleSendMessage)は
 // turn-engine.ts に分離し、本ファイルは IPC 登録と各種ハンドラの配線に専念する。

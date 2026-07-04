@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { log } from '../../shared/logger';
-import { getUserDataDir, getVoiceEngineExePath } from '../../shared/node/paths';
+import { log } from '../../../shared/logger';
+import { getUserDataDir, getVoiceEngineExePath } from '../../../shared/node/paths';
 
 // 音声エンジンの孤児プロセス対策(N-REL-4)。ライフサイクル本体(voice-engine.ts)から分離。
 //

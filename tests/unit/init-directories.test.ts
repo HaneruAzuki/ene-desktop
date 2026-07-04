@@ -11,7 +11,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getLogsDir: (): string => `${h.dataDir}/logs`,
 }));
 
-import { ensureMemoryDirectories } from '../../src/app/main/init-directories';
+import { ensureMemoryDirectories } from '../../src/app/main/bootstrap/init-directories';
 
 beforeEach(async () => {
   h.dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-init-'));

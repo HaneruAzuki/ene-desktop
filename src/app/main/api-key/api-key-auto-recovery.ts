@@ -1,5 +1,5 @@
 import type { BrowserWindow } from 'electron';
-import { log } from '../../shared/logger';
+import { log } from '../../../shared/logger';
 import { openApiKeyDialog } from './api-key-dialog';
 
 // APIキー失効時の自動再表示(設計書 §6.1)。

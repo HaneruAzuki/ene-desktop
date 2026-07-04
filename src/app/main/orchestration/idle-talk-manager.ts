@@ -1,26 +1,26 @@
 import { powerMonitor, type BrowserWindow } from 'electron';
-import { log } from '../../shared/logger';
-import { nowLocalIso } from '../../shared/datetime';
-import { timeOfDayLabel } from '../../shared/moment';
-import { normalizeEmotion } from '../../shared/llm-parse';
-import { IDLE_TALK_CHECK_INTERVAL_MS } from '../../shared/constants';
+import { log } from '../../../shared/logger';
+import { nowLocalIso } from '../../../shared/datetime';
+import { timeOfDayLabel } from '../../../shared/moment';
+import { normalizeEmotion } from '../../../shared/llm-parse';
+import { IDLE_TALK_CHECK_INTERVAL_MS } from '../../../shared/constants';
 import {
   shouldSpeakIdle,
   buildIdleTalkPrompt,
   parseIdleTalkResponse,
   type IdleTalkState,
-} from '../../conversation/idle-talk';
-import { makeLlmComplete } from '../../conversation/client';
-import { detectAiSelfReference } from '../../shared/ai-self-check';
-import { speakResponse } from './voice-runtime';
-import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
-import { readPresenceMemory } from '../../memory/readout/presence-reads';
-import { appendShortTerm } from '../../memory/core/short-term';
-import { loadAppSettings } from '../../shared/node/app-settings';
-import type { EmotionLabel } from '../../shared/types/animation';
-import type { ConversationResponse } from '../../shared/types/conversation';
-import { resolveVoice, type AppRuntime } from './app-runtime';
-import { IPC } from '../../shared/ipc-channels';
+} from '../../../conversation/idle-talk';
+import { makeLlmComplete } from '../../../conversation/client';
+import { detectAiSelfReference } from '../../../shared/ai-self-check';
+import { speakResponse } from '../voice/voice-runtime';
+import { loadOpenLoopState, saveOpenLoopState } from '../../../memory/open-loops';
+import { readPresenceMemory } from '../../../memory/readout/presence-reads';
+import { appendShortTerm } from '../../../memory/core/short-term';
+import { loadAppSettings } from '../../../shared/node/app-settings';
+import type { EmotionLabel } from '../../../shared/types/animation';
+import type { ConversationResponse } from '../../../shared/types/conversation';
+import { resolveVoice, type AppRuntime } from '../bootstrap/app-runtime';
+import { IPC } from '../../../shared/ipc-channels';
 
 // 自発発話マネージャ(P7・N-PRES-7)。タイマーで定期的に「いま自分から一言かけてよいか」を判定し、
 // 良ければ材料(気にかけ/今日の暮らし/時間帯)から短い一言を生成して吹き出し＋音声で出す。

@@ -1,7 +1,7 @@
 import { screen, type BrowserWindow } from 'electron';
-import { getWindowPositionPath } from '../../shared/node/paths';
-import { readJson, writeJson } from '../../shared/node/json-store';
-import { WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_EDGE_MARGIN } from '../../shared/constants';
+import { getWindowPositionPath } from '../../../shared/node/paths';
+import { readJson, writeJson } from '../../../shared/node/json-store';
+import { WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_EDGE_MARGIN } from '../../../shared/constants';
 
 // ウィンドウ位置の管理(設計書 §8.1 / §8.3)。
 // electron に依存しない純粋関数(計算・補正)と、electron 依存のラッパに分ける。

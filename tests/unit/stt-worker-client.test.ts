@@ -23,7 +23,7 @@ describe('stt-worker-client (既定 off=フォールバック)', () => {
   });
 
   it('ENE_STT_WORKER 未設定なら worker を起こさず in-process transcribe に委譲する', async () => {
-    const { transcribeViaWorker } = await import('../../src/app/main/stt-worker-client');
+    const { transcribeViaWorker } = await import('../../src/app/main/voice/stt-worker-client');
     const out = await transcribeViaWorker(new Float32Array(8));
     expect(out).toBe('in-process:8');
     expect(inProcess).toHaveBeenCalledTimes(1);

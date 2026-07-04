@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { BrowserWindow } from 'electron';
-import { VadRuntime, type VadModel, type VadRuntimeDeps } from '../../src/app/main/vad-runtime';
+import { VadRuntime, type VadModel, type VadRuntimeDeps } from '../../src/app/main/voice/vad-runtime';
 import { VAD_FRAME_QUEUE_MAX, VAD_FRAME_SIZE } from '../../src/shared/constants';
 import { IPC } from '../../src/shared/ipc-channels';
 

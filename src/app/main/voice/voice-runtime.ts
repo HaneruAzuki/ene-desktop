@@ -1,22 +1,22 @@
 import type { BrowserWindow } from 'electron';
 import { performance } from 'node:perf_hooks';
-import { log } from '../../shared/logger';
-import { loadVoiceConfig } from '../../voice/tts/voice-loader';
-import { AivisSpeechTtsEngine } from '../../voice/tts/aivisspeech-tts';
-import { reconcileVoiceConfig } from '../../voice/tts/voice-provisioner';
-import { speakChunks, type SpeakChunk } from '../../voice/tts/voice-chat';
-import { createJsonStreamParser } from '../../conversation/json-stream-parser';
-import { splitSentences } from '../../conversation/sentence-splitter';
-import { buildPrompt } from '../../conversation/prompt-builder';
-import { makeStreamCall } from '../../conversation/client';
-import { fallbackResponse } from '../../conversation/fallback';
-import type { EmotionLabel } from '../../shared/types/animation';
-import type { TtsEngine, VoiceConfig } from '../../shared/types/voice';
-import type { CharacterContext } from '../../shared/types/character';
-import type { MemoryContext } from '../../shared/types/memory';
-import type { RouterResult } from '../../shared/types/router';
-import type { ConversationResponse } from '../../shared/types/conversation';
-import { IPC } from '../../shared/ipc-channels';
+import { log } from '../../../shared/logger';
+import { loadVoiceConfig } from '../../../voice/tts/voice-loader';
+import { AivisSpeechTtsEngine } from '../../../voice/tts/aivisspeech-tts';
+import { reconcileVoiceConfig } from '../../../voice/tts/voice-provisioner';
+import { speakChunks, type SpeakChunk } from '../../../voice/tts/voice-chat';
+import { createJsonStreamParser } from '../../../conversation/json-stream-parser';
+import { splitSentences } from '../../../conversation/sentence-splitter';
+import { buildPrompt } from '../../../conversation/prompt-builder';
+import { makeStreamCall } from '../../../conversation/client';
+import { fallbackResponse } from '../../../conversation/fallback';
+import type { EmotionLabel } from '../../../shared/types/animation';
+import type { TtsEngine, VoiceConfig } from '../../../shared/types/voice';
+import type { CharacterContext } from '../../../shared/types/character';
+import type { MemoryContext } from '../../../shared/types/memory';
+import type { RouterResult } from '../../../shared/types/router';
+import type { ConversationResponse } from '../../../shared/types/conversation';
+import { IPC } from '../../../shared/ipc-channels';
 
 // 音声ランタイム(main 側・task_17 Phase A / design-revision-voice §4)。
 // 起動時に best-effort で TTS を用意し、応答メッセージを文単位で合成 → renderer へ音声チャンクを送る。

@@ -222,32 +222,40 @@ ene-desktop/
 │
 ├── src/
 │   ├── app/                       ← 土台:アプリの器(Electron 配線・UI)。ドメイン層をここで組み立てる
-│   │   ├── main/                  ← Electron main process
-│   │   │   ├── index.ts               ← エントリポイント
-│   │   │   ├── window.ts              ← BrowserWindow設定(透過)
-│   │   │   ├── window-position.ts     ← ウィンドウ位置の読込/デバウンス保存
-│   │   │   ├── character-context-menu.ts ← キャラのコンテキストメニュー(クレジット表示等)
-│   │   │   ├── single-instance.ts     ← 多重起動防止
-│   │   │   ├── init-directories.ts    ← data/ 配下の初期化
-│   │   │   ├── app-runtime.ts         ← AppRuntime 型(起動時状態・main 各所で共有・ipc 逆依存回避 N-ARCH-2)
-│   │   │   ├── ipc.ts                 ← IPCハンドラ集約・配線(ターン司令塔は turn-engine へ分離・N-ARCH-3)
-│   │   │   ├── settings-ipc.ts        ← 設定系IPCの分離(各種 get/set・ipc.ts の entanglement 回避・UI改修2026-06)
-│   │   │   ├── turn-engine.ts         ← 1ターンの司令塔 generateResponse/commitTurn/handleSendMessage(N-ARCH-3)
-│   │   │   ├── lifecycle.ts           ← 起動シーケンス(runStartupSequence)
-│   │   │   ├── shutdown.ts            ← 終了シーケンス(runShutdownSequence)
-│   │   │   ├── api-key-dialog.ts      ← APIキーダイアログ表示 + 専用IPC統合(N-09-1)
-│   │   │   ├── api-key-tester.ts      ← APIキー疎通テスト(SDK使用)
-│   │   │   ├── api-key-auto-recovery.ts  ← 失効時の自動再表示配線
-│   │   │   ├── voice-engine.ts        ← AivisSpeech サイドカーのライフサイクル管理(task_17/N-17-12)
-│   │   │   ├── voice-engine-orphan.ts  ← エンジン孤児プロセスの掃除(クラッシュ後の次回起動でパス一致 kill・N-REL-4)
-│   │   │   ├── stt-worker.ts           ← STT 推論の utilityProcess エントリ(main を塞がない・N-REL-5)
-│   │   │   ├── stt-worker-client.ts    ← STT worker の main 側(fork+フォールバック・既定off=ENE_STT_WORKER・N-REL-5)
-│   │   │   ├── voice-runtime.ts        ← 音声出力ランタイム(TTS初期化・確定応答を文単位合成→renderer・task_17)
-│   │   │   ├── vad-runtime.ts          ← ハンズフリーVADランタイム(フレーム受信→区間検出→STT・task_17)
-│   │   │   ├── voice-turn-coordinator.ts ← 音声ターン調停(発話コアレッシング・無音窓の自動調整・2026-06)
-│   │   │   ├── backchannel-controller.ts ← 相槌コントローラ(聞くターンの配線・task_18)
-│   │   │   ├── idle-talk-manager.ts   ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
-│   │   │   └── offscreen-life.ts      ← オフスクリーンライフ生成(LLM×memory 跨ぎ・存在感P3・旧 conversation/・N-ARCH-5)
+│   │   ├── main/                  ← Electron main process。関心別にサブフォルダ化(N-ARCH-9・2026-07)。
+│   │   │   │                          ビルドエントリ(index/stt-worker)と移動先未定の voice-turn-coordinator は root に据置
+│   │   │   ├── index.ts               ← エントリポイント(electron-vite main エントリ)
+│   │   │   ├── stt-worker.ts           ← STT 推論の utilityProcess エントリ(電-vite の別エントリ・main を塞がない・N-REL-5)
+│   │   │   ├── voice-turn-coordinator.ts ← 音声ターン調停(投機生成コアレッシング/barge-in/無音窓適応・純粋状態機械)。移動先検討中(conversation 候補)
+│   │   │   ├── bootstrap/              ← 起動・終了・器の生成
+│   │   │   │   ├── app-runtime.ts      ← AppRuntime 型(起動時状態・main 各所で共有・N-ARCH-2)
+│   │   │   │   ├── lifecycle.ts        ← 起動シーケンス(runStartupSequence)
+│   │   │   │   ├── init-directories.ts ← data/ 配下の初期化
+│   │   │   │   ├── single-instance.ts  ← 多重起動防止
+│   │   │   │   ├── shutdown.ts         ← 終了シーケンス(runShutdownSequence)
+│   │   │   │   └── auto-update.ts      ← electron-updater 自動更新(N-REL-2)
+│   │   │   ├── api-key/                ← APIキーの入力/検証/回復
+│   │   │   │   ├── api-key-dialog.ts   ← APIキーダイアログ表示 + 専用IPC統合(N-09-1)
+│   │   │   │   ├── api-key-tester.ts   ← APIキー疎通テスト(SDK使用)
+│   │   │   │   └── api-key-auto-recovery.ts ← 失効時の自動再表示配線
+│   │   │   ├── window/                 ← ウィンドウ・メニュー
+│   │   │   │   ├── window.ts           ← BrowserWindow設定(透過)
+│   │   │   │   ├── window-position.ts  ← ウィンドウ位置の読込/デバウンス保存
+│   │   │   │   └── character-context-menu.ts ← キャラのコンテキストメニュー(クレジット表示等)
+│   │   │   ├── ipc/                    ← IPC 配線
+│   │   │   │   ├── ipc.ts              ← IPCハンドラ集約・配線(ターン司令塔は orchestration/turn-engine へ・N-ARCH-3)
+│   │   │   │   └── settings-ipc.ts     ← 設定系IPCの分離(各種 get/set・UI改修2026-06)
+│   │   │   ├── voice/                  ← 音声サブシステムの配線(voice ドメインを Electron に繋ぐ)
+│   │   │   │   ├── voice-runtime.ts    ← 音声出力ランタイム(TTS初期化・確定応答を文単位合成→renderer・task_17)
+│   │   │   │   ├── vad-runtime.ts      ← ハンズフリーVADランタイム(フレーム受信→区間検出→STT・task_17)
+│   │   │   │   ├── backchannel-controller.ts ← 相槌コントローラ(聞くターンの配線・task_18)
+│   │   │   │   ├── stt-worker-client.ts ← STT worker の main 側(fork+フォールバック・既定off=ENE_STT_WORKER・N-REL-5)
+│   │   │   │   ├── voice-engine.ts     ← AivisSpeech サイドカーのライフサイクル管理(task_17/N-17-12)
+│   │   │   │   └── voice-engine-orphan.ts ← エンジン孤児プロセスの掃除(パス一致 kill・N-REL-4)
+│   │   │   └── orchestration/          ← 会話ターン/存在感のオーケストレーション
+│   │   │       ├── turn-engine.ts      ← 1ターンの司令塔 generateResponse/commitTurn/handleSendMessage(N-ARCH-3)
+│   │   │       ├── idle-talk-manager.ts ← 自発発話(話しかけ頻度)の管理(存在感・オフスクリーンライフ連動)
+│   │   │       └── offscreen-life.ts   ← オフスクリーンライフ生成(LLM×offscreen-life/memory 跨ぎ・存在感P3)
 │   │   │   (OS Integration(os/)は廃止・2026-06。トリミは PC を操作しない=頼まれても chat で断る)
 │   │   │
 │   │   ├── preload/                   ← Preload script

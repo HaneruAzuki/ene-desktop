@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
-import { WINDOW_WIDTH, WINDOW_HEIGHT } from '../../shared/constants';
-import { getTrayIconPath } from '../../shared/node/paths';
+import { WINDOW_WIDTH, WINDOW_HEIGHT } from '../../../shared/constants';
+import { getTrayIconPath } from '../../../shared/node/paths';
 import type { Position } from './window-position';
 
 // 透過ウィンドウの作成(設計書 §8.1 / §4.4)。

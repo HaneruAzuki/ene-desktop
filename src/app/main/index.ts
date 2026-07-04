@@ -1,10 +1,10 @@
 import { app, type BrowserWindow } from 'electron';
 import { log } from '../../shared/logger';
-import { acquireSingleInstanceLock } from './single-instance';
-import { runStartupSequence } from './lifecycle';
-import { runShutdownSequence } from './shutdown';
-import { stopVoiceEngine } from './voice-engine';
-import type { AppRuntime } from './app-runtime';
+import { acquireSingleInstanceLock } from './bootstrap/single-instance';
+import { runStartupSequence } from './bootstrap/lifecycle';
+import { runShutdownSequence } from './bootstrap/shutdown';
+import { stopVoiceEngine } from './voice/voice-engine';
+import type { AppRuntime } from './bootstrap/app-runtime';
 
 // Electron main エントリポイント(設計書 §7)。
 // 多重起動防止 → 起動シーケンス(lifecycle)→ 終了時に記憶抽出(shutdown)。
