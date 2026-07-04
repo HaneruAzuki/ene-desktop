@@ -1,4 +1,5 @@
 import { buildEqChain } from './voice-eq';
+import { decodeWav, stopSourceSafely } from './audio-graph';
 
 // 音声チャンク(WAV)の逐次再生(task_17 Phase A / design-revision-voice §1)。
 // main から届く WAV を AudioContext で順番に再生する。
@@ -165,10 +166,8 @@ function playNext(): void {
 /** WAV を1つ受け取り、デコードして再生キューに積む(順番に再生される)。text/index はストリーミングのみ。 */
 export async function enqueueAudio(wav: ArrayBuffer, text?: string, index?: number): Promise<void> {
   const c = getCtx();
-  // 自動再生ポリシー対策: 送信(クリック/Enter)後に届くのでユーザー操作済み。念のため resume。
-  if (c.state === 'suspended') await c.resume();
-  // decodeAudioData は渡した ArrayBuffer を detach するため、コピーを渡す。
-  const buf = await c.decodeAudioData(wav.slice(0));
+  // 自動再生ポリシー対策: 送信(クリック/Enter)後に届くのでユーザー操作済み。decodeWav が resume も行う。
+  const buf = await decodeWav(c, wav);
   queue.push({ buf, text, index });
   if (endGraceTimer) {
     // 文間ギャップの猶予中に次チャンク到着=継続。終了をキャンセルし、onPlayStart は再発火しない。
@@ -196,12 +195,7 @@ export function stopPlayback(): void {
     endGraceTimer = null;
   }
   if (currentSource) {
-    currentSource.onended = null; // playNext を呼ばせない
-    try {
-      currentSource.stop();
-    } catch {
-      /* 既に停止済みなら無視 */
-    }
+    stopSourceSafely(currentSource);
     currentSource = null;
   }
   if (playing) {

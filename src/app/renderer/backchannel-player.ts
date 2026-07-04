@@ -10,6 +10,7 @@
 
 import { isMuted } from './audio-player';
 import { buildEqChain } from './voice-eq';
+import { decodeWav, stopSourceSafely } from './audio-graph';
 
 let ctx: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
@@ -33,9 +34,7 @@ function getCtx(): AudioContext {
 export async function playBackchannel(wav: ArrayBuffer): Promise<void> {
   if (isMuted()) return; // ミュート中はトリミの声(相槌含む)を鳴らさない(UI改修 段階3)
   const c = getCtx();
-  if (c.state === 'suspended') await c.resume();
-  // decodeAudioData は渡した ArrayBuffer を detach するためコピーを渡す。
-  const buf = await c.decodeAudioData(wav.slice(0));
+  const buf = await decodeWav(c, wav);
   const src = c.createBufferSource();
   src.buffer = buf;
   src.connect(eqInput ?? c.destination); // EQ があれば経由(声色を応答音声と揃える)
@@ -54,12 +53,7 @@ export async function playBackchannel(wav: ArrayBuffer): Promise<void> {
  */
 export function stopBackchannel(): void {
   if (currentSource) {
-    currentSource.onended = null; // 解放ロジックを呼ばせない
-    try {
-      currentSource.stop();
-    } catch {
-      /* 既に停止済みなら無視 */
-    }
+    stopSourceSafely(currentSource);
     currentSource = null;
   }
 }

@@ -1,12 +1,7 @@
-import { STT_SAMPLE_RATE } from '../../shared/constants';
+import { createMicGraph } from './mic-graph';
 
 // マイク取得(push-to-talk・task_17 Phase B)。
-//
-// AudioContext を 16kHz で作り、getUserMedia ソースをそのレートで取り込むことで
-// Whisper が要求する「16kHz mono Float32」を直接得る(手動リサンプル不要)。
-// ScriptProcessorNode は deprecated だが Electron(Chromium)で安定動作し、
-// AudioWorklet 用の別ファイル/バンドル(§4.3 軽量・依存を増やさない方針)を避けられる。
-//
+// 16kHz mono の取り込みグラフは mic-graph に集約。ここはフレームを貯めて stop() で連結する PTT の差分だけ。
 // 録音音声は外部に出さない。文字起こし(ローカル・main)にのみ使う(§4.2 / §7.1)。
 
 /** ScriptProcessorNode のバッファ長(16kHz で約0.25秒ごとに発火)。 */
@@ -24,39 +19,17 @@ export interface Recorder {
  * マイクが使えない場合は getUserMedia が reject する(呼び出し側でハンドリング)。
  */
 export async function startRecording(): Promise<Recorder> {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-  });
-  const ctx = new AudioContext({ sampleRate: STT_SAMPLE_RATE });
-  const source = ctx.createMediaStreamSource(stream);
-  const processor = ctx.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
-  // onaudioprocess を発火させるにはグラフを destination まで繋ぐ必要があるが、
-  // そのまま繋ぐとマイク音がスピーカーへ回り込む(ハウリング)。gain=0 のノードで無音化する。
-  const mute = ctx.createGain();
-  mute.gain.value = 0;
-
   const chunks: Float32Array[] = [];
-  processor.onaudioprocess = (e: AudioProcessingEvent): void => {
-    // 内部バッファは使い回されるためコピーして保持する。
-    chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-  };
-
-  source.connect(processor);
-  processor.connect(mute);
-  mute.connect(ctx.destination);
-
-  const cleanup = (): void => {
-    processor.onaudioprocess = null;
-    processor.disconnect();
-    source.disconnect();
-    mute.disconnect();
-    stream.getTracks().forEach((t) => t.stop());
-    void ctx.close();
-  };
+  // PTT は韻律を使わないので AGC は既定(on)でよい。
+  const graph = await createMicGraph({
+    bufferSize: PROCESSOR_BUFFER_SIZE,
+    autoGainControl: true,
+    onFrame: (frame) => chunks.push(frame),
+  });
 
   return {
     async stop(): Promise<Float32Array> {
-      cleanup();
+      graph.teardown();
       const total = chunks.reduce((n, c) => n + c.length, 0);
       const out = new Float32Array(total);
       let offset = 0;
@@ -67,7 +40,7 @@ export async function startRecording(): Promise<Recorder> {
       return out;
     },
     cancel(): void {
-      cleanup();
+      graph.teardown();
       chunks.length = 0;
     },
   };
