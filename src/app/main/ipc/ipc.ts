@@ -18,7 +18,6 @@ import { warmPromptCache } from '../../../conversation/client';
 import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../../character/vrm-loader';
 import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../../shared/node/app-settings';
 import { saveWindowPosition } from '../window/window-position';
-import { showCharacterContextMenu } from '../window/character-context-menu';
 import { VadRuntime, type CoalesceHooks } from '../voice/vad-runtime';
 import { VoiceTurnCoordinator } from '../../../conversation/voice-turn-coordinator';
 import { BackchannelController } from '../voice/backchannel-controller';
@@ -352,10 +351,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow, runtime: AppRunti
 
   ipcMain.handle(IPC.SET_IGNORE_MOUSE_EVENTS, async (_event, ignore: boolean): Promise<void> => {
     mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
-  });
-
-  ipcMain.handle(IPC.SHOW_CHARACTER_CONTEXT_MENU, async (): Promise<void> => {
-    showCharacterContextMenu(mainWindow, runtime);
   });
 
   // マイク音声の文字起こし(task_17 Phase B)。renderer の push-to-talk から呼ばれる。

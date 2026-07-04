@@ -23,17 +23,6 @@ import type { BackchannelDecision } from '../../shared/types/backchannel';
 //   2026-06-10 に撤去した(語彙を continuer に統一して死蔵化したため)。設計は
 //   docs/archive/design-revision-backchannel-prosody-lv2.md に保存。現行はタイミング判定のみ。
 
-/** 1フレームの RMS(二乗平均平方根=エネルギー)。VAD 取り込み診断(ゼロ埋め検出)に使う。純粋。 */
-export function frameRms(frame: Float32Array): number {
-  if (frame.length === 0) return 0;
-  let sum = 0;
-  for (let i = 0; i < frame.length; i++) {
-    const v = frame[i] ?? 0;
-    sum += v * v;
-  }
-  return Math.sqrt(sum / frame.length);
-}
-
 export interface BackchannelEngineConfig {
   sampleRate: number;
   frameSize: number;

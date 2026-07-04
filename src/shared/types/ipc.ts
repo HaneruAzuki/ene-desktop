@@ -88,9 +88,6 @@ export interface EneAPI {
   moveWindow(x: number, y: number): Promise<void>;
   setIgnoreMouseEvents(ignore: boolean): Promise<void>; // クリックスルー制御(§8.6)
 
-  // キャラ右クリックメニュー(main 側でネイティブメニュー表示)
-  showCharacterContextMenu(): Promise<void>;
-
   // 入力欄を開いた瞬間に Tier0 キャッシュを温める(task_14 Phase 3・レイテンシ施策)
   warmCache(): Promise<void>;
 

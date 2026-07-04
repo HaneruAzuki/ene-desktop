@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   BackchannelEngine,
-  frameRms,
   type BackchannelEngineConfig,
 } from '../../src/voice/vad/backchannel-engine';
 import type { BackchannelDecision } from '../../src/shared/types/backchannel';
@@ -106,17 +105,5 @@ describe('BackchannelEngine (task_18 Phase A / B-17 fire-on-resume)', () => {
     pushN(eng, 0.9, 39); // reset 後は 0 から(minSpeech に1フレーム足りない)
     pushN(eng, 0.0, 12);
     expect(eng.push(0.9)).toBeNull();
-  });
-});
-
-describe('frameRms (VAD 取り込み診断にも使用)', () => {
-  it('一定振幅の RMS は振幅に等しい', () => {
-    expect(frameRms(new Float32Array(100).fill(0.5))).toBeCloseTo(0.5, 5);
-  });
-  it('無音は 0', () => {
-    expect(frameRms(new Float32Array(64))).toBe(0);
-  });
-  it('空配列は 0(0除算しない)', () => {
-    expect(frameRms(new Float32Array(0))).toBe(0);
   });
 });

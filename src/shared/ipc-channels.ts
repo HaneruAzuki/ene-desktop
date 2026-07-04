@@ -39,7 +39,6 @@ export const IPC = {
   SET_OWNER_NAME: 'ene:set-owner-name',
   SET_VRM_DISPLAY: 'ene:set-vrm-display',
   SHOW_ABOUT: 'ene:show-about',
-  SHOW_CHARACTER_CONTEXT_MENU: 'ene:show-character-context-menu',
   THINKING_FILLER: 'ene:thinking-filler',
   TRANSCRIBE_AUDIO: 'ene:transcribe-audio',
   TURN_NOD: 'ene:turn-nod',

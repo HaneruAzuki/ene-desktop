@@ -41,7 +41,6 @@ const eneAPI: EneAPI = {
   getInitialGreeting: () => ipcRenderer.invoke(IPC.GET_INITIAL_GREETING),
   moveWindow: (x, y) => ipcRenderer.invoke(IPC.MOVE_WINDOW, x, y),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke(IPC.SET_IGNORE_MOUSE_EVENTS, ignore),
-  showCharacterContextMenu: () => ipcRenderer.invoke(IPC.SHOW_CHARACTER_CONTEXT_MENU),
   warmCache: () => ipcRenderer.invoke(IPC.WARM_CACHE),
   isReady: () => ipcRenderer.invoke(IPC.IS_READY),
   transcribeAudio: (samples) => ipcRenderer.invoke(IPC.TRANSCRIBE_AUDIO, samples),
