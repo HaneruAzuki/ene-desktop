@@ -20,7 +20,7 @@ import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../../shared
 import { saveWindowPosition } from '../window/window-position';
 import { showCharacterContextMenu } from '../window/character-context-menu';
 import { VadRuntime, type CoalesceHooks } from '../voice/vad-runtime';
-import { VoiceTurnCoordinator } from '../voice-turn-coordinator';
+import { VoiceTurnCoordinator } from '../../../conversation/voice-turn-coordinator';
 import { BackchannelController } from '../voice/backchannel-controller';
 import { isSttModelAvailable } from '../../../voice/stt/stt-transcriber';
 import { transcribeViaWorker } from '../voice/stt-worker-client';

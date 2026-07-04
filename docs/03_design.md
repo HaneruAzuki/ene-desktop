@@ -223,10 +223,9 @@ ene-desktop/
 ├── src/
 │   ├── app/                       ← 土台:アプリの器(Electron 配線・UI)。ドメイン層をここで組み立てる
 │   │   ├── main/                  ← Electron main process。関心別にサブフォルダ化(N-ARCH-9・2026-07)。
-│   │   │   │                          ビルドエントリ(index/stt-worker)と移動先未定の voice-turn-coordinator は root に据置
+│   │   │   │                          root 据置は electron-vite のビルドエントリ(index/stt-worker)のみ
 │   │   │   ├── index.ts               ← エントリポイント(electron-vite main エントリ)
 │   │   │   ├── stt-worker.ts           ← STT 推論の utilityProcess エントリ(電-vite の別エントリ・main を塞がない・N-REL-5)
-│   │   │   ├── voice-turn-coordinator.ts ← 音声ターン調停(投機生成コアレッシング/barge-in/無音窓適応・純粋状態機械)。移動先検討中(conversation 候補)
 │   │   │   ├── bootstrap/              ← 起動・終了・器の生成
 │   │   │   │   ├── app-runtime.ts      ← AppRuntime 型(起動時状態・main 各所で共有・N-ARCH-2)
 │   │   │   │   ├── lifecycle.ts        ← 起動シーケンス(runStartupSequence)
@@ -365,7 +364,8 @@ ene-desktop/
 │   │   ├── sentence-splitter.ts   ← 応答テキストの文分割(TTS配信用・純粋・旧 voice/)
 │   │   ├── backchannel-pool.ts    ← 相槌の語選択(語彙=言語・純粋・RNG注入・旧 voice/)
 │   │   ├── backchannel-loader.ts  ← 相槌語彙(backchannels.json)のロード(旧 voice/)
-│   │   └── thinking-filler.ts     ← 思考フィラー発火判定(難易度＋テキスト駆動・旧 voice/)
+│   │   ├── thinking-filler.ts     ← 思考フィラー発火判定(難易度＋テキスト駆動・旧 voice/)
+│   │   └── voice-turn-coordinator.ts ← 音声ターン調停(投機生成コアレッシング/barge-in/無音窓適応・純粋状態機械・旧 app/main・N-ARCH-9)
 │   │
 │   ├── voice/                     ← あり方④:語り口=声(音声信号 I/O)。判定基準=「音声サンプル(Float32Array)に触れるもの」。パイプライン別に層化(N-ARCH-8・2026-07)
 │   │   ├── tts/                   ← 発声(text→audio)

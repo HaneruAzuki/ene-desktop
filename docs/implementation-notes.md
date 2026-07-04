@@ -1084,11 +1084,11 @@
 ### N-ARCH-9 🟢 app/main の関心別サブフォルダ化(合成ルートの航行性・2026-07-04)
 - app/main は26ファイルのフラット袋(bootstrap/ipc/window/api-key/voice配線/orchestration が混在)。**合成ルート(composition root)ゆえ依存衛生でなく可読性が目的**(memory と性格が違う=lint 強制は不要)。
 - 6サブフォルダへ: `bootstrap`(6)/`api-key`(3)/`window`(3)/`ipc`(2)/`voice`(音声サブシステム配線6)/`orchestration`(turn-engine/idle-talk-manager/offscreen-life)。
-- **root 据置3**: `index.ts`・`stt-worker.ts`(electron-vite の**ビルドエントリ**=`electron.vite.config` にパス直書き。移すと config 変更が要る→ entry は root に置く方針)＋ `voice-turn-coordinator.ts`(**移動先検討中**=純粋状態機械で conversation 候補。決まるまで root)。
+- **root 据置2**: `index.ts`・`stt-worker.ts`(electron-vite の**ビルドエントリ**=`electron.vite.config` にパス直書き。移すと config 変更が要る→ entry は root に置く方針)。※ `voice-turn-coordinator.ts` は当初 root 暫定だったが、純粋状態機械(shared のみ・音声サンプル非依存)ゆえ **conversation へ移設済**(N-ARCH-7 の境界基準に忠実・ipc.ts が唯一の消費者)。
 - **ビルド安全性**: main は index/stt-worker の2エントリに全て bundle されるので、他ファイルの移動は out/ 構造を変えず、`join(__dirname,'../preload/…')` 等の**実行時パスは出力相対で不変**。`npm run build` で3バンドル成功を確認。
 - 越境なし(全て app 内)。dependency-cruiser ルール変更不要。
 - **検証**: typecheck / eslint / lint:deps(違反0) / **541テスト** / **build 成功**。SSOT(03_design §2)反映。
-- **残(次段)**: voice-turn-coordinator の移動先確定。app/main/voice(6)を voice ドメインへ更に寄せるかは別途(現状は Electron 配線ゆえ app が正しい)。
+- **補足**: app/main/voice(6)・orchestration(3)は「Electron/プロセス配線」または「複数ドメインの合成」ゆえ app が正しい(純粋ロジックは既に各ドメインへ抽出済=domain が中身・app が配線)。voice-turn-coordinator だけは純粋だったので conversation へ出した。
 
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。

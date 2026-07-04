@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- 音声ターン調停(投機生成コアレッシング/barge-in/無音窓適応)の単一状態機械。
    DI 化済でユニットテストあり(voice-turn-coordinator.test.ts)。凝集を優先する例外(§8.5)。 */
-import { log } from '../../shared/logger';
-import type { ConversationResponse } from '../../shared/types/conversation';
+import { log } from '../shared/logger';
+import type { ConversationResponse } from '../shared/types/conversation';
 import {
   VAD_PROVISIONAL_SILENCE_MS,
   COALESCE_WINDOW_MIN_MS,
@@ -14,7 +14,7 @@ import {
   LISTENING_YAWN_MS,
   TURN_TIMEOUT_MS,
   FIRST_AUDIO_TIMEOUT_MS,
-} from '../../shared/constants';
+} from '../shared/constants';
 
 /** 傾聴入室後、この時間ユーザの発話が無ければ自動退室する(姿勢を戻す・固着回避・listening-mode)。 */
 const LISTENING_IDLE_TIMEOUT_MS = 20_000;
