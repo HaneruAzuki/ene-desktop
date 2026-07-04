@@ -88,3 +88,37 @@ describe('splitFirstChunk(第一声短縮・施策A)', () => {
     expect(splitFirstChunk(buf, 20)).toBeNull();
   });
 });
+
+// 言語非依存(英語対応): 日本語 。！？ に加え、英語の . ! ? も文末として扱う。
+// '.' は「直後が空白/改行」のときだけ文末=小数/URL/バッファ末尾を誤区切りしない。
+describe('英語・日英混在の文分割', () => {
+  it('英語の . ! ? で区切る(. は直後が空白のとき)', () => {
+    const r = splitSentences('Hello world. How are you? Fine!');
+    expect(r.complete).toEqual(['Hello world.', 'How are you?', 'Fine!']);
+    expect(r.remainder).toBe('');
+  });
+
+  it('小数(3.14)や URL の . では区切らない(文末の . だけ拾う)', () => {
+    expect(splitSentences('3.14').complete).toEqual([]);
+    expect(splitSentences('see example.com').complete).toEqual([]);
+    expect(splitSentences('Pi is 3.14 today. Next').complete).toEqual(['Pi is 3.14 today.']);
+  });
+
+  it('. がバッファ末尾(直後不明)なら区切らず次 delta を待つ', () => {
+    const r = splitSentences('It ends here.');
+    expect(r.complete).toEqual([]);
+    expect(r.remainder).toBe('It ends here.');
+  });
+
+  it('日英混在でも両方の文末を拾う', () => {
+    const r = splitSentences('これは日本語。And this is English. ');
+    expect(r.complete).toEqual(['これは日本語。', 'And this is English.']);
+  });
+
+  it('splitFirstChunk も英語の文末で第一声を切る', () => {
+    expect(splitFirstChunk('Hi there. More text follows', 50)).toEqual({
+      chunk: 'Hi there.',
+      remainder: ' More text follows',
+    });
+  });
+});

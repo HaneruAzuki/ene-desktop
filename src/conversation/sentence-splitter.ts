@@ -1,9 +1,24 @@
-// 日本語テキストの文分割(task_17 C3 / design-revision-voice §2)。
-// ストリーミング TTS のため、届いたバッファを「TTS へ流せる完成文」と「未完の残り」に分ける。
-// 純粋関数(副作用なし)=単体テスト対象。
+// テキストの文分割(task_17 C3 / design-revision-voice §2)。ストリーミング TTS のため、届いたバッファを
+// 「TTS へ流せる完成文」と「未完の残り」に分ける。純粋関数(副作用なし)=単体テスト対象。
+// **言語非依存**: 日本語(。！？)と英語(. ! ?)の両方を文末として扱う。半角ピリオド '.' は小数(3.14)・
+// URL(example.com)・略語で誤区切りしやすいので「直後が空白/改行のときだけ」文末とみなす。読点(、)では区切らない。
 
-/** 文末とみなす記号(全角・半角の句点/感嘆/疑問)。読点(、)では区切らない。 */
-const SENTENCE_END = '。！？!?';
+/** 曖昧さなく即座に文末とみなす記号(全角句点/感嘆/疑問＋半角 ! ?)。 */
+const HARD_SENTENCE_ENDERS = '。！？!?';
+
+/**
+ * buffer[i] が文末か。ハード記号(。！？!?)は即文末。半角ピリオド '.' は英語の文末のみ=**直後が空白/改行**の
+ * ときに限る(小数/URL/略語を誤区切りしない)。'.' がバッファ末尾(直後不明)なら false=次の delta を待つ。
+ */
+function isSentenceEnd(buffer: string, i: number): boolean {
+  const ch = buffer[i] ?? '';
+  if (HARD_SENTENCE_ENDERS.includes(ch)) return true;
+  if (ch === '.') {
+    const next = buffer[i + 1];
+    return next === ' ' || next === '\t' || next === '\n';
+  }
+  return false;
+}
 
 export interface SplitResult {
   /** TTS へ流せる完成文(末尾記号を含む・トリム済・空文字は除外)。 */
@@ -27,10 +42,10 @@ export function splitSentences(buffer: string): SplitResult {
       if (s) complete.push(s);
       i += 1;
       start = i;
-    } else if (SENTENCE_END.includes(ch)) {
+    } else if (isSentenceEnd(buffer, i)) {
       // 文末記号の連続をまとめて 1 文に含める。
       let j = i;
-      while (j + 1 < buffer.length && SENTENCE_END.includes(buffer[j + 1])) j += 1;
+      while (j + 1 < buffer.length && isSentenceEnd(buffer, j + 1)) j += 1;
       const s = buffer.slice(start, j + 1).trim();
       if (s) complete.push(s);
       i = j + 1;
@@ -51,7 +66,7 @@ export interface FirstChunkResult {
 
 /**
  * 第一声を早めるため、**最初の発話チャンクだけ**を早期に切り出す(B-06/施策A)。
- * 通常の文末(。！？!?)に加え、**読点(、)・改行・字数上限**でも区切る。2文目以降には使わない。
+ * 通常の文末(。！？!? と英語 '.')に加え、**読点(、)・改行・字数上限**でも区切る。2文目以降には使わない。
  *
  * ルビ保護:`《…》` の途中では切らない。また「基底+ルビ」が分断されないよう、
  *  - 字数上限での区切りは、直後が `《`(ルビ開始)でないルビ外の位置でのみ行う、
@@ -69,14 +84,14 @@ export function splitFirstChunk(buffer: string, maxChars: number): FirstChunkRes
     if (ch === '》') { inRuby = false; continue; }
     if (inRuby) continue;
 
-    const isEnd = SENTENCE_END.includes(ch);
+    const isEnd = isSentenceEnd(buffer, i);
     const isBreak = isEnd || ch === '\n' || ch === '、';
     if (!isBreak && !/\s/.test(ch)) realChars += 1;
 
     // 句読点・改行:実文字が1つ以上あれば、ここで第一声を確定(ルビ安全)。
     if (isBreak && realChars >= 1) {
       let j = i;
-      if (isEnd) while (j + 1 < buffer.length && SENTENCE_END.includes(buffer[j + 1] ?? '')) j += 1;
+      if (isEnd) while (j + 1 < buffer.length && isSentenceEnd(buffer, j + 1)) j += 1;
       const chunk = buffer.slice(0, j + 1).trim();
       if (chunk) return { chunk, remainder: buffer.slice(j + 1) };
     }
