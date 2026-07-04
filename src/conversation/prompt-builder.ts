@@ -281,11 +281,6 @@ function formatMoment(moment: ConversationMoment | undefined): string {
     parts.push('', moment.finitenessHint);
   }
 
-  // ③b: 落ち込み対応(現在の会話に落ち込みの cue がある時のみ・発言内容への促し)。
-  if (moment.lowMoodHint) {
-    parts.push('', moment.lowMoodHint);
-  }
-
   return parts.join('\n');
 }
 

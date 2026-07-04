@@ -3,7 +3,6 @@ import { getShortTerm } from '../core/short-term';
 import { loadAllEpisodicFiles } from '../core/episodic';
 import { loadLifeMemory } from '../core/life-memory';
 import { retrieve, type RetrieverDeps } from '../recall/retriever';
-import { seemsDown, LOW_MOOD_HINT } from './mood-cues';
 import { deriveFamiliarityStage } from './familiarity';
 import { loadOrCreateCharacterState } from '../../character/character-state';
 import { buildMoment, logRecallDiag } from './moment-builder';
@@ -60,8 +59,6 @@ export async function buildConversationMemory(
   };
   const result = await buildMemoryContext(query, deps);
   result.moment = await buildMoment(userRecords, result.semantic, active, stage, sessionTurnCount);
-  // 落ち込み対応(③b): 現在の発話に落ち込みの cue があれば、明るい話題へそっと寄せるヒントを載せる。
-  if (seemsDown(query.text)) result.moment.lowMoodHint = LOW_MOOD_HINT;
   logRecallDiag(stage, canon, result.relevantEpisodic);
   return result;
 }

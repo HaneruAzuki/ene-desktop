@@ -18,8 +18,7 @@ import type { EpisodicMemory, EpisodicRecord, RetrievalQuery } from '../../share
 // ユーザー発言を引き金に**想起プール(user episodic ＋ canon)**を全件横断で引く(Router 非依存)。
 //  - 開示ゲーティング:familiarityStage 以下の記憶のみ候補(RRF の手前でハードフィルタ)。
 //  - 個性バイアス:RRF に「関心アフィニティ」を加算(トリミの関心に触れる記憶を少し優先想起)。
-//    旧「元気づけ(valence の減衰平均→正valence記憶を加点)」は撤去(2026-06-24・③b)。落ち込み対応は
-//    現在の会話 cue → moment ヒント(mood-cues / context-builder)へ移した。
+//    ※ 落ち込み等のムード判定は Claude の推論に委ね、想起バイアスや専用検出は持たない。
 //  - 上位 RECALL_CANDIDATE_POOL に絞って softmax サンプリング(揺らぎ・関連の裾を除外)。
 //  - **後方互換**:deps 未指定なら従来挙動(関心なし・全開示・argmax)。
 
