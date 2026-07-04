@@ -67,3 +67,45 @@ describe('selectOpenLoops (P4/⑦)', () => {
     expect(selectOpenLoops(records, surfacedState, NOW_MS).notes).toEqual([]);
   });
 });
+
+describe('selectOpenLoops: 自分(self)と相手(user)の分離(案1)', () => {
+  /** provenance 指定つきの記録。 */
+  function recP(id: string, prov: 'user' | 'self', note: string): EpisodicRecord {
+    return {
+      id,
+      memory: {
+        date: daysAgoIso(1),
+        topic: 't',
+        summary: 's',
+        importance: 3,
+        category: 'general',
+        provenance: prov,
+        openLoop: { kind: 'question', note },
+      },
+    };
+  }
+
+  it('user は notes、self は selfNotes に振り分けられ、両方 surfaced に入る', () => {
+    const records = [recP('u', 'user', '相手の結果待ち'), recP('s', 'self', '自分の再テスト')];
+    const sel = selectOpenLoops(records, empty, NOW_MS);
+    expect(sel.notes).toEqual(['相手の結果待ち']);
+    expect(sel.selfNotes).toEqual(['自分の再テスト']);
+    expect(sel.surfaced).toEqual(expect.arrayContaining(['u', 's']));
+  });
+
+  it('include で無効化した帰属は候補にも surfaced にも入らない(挨拶が self の1ショットを黙って消費しない)', () => {
+    const records = [recP('u', 'user', '相手の結果待ち'), recP('s', 'self', '自分の再テスト')];
+    const sel = selectOpenLoops(records, empty, NOW_MS, 5, { user: true, self: false });
+    expect(sel.notes).toEqual(['相手の結果待ち']);
+    expect(sel.selfNotes).toEqual([]);
+    expect(sel.surfaced).not.toContain('s'); // self は消費されない
+  });
+
+  it('self だけを選ぶこともできる(会話経路で self クールダウンだけ空いた場合)', () => {
+    const records = [recP('u', 'user', '相手の結果待ち'), recP('s', 'self', '自分の再テスト')];
+    const sel = selectOpenLoops(records, empty, NOW_MS, 5, { user: false, self: true });
+    expect(sel.notes).toEqual([]);
+    expect(sel.selfNotes).toEqual(['自分の再テスト']);
+    expect(sel.surfaced).not.toContain('u');
+  });
+});

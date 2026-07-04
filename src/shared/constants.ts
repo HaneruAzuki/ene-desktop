@@ -537,6 +537,15 @@ export const OPEN_LOOP_GLOBAL_COOLDOWN_HOURS = 6;
  */
 export const KNOWLEDGE_GAP_COOLDOWN_HOURS = 24;
 
+/**
+ * トリミ自身の「気がかり」(自分の予定・結果待ち=provenance:self の open loop)を再び能動提示するまで空ける
+ * 最小時間(時間・案1「意思と不安のにじみ」)。相手の気にかけ(OPEN_LOOP_GLOBAL_COOLDOWN_HOURS=6h)より**長く**取る:
+ * 「不安」はデレと同じで、めったに漏れないからこそ人間くさい(連発すると不安症キャラに戯画化する)。
+ * 既定 48=「およそ2日に一度、ふと自分の気がかりがこぼれる」程度。0 で毎ターン。会話経路のみが参照・更新。
+ * 実際の頻度はこれと open-loop の1ショット(surfaced)＋暮らし吸収ペース(週≈1件)で二重に律速される。
+ */
+export const SELF_LOOP_COOLDOWN_HOURS = 48;
+
 // --- P7: 自発発話(アイドル時)+ 有限性(トーン=発言内容のみ) ---
 
 /** アイドル発話を検討する間隔(ms・タイマー周期)。 */

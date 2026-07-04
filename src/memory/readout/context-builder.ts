@@ -21,6 +21,7 @@ import {
   RECALL_DEBUG_ENV,
   OPEN_LOOP_GLOBAL_COOLDOWN_HOURS,
   KNOWLEDGE_GAP_COOLDOWN_HOURS,
+  SELF_LOOP_COOLDOWN_HOURS,
   DAY_MS,
 } from '../../shared/constants';
 import type {
@@ -110,6 +111,7 @@ async function buildMoment(
   //   各クールダウン中はその種類を載せない。関連話題が出れば retriever 経路で自然に再訪する(別経路・対象外)。
   //   提示できた種類だけタイムスタンプを進める。失敗は握りつぶす。
   let openLoops: string[] = [];
+  let selfOpenLoops: string[] = [];
   let knowledgeGaps: string[] = [];
   try {
     const state = await loadOpenLoopState();
@@ -120,14 +122,27 @@ async function buildMoment(
     let surfaced = state.surfaced;
     let lastOpenLoopAt = state.lastOpenLoopAt;
     let lastGapAt = state.lastGapAt;
+    let lastSelfLoopAt = state.lastSelfLoopAt;
     let changed = false;
 
-    if (cooled(state.lastOpenLoopAt, OPEN_LOOP_GLOBAL_COOLDOWN_HOURS)) {
-      const sel = selectOpenLoops(userRecords, state, nowMs, stage);
+    // 相手の気にかけ(user・6h)とトリミ自身の気がかり(self・SELF_LOOP_COOLDOWN_HOURS=長め)は
+    // **別クールダウン**。「不安」はデレと同じで薄く効かせる=self は user より稀に漏れる(案1)。
+    const includeUser = cooled(state.lastOpenLoopAt, OPEN_LOOP_GLOBAL_COOLDOWN_HOURS);
+    const includeSelf = cooled(state.lastSelfLoopAt, SELF_LOOP_COOLDOWN_HOURS);
+    if (includeUser || includeSelf) {
+      const sel = selectOpenLoops(userRecords, state, nowMs, stage, {
+        user: includeUser,
+        self: includeSelf,
+      });
       openLoops = sel.notes;
+      selfOpenLoops = sel.selfNotes;
+      if (openLoops.length > 0 || selfOpenLoops.length > 0) surfaced = sel.surfaced;
       if (openLoops.length > 0) {
-        surfaced = sel.surfaced;
         lastOpenLoopAt = nowIso;
+        changed = true;
+      }
+      if (selfOpenLoops.length > 0) {
+        lastSelfLoopAt = nowIso;
         changed = true;
       }
     }
@@ -142,6 +157,7 @@ async function buildMoment(
       const next: OpenLoopState = { surfaced };
       if (lastOpenLoopAt) next.lastOpenLoopAt = lastOpenLoopAt;
       if (lastGapAt) next.lastGapAt = lastGapAt;
+      if (lastSelfLoopAt) next.lastSelfLoopAt = lastSelfLoopAt;
       await saveOpenLoopState(next);
     }
   } catch (e) {
@@ -156,6 +172,7 @@ async function buildMoment(
   const elapsed = describeElapsed(active.relationship?.lastConversationDate, todayYmd);
   if (elapsed) moment.elapsedLabel = elapsed;
   if (openLoops.length > 0) moment.openLoops = openLoops;
+  if (selfOpenLoops.length > 0) moment.selfOpenLoops = selfOpenLoops;
   if (knowledgeGaps.length > 0) moment.knowledgeGaps = knowledgeGaps;
   const fin = finitenessHint(d.getHours(), sessionTurns);
   if (fin) moment.finitenessHint = fin;

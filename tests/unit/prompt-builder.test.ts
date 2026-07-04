@@ -102,6 +102,44 @@ describe('buildPrompt (設計書 §3.4 / task_14 Tier 構成)', () => {
     expect(text).not.toContain('まだ結末を聞いていない');
   });
 
+  it('自分の気がかり(provenance:self)の open loop は「尋ねる」ではなく「自分のこととして漏らす」ヒントになる(懸念1・案1)', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        { date: '2026-06-01T00:00:00+09:00', topic: '弾幕ゲー', summary: '弾幕ゲーを作り始めた', importance: 4, category: 'hobby', provenance: 'self', openLoop: { kind: 'question', note: '続けるか気にしている' } },
+      ],
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).toContain('自分のこととして');
+    // 自分ごとを相手に「どうなった?」と尋ねさせない(取り違え防止)。
+    expect(text).not.toContain('まだ結末を聞いていない');
+  });
+
+  it('自分がした約束(promise-by-me)の open loop は「自分から切り出す」ヒントになる', () => {
+    const mc = makeMemoryContext({
+      relevantEpisodic: [
+        { date: '2026-06-01T00:00:00+09:00', topic: '約束', summary: '今度コツを教えると言った', importance: 3, category: 'general', provenance: 'user', openLoop: { kind: 'promise-by-me', note: '教えると約束した' } },
+      ],
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).toContain('自分から自然に切り出してよい');
+  });
+
+  it('moment.selfOpenLoops は相手の気にかけとは別に「あなた自身の気がかり」節で出る(案1)', () => {
+    const mc = makeMemoryContext({
+      moment: {
+        nowIso: '2026-06-13T20:00:00+09:00',
+        timeOfDay: '夜',
+        openLoops: ['相手は面接の結果待ち'],
+        selfOpenLoops: ['再テストが木曜にある'],
+      },
+    });
+    const text = lastUserText(buildPrompt(makeCharContext(), mc, makeRouterResult(), 'x'));
+    expect(text).toContain('あなた自身の気がかり');
+    expect(text).toContain('再テストが木曜にある');
+    // 相手の気にかけ節と混ざらない。
+    expect(text).toContain('気にかけていること(相手のこと');
+  });
+
   it('canon(self)と user 記憶は別セクションに分けて提示される(provenance 混同防止)', () => {
     const mc = makeMemoryContext({
       relevantEpisodic: [

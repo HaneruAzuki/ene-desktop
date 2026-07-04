@@ -37,6 +37,9 @@ export async function readPresenceMemory(
     .filter((r) => r.memory.category === DAILY_LIFE_CATEGORY)
     .sort((a, b) => b.memory.date.localeCompare(a.memory.date));
   // 気にかけ(open-loops)は開示ゲート(§1.5): 親密度より深い気にかけは出さない(stage 未指定=全開示)。
-  const openLoops = selectOpenLoops(all, state, nowMs, stage);
+  // 挨拶・自発発話では**相手の気にかけ(user)だけ**を選ぶ。トリミ自身の気がかり(self)はここでは出さない:
+  //  - 自分の暮らしは dailyLife / recentLife で既に伝わる(重複回避)。
+  //  - self の1ショット(surfaced)を挨拶で黙って消費せず、会話経路の「ふと漏れる」機会に温存する(案1)。
+  const openLoops = selectOpenLoops(all, state, nowMs, stage, { user: true, self: false });
   return { dailyLife, openLoops };
 }

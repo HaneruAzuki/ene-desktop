@@ -133,7 +133,10 @@ export interface ConversationMoment {
   nowIso: string; // 現在のローカルTZ込み ISO 8601(P1)
   timeOfDay: string; // 朝/昼/夕方/夜/深夜(P1)
   elapsedLabel?: string; // 前回会話からの経過の言葉(例「3日ぶり」)。同日・初回は undefined(P1)
-  openLoops?: string[]; // 気にかけている事柄の覚書(最大 OPEN_LOOP_SURFACE_MAX 件・P4)
+  openLoops?: string[]; // 気にかけている事柄の覚書(相手の未解決事=provenance:user・最大 OPEN_LOOP_SURFACE_MAX 件・P4)
+  // トリミ自身の気がかり(自分の予定・結果待ち=provenance:self の open loop・案1「意思と不安のにじみ」)。
+  // 相手の気にかけ(openLoops)とは提示文を分ける=「自分のこと」を相手に「どうなった?」と尋ねる取り違えを防ぐ。
+  selfOpenLoops?: string[];
   knowledgeGaps?: string[]; // まだ知らない相手の属性ラベル(最大 KNOWLEDGE_GAP_SURFACE_MAX 件・親密度ゲート済・P5)
   userBirthdayToday?: boolean; // 今日が相手の誕生日か(P5)
   finitenessHint?: string; // 有限性のトーン指示(発言内容のみ・例「(いまは深夜。眠そうにしてよい)」・P7)
