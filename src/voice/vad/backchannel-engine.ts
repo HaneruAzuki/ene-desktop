@@ -19,8 +19,8 @@ import type { BackchannelDecision } from '../../shared/types/backchannel';
 //
 // 設計の憲法(task_18): 尺・有無は「良い聞き手とは」で決める。Claude が返るまでの時間では決めない。
 //
-// ★ 韻律トーン判定(Lv2: surprise/continuer の打ち分け・F0/エネルギー・自己キャリブレーション・永続化)は
-//   行わない(語彙を continuer に統一して死蔵化したため)。設計は
+// ★ 韻律トーン判定(F0/エネルギーで surprise/continuer 等の相槌の型を打ち分ける・自己キャリブレーション・
+//   永続化)は行わない(語彙を continuer に統一して死蔵化したため)。設計は
 //   docs/archive/design-revision-backchannel-prosody-lv2.md に保存。
 
 export interface BackchannelEngineConfig {

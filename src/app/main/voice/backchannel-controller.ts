@@ -92,7 +92,7 @@ export class BackchannelController {
   /**
    * 1フレームの発話確率を投入(ENE 非発話中=ユーザの番にのみ呼ぶこと)。
    * 相槌を打つべきなら送る。**タイミング(=うなずき)は pool だけで動く**(音声は任意・あれば一緒に鳴る)。
-   * 語は continuer(韻律トーン判定 Lv2 は撤去・2026-06-10)。
+   * 語は continuer。
    */
   onFrame(prob: number): void {
     if (!this.pool) return;

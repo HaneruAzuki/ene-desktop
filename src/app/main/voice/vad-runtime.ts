@@ -227,7 +227,7 @@ export class VadRuntime {
 
       const prob = await this.vad.process(frame);
       // 相槌は「ユーザの番」だけ(ENE 発話中は自分の声へ相槌を打たない・エコー誤発火回避)。
-      // タイミング判定のみ(韻律トーン判定 Lv2 は撤去・2026-06-10)。
+      // タイミング判定のみ。
       if (!this.speaking && this.backchannel) {
         this.backchannel.onFrame(prob);
       }

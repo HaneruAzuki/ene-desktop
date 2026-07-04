@@ -20,7 +20,6 @@ export class VoiceMic {
     if (this.running) return;
     this.graph = await createMicGraph({
       bufferSize: VAD_FRAME_SIZE,
-      // AGC は音量を均して「声の勢い(強調)」を潰すため OFF(相槌の韻律型選択 Lv2 のため)。
       autoGainControl: false,
       // 512サンプル/フレームを main の VAD へ送る。
       onFrame: (frame) => window.ene.sendVadFrame(frame),

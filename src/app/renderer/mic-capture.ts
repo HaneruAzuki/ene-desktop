@@ -20,7 +20,6 @@ export interface Recorder {
  */
 export async function startRecording(): Promise<Recorder> {
   const chunks: Float32Array[] = [];
-  // PTT は韻律を使わないので AGC は既定(on)でよい。
   const graph = await createMicGraph({
     bufferSize: PROCESSOR_BUFFER_SIZE,
     autoGainControl: true,

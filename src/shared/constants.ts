@@ -301,9 +301,6 @@ export const BACKCHANNEL_VOICE_RATIO = 0.5;
  * 1.0→0.4(2026-06-12 ユーザー): ターン終端うなずきを浅くしたら相槌が相対的に深く見えたため、浅い側(0.4)に合わせる。
  */
 export const BACKCHANNEL_NOD_STRENGTH = 0.4;
-// 韻律トーン判定 Lv2 の閾値(BACKCHANNEL_EMPHASIS_RATIO / BACKCHANNEL_PITCH_RATIO)は
-// 2026-06-10 に撤去した(語彙を continuer に統一して死蔵化したため)。
-// 設計は docs/archive/design-revision-backchannel-prosody-lv2.md。
 
 // --- ターン終端うなずき(ターンテイキングの視覚信号・2026-06-12 ユーザー設計) ---
 // 無音窓が閉じた瞬間(VAD endTurn=「無音枠終端」)に1回うなずき、ターンを受け取ったことを**音を増やさず視覚で**示す。

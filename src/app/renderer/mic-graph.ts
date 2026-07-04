@@ -15,7 +15,7 @@ export interface MicGraph {
 export interface MicGraphOptions {
   /** ScriptProcessorNode のバッファ長(このサンプル数ごとに onFrame が発火)。 */
   bufferSize: number;
-  /** AGC(自動ゲイン)を有効にするか。声の勢い(韻律)を保ちたい経路は false。 */
+  /** AGC(自動ゲイン)を有効にするか。 */
   autoGainControl: boolean;
   /** 1フレーム(16kHz mono Float32・コピー済み)ごとに呼ぶ。 */
   onFrame: (frame: Float32Array) => void;
