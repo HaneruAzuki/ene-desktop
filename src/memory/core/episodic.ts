@@ -1,9 +1,9 @@
 import { promises as fs } from 'node:fs';
 import { join, relative, isAbsolute } from 'node:path';
-import { getMemoryDir } from '../shared/node/paths';
-import { readJson, writeJson, listJsonFiles } from '../shared/node/json-store';
-import { EPISODIC_SCHEMA_VERSION } from '../shared/constants';
-import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
+import { getMemoryDir } from '../../shared/node/paths';
+import { readJson, writeJson, listJsonFiles } from '../../shared/node/json-store';
+import { EPISODIC_SCHEMA_VERSION } from '../../shared/constants';
+import type { EpisodicMemory, EpisodicRecord } from '../../shared/types/memory';
 
 // 中期記憶(Episodic・設計書 §3.3 / §5.2 / design-revision-memory-v2)。
 // 出来事・事実の要約をファイル単位で保存。ファイルパスが一意 ID を兼ねる(別フィールドを持たない)。

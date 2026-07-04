@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planConsolidation } from '../../src/memory/consolidation-policy';
+import { planConsolidation } from '../../src/memory/forget/consolidation-policy';
 import type { EpisodicRecord } from '../../src/shared/types/memory';
 
 // 忘却の「計画」純粋ロジックの検証(§11.6・段階的縮退)。LLM/IO なし=決定論。

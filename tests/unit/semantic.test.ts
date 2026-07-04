@@ -8,7 +8,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getSemanticPath: (): string => `${h.memDir}/semantic.json`,
 }));
 
-import { getSemantic, updateSemantic, lockOwnerName } from '../../src/memory/semantic';
+import { getSemantic, updateSemantic, lockOwnerName } from '../../src/memory/core/semantic';
 
 beforeEach(async () => {
   h.memDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-sem-'));

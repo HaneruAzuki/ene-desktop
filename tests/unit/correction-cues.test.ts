@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasCorrectionCue, augmentWithRecent } from '../../src/memory/correction-cues';
+import { hasCorrectionCue, augmentWithRecent } from '../../src/memory/remember/correction-cues';
 import type { EpisodicMemory, EpisodicRecord } from '../../src/shared/types/memory';
 
 // 訂正リーチの拡張(P4)の純関数検証。

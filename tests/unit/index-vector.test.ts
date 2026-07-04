@@ -19,7 +19,7 @@ import {
   searchVectors,
   syncVectorIndex,
   loadVectorIndex,
-} from '../../src/memory/index-vector';
+} from '../../src/memory/core/index-vector';
 import type { Embedder } from '../../src/shared/node/embedder';
 import type { EpisodicMemory, EpisodicRecord } from '../../src/shared/types/memory';
 

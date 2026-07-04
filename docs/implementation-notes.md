@@ -1052,6 +1052,20 @@
 - **機械強制(N-ARCH-2 の延長)**: `.dependency-cruiser.cjs` に `no-cross-domain`(error)を追加。`from` のドメインを `$1` で捕捉し `^src/$1/`(同一ドメイン)＋ `^src/character/active-character`(上記例外)のみ許可。**一時プローブ(memory が voice を import)で error を出すことを検証後に撤去**=ルールが実際に噛むことを確認。
 - **検証**: typecheck / eslint / lint:deps(違反0・152 modules)/ build / **491 テスト** 全グリーン。SSOT(03_design §2 ツリー・05_architecture §4)反映済み。
 
+### N-ARCH-6 🟢 memory を能力で層化＋異物の退去(Screaming Architecture 深掘り・2026-07-04)
+- **問題(ユーザー指摘)**: `memory/` 30ファイルが「メモリ関連だから」で1つのフラットな袋に堆積し、想起・忘却など**互いに依存しない機能**が同居=Screaming Architecture でない。加えて `character/birthday-checker`(個性でなく日付判定)、`memory/offscreen-life-*`(記憶でなく画面外の暮らし)の**配置ミス**。
+- **依存図で機械診断(推測でなく実測)**: dependency-cruiser の JSON 出力から memory 内部の全エッジを抽出。「2クラスタ以上から参照されるファイル＋その下流閉包」を **core** として機械導出 → 8ファイル(episodic/index-inverted/index-vector/recall-pool/short-term/semantic/life-memory/schema-validation)が確定。残りを動詞に分類し、**core を沈めた後の横断エッジを計算 → remember/readout/forget の相互依存 0本・逆流 0本**(全29越境エッジが下向き)を確認。これが「動詞で割っても絡まない」ことの証明。
+- **層序**: `core → { recall, open-loops } → { remember, readout, forget }`(下向きのみ)。
+  - `recall-pool` は名前に反し **core**(recall へ昇格不可): `core/index-inverted` が索引再生成で `recall-pool` を全走査 → 上げると core→recall の逆流。役割も「思い出せる記憶の母集団=データ土台」で substrate。
+  - `open-loops` は remember(書く)と readout(読む)の**両方**が使う共有概念 → 素朴には readout に見えるが独立層。1ファイルなのでフォルダ化せず `memory/open-loops.ts` に据え、層ルールで下向き強制。
+- **異物の退去**:
+  - `memory/offscreen-life-{pack,select}` → 新ドメイン `src/offscreen-life/{pack,select}`(memory 内部依存0=昇格コストほぼ0。画面外の暮らしは売りの機能で、plumbing 扱いをやめ最上位で叫ばせる)。
+  - `character/birthday-checker` → `conversation/birthday-checker`。移動を阻んでいた `character/character-context` の birthdayHint 計算は、唯一の呼び出し元 `app/main/lifecycle` が直後に上書きする**冗長計算**だったので撤去(重複解消・birthdayHint は「今日」依存の起動時モーメントなので配線層が持つのが筋)。
+- **判別ルール(今後の指針)**: 上げる=独立した**能力**(別 substrate を持てる: offscreen-life)。中に留める=一つの能力の**側面**で substrate を共有(memory の動詞群は core を共有 → memory 内サブフォルダが定位置。最上位へ散らさない)。
+- **機械強制(再発防止)**: `.dependency-cruiser.cjs` に **`no-memory-verb-cross`**(remember/readout/forget 相互禁止)＋ **`no-memory-core-upward`**(core が上位を参照禁止)を追加。既存の `no-episodic-store-outside-memory` / `no-index-impl-outside-memory` を `memory/core/` パスへ追従。`offscreen-life` をドメイン列挙へ追加。過去のリファクタ失敗の正体(core を分離せず動詞だけ割る)を lint で封じた。
+- **実装手法**: import 相対パス書換は決定論スクリプト(各 import を「移動後の位置から見た正しい相対」に再計算)→ `git mv` → `tsc` を真実源に検証。`vi.mock()` のパス文字列(from/import 構文でない)は別途手当て。
+- **検証**: typecheck(exit 0)/ eslint 緑 / lint:deps(**違反0**・164 modules・614 deps)/ **541 テスト** 全グリーン。SSOT(03_design §2 ツリー)反映済み。
+
 ### 横断監査クローズ 🟢 E2(軽微3件)＋ disclosureLevel 確認(2026-06-16)
 - **E2①(陳腐化コメント)**: `ControlBar.tsx` の「離席/じゃあね未実装」コメントを実態(全ボタン配線済み)へ更新。
 - **E2②(非原子的 save)**: `app-settings.ts` の4 save が read-modify-write で、設定パネルの素早い複数トグルで後勝ち取りこぼしの縁。`updateSettings` で promise チェーン直列化(短期記憶 withWriteLock と同方針)。

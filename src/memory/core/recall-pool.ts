@@ -1,6 +1,6 @@
 import { loadAllEpisodicFiles } from './episodic';
 import { loadLifeMemory } from './life-memory';
-import type { EpisodicRecord } from '../shared/types/memory';
+import type { EpisodicRecord } from '../../shared/types/memory';
 
 // 想起プール(task_16)。ユーザー episodic と人生記憶 canon を統合した母集団。
 // retriever・逆引き索引・ベクトル索引が共通で使い、canon も横断想起の対象に含める。

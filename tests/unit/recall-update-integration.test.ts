@@ -19,10 +19,10 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { saveEpisodic, loadEpisodicById, episodicId } from '../../src/memory/episodic';
-import { indexEpisodic, queryInverted } from '../../src/memory/index-inverted';
-import { retrieve } from '../../src/memory/retriever';
-import { extractFromShortTerm } from '../../src/memory/extraction-trigger';
+import { saveEpisodic, loadEpisodicById, episodicId } from '../../src/memory/core/episodic';
+import { indexEpisodic, queryInverted } from '../../src/memory/core/index-inverted';
+import { retrieve } from '../../src/memory/recall/retriever';
+import { extractFromShortTerm } from '../../src/memory/remember/extraction-trigger';
 import { writeJson } from '../../src/shared/node/json-store';
 import type { EpisodicMemory, ShortTermEntry } from '../../src/shared/types/memory';
 

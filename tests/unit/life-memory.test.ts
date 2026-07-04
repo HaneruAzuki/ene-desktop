@@ -10,7 +10,7 @@ vi.mock('../../src/shared/node/paths', () => ({
   getLifeMemoryPath: (): string => `${h.dir}/life-memory.json`,
 }));
 
-import { loadLifeMemory } from '../../src/memory/life-memory';
+import { loadLifeMemory } from '../../src/memory/core/life-memory';
 
 beforeEach(async () => {
   h.dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-canon-'));

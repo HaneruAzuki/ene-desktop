@@ -14,11 +14,11 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { runForgetting } from '../../src/memory/forgetting';
-import { saveEpisodic, loadEpisodicById, loadAllEpisodicFiles } from '../../src/memory/episodic';
-import { getConsolidationState } from '../../src/memory/consolidation-state';
+import { runForgetting } from '../../src/memory/forget/forgetting';
+import { saveEpisodic, loadEpisodicById, loadAllEpisodicFiles } from '../../src/memory/core/episodic';
+import { getConsolidationState } from '../../src/memory/forget/consolidation-state';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
-import type { LlmComplete } from '../../src/memory/extractor';
+import type { LlmComplete } from '../../src/memory/remember/extractor';
 
 const complete: LlmComplete = async () =>
   '{"summary":"5月のまとめ","topic":"5月","tags":["t"],"entities":["太郎"]}';

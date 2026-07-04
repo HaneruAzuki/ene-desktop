@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkBirthday } from '../../src/character/birthday-checker';
+import { checkBirthday } from '../../src/conversation/birthday-checker';
 import type { CharacterIdentity, ActiveCharacter } from '../../src/shared/types/character';
 
 function makeIdentity(birthday?: { month: number; day: number }): CharacterIdentity {

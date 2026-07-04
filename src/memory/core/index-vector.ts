@@ -1,10 +1,10 @@
-import { getVectorIndexPath } from '../shared/node/paths';
-import { readJson, writeJson } from '../shared/node/json-store';
-import { log } from '../shared/logger';
-import { EMBEDDING_DIM } from '../shared/constants';
-import { cosineSimilarity } from '../shared/vector-math';
-import type { Embedder } from '../shared/node/embedder';
-import type { EpisodicRecord } from '../shared/types/memory';
+import { getVectorIndexPath } from '../../shared/node/paths';
+import { readJson, writeJson } from '../../shared/node/json-store';
+import { log } from '../../shared/logger';
+import { EMBEDDING_DIM } from '../../shared/constants';
+import { cosineSimilarity } from '../../shared/vector-math';
+import type { Embedder } from '../../shared/node/embedder';
+import type { EpisodicRecord } from '../../shared/types/memory';
 
 // ベクトル索引(意味検索・Phase B・design-revision-memory-v2 §1.3)。
 // 派生キャッシュ＝真実の源は episodic 本体。削除しても JSON から再生成できる(§6.1 可搬性)。

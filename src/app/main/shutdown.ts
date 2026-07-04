@@ -1,6 +1,6 @@
 import { log } from '../../shared/logger';
-import { flushExtraction } from '../../memory/extraction-scheduler';
-import { clearShortTerm } from '../../memory/short-term';
+import { flushExtraction } from '../../memory/remember/extraction-scheduler';
+import { clearShortTerm } from '../../memory/core/short-term';
 import { makeLlmComplete } from '../../conversation/client';
 import { stopVoiceEngine } from './voice-engine';
 import { killSttWorker } from './stt-worker-client';

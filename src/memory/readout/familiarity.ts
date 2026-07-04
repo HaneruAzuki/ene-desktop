@@ -1,5 +1,5 @@
-import { FAMILIARITY_THRESHOLDS, DAY_MS } from '../shared/constants';
-import type { RelationshipFacts } from '../shared/types/character';
+import { FAMILIARITY_THRESHOLDS, DAY_MS } from '../../shared/constants';
+import type { RelationshipFacts } from '../../shared/types/character';
 
 // 親しさ段階の導出(task_16・開示ゲーティング・design-revision-character-heart §4.2)。
 //

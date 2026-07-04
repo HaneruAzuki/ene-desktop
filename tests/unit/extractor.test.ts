@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractMemoryFromConversation } from '../../src/memory/extractor';
+import { extractMemoryFromConversation } from '../../src/memory/remember/extractor';
 import type { ShortTermEntry } from '../../src/shared/types/memory';
 
 const entries: ShortTermEntry[] = [

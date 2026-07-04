@@ -1,5 +1,5 @@
-import { RECALL_TOPIC_MAX } from '../shared/constants';
-import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
+import { RECALL_TOPIC_MAX } from '../../shared/constants';
+import type { EpisodicMemory, EpisodicRecord } from '../../shared/types/memory';
 
 // 想起の最終選抜(P2・多様性)。retriever のスコアリング後、返す件数を「トピックの偏り」を抑えて選ぶ純粋ロジック。
 // I/O も乱数も持たない=決定論で単体テスト可能(retriever はこのモジュールへスコア済みの順序を渡すだけ)。

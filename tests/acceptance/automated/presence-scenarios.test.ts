@@ -31,10 +31,10 @@ vi.mock('../../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { buildConversationMemory } from '../../../src/memory/context-builder';
+import { buildConversationMemory } from '../../../src/memory/readout/context-builder';
 import { buildPrompt } from '../../../src/conversation/prompt-builder';
-import { saveEpisodic } from '../../../src/memory/episodic';
-import { updateSemantic } from '../../../src/memory/semantic';
+import { saveEpisodic } from '../../../src/memory/core/episodic';
+import { updateSemantic } from '../../../src/memory/core/semantic';
 import { saveActiveCharacter } from '../../../src/character/active-character';
 import { makeCharContext, makeRouterResult, systemText, lastUserText } from '../../unit/fixtures';
 import { nowLocalIso } from '../../../src/shared/datetime';

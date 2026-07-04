@@ -17,10 +17,10 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { buildMemoryContext } from '../../src/memory/context-builder';
-import { updateSemantic } from '../../src/memory/semantic';
-import { appendShortTerm } from '../../src/memory/short-term';
-import { saveEpisodic } from '../../src/memory/episodic';
+import { buildMemoryContext } from '../../src/memory/readout/context-builder';
+import { updateSemantic } from '../../src/memory/core/semantic';
+import { appendShortTerm } from '../../src/memory/core/short-term';
+import { saveEpisodic } from '../../src/memory/core/episodic';
 
 beforeEach(async () => {
   h.memDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ene-mctx-'));

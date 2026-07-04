@@ -4,7 +4,7 @@ import { openApiKeyDialog } from './api-key-dialog';
 import { getUserDataDir } from '../../shared/node/paths';
 import { exportUserData, importUserData, looksLikeBackup } from '../../shared/node/user-data-backup';
 import { log } from '../../shared/logger';
-import { getSemantic, updateSemantic } from '../../memory/semantic';
+import { getSemantic, updateSemantic } from '../../memory/core/semantic';
 import type { IdleTalkMode } from '../../shared/types/settings';
 import type { OwnerName } from '../../shared/types/ipc';
 import type { AppRuntime } from './app-runtime';

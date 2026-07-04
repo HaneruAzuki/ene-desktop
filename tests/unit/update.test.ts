@@ -14,9 +14,9 @@ vi.mock('../../src/shared/node/paths', () => ({
   getInvertedIndexPath: (): string => `${h.memDir}/index/inverted.json`,
 }));
 
-import { saveEpisodic, loadEpisodicById, episodicId } from '../../src/memory/episodic';
-import { indexEpisodic, queryInverted } from '../../src/memory/index-inverted';
-import { applyCorrections } from '../../src/memory/update';
+import { saveEpisodic, loadEpisodicById, episodicId } from '../../src/memory/core/episodic';
+import { indexEpisodic, queryInverted } from '../../src/memory/core/index-inverted';
+import { applyCorrections } from '../../src/memory/remember/update';
 import type { Correction, EpisodicMemory } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {

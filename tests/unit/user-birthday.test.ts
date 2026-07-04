@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isUserBirthdayToday } from '../../src/memory/user-birthday';
+import { isUserBirthdayToday } from '../../src/memory/readout/user-birthday';
 import type { ActiveCharacter } from '../../src/shared/types/character';
 
 // P5: 相手(ユーザー)の誕生日判定(キャラ誕生日 birthday-checker の鏡像)。

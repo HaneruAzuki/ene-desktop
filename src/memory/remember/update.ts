@@ -1,7 +1,7 @@
-import { log } from '../shared/logger';
-import { loadEpisodicById, updateEpisodicById } from './episodic';
-import { rebuildInvertedIndex } from './index-inverted';
-import type { Correction } from '../shared/types/memory';
+import { log } from '../../shared/logger';
+import { loadEpisodicById, updateEpisodicById } from '../core/episodic';
+import { rebuildInvertedIndex } from '../core/index-inverted';
+import type { Correction } from '../../shared/types/memory';
 
 // 記憶の非破壊更新(supersede/refine/reattribute・task_15)。
 // 物理削除はしない(ユーザー操作のみ・§6.4)。曖昧な人物分裂の一括再帰属はしない。

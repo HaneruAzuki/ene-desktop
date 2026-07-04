@@ -294,7 +294,6 @@ ene-desktop/
 │   │   ├── loader.ts              ← Profileロード(loadCharacterProfile)
 │   │   ├── character-context.ts   ← CharacterContext 構築(旧 context-builder.ts・同名回避 N-ARCH-5)
 │   │   ├── system-prompt-builder.ts ← 人格システムプロンプト構築(N-02-2)
-│   │   ├── birthday-checker.ts    ← 誕生日判定
 │   │   ├── active-character.ts    ← active-character.json の読書(最小状態)
 │   │   └── vrm-loader.ts          ← vrm.json ロード(F)
 │   │
@@ -304,37 +303,50 @@ ene-desktop/
 │   │   └── domain-fallback.ts     ← fallback ドメイン生成(旧 fallback.ts・同名回避 N-ARCH-5)
 │   │
 │   ├── memory/                    ← あり方③:人間のような記憶(Memory Layer・忘却・心)
-│   │   ├── short-term.ts
-│   │   ├── episodic.ts
-│   │   ├── episodic-write.ts      ← 中期記憶の書き込み窓口(保存＋逆引き索引付けを束ねる facade・§4.4)
-│   │   ├── presence-reads.ts      ← 存在感(挨拶/自発発話)向け読み取り窓口(最近の暮らし＋気にかけ・§4.4 読み取り側 facade)
-│   │   ├── semantic.ts
-│   │   ├── retriever.ts           ← 想起(語彙+entity+ベクトルRRF・task_15)
-│   │   ├── recall-select.ts       ← 想起の多様性選抜(トピック偏り抑制・純粋・P2・2026-06-23)
-│   │   ├── update.ts              ← 非破壊更新 supersede/refine/reattribute(provenance訂正も・task_15/P1)
-│   │   ├── episodic-dedup.ts      ← 書込時の近似重複マージ(意味類似で統合・純粋・P3・2026-06-23)
-│   │   ├── correction-cues.ts     ← 訂正の合図検出＋直近補強(訂正リーチ拡張・純粋・P4・2026-06-23)
-│   │   ├── index-inverted.ts      ← entity/keyword 逆引き索引(派生キャッシュ)
-│   │   ├── index-vector.ts        ← 意味検索ベクトル索引(派生キャッシュ・Phase B)
-│   │   ├── recall-pool.ts         ← user episodic ＋ canon の統合プール(task_16)
-│   │   ├── life-memory.ts         ← 人生記憶 canon ローダ(task_16・provenance:self)
-│   │   ├── mood-cues.ts            ← 落ち込みの cue 検出(現在の会話→明るい話題ヒント・純粋・③b・旧 user-tone/元気づけ撤去・2026-06-24)
-│   │   ├── familiarity.ts         ← 親しさ段階の導出(task_16・接触の事実)
-│   │   ├── context-builder.ts     ← MemoryContext 組み立て
-│   │   ├── extractor.ts           ← 会話から記憶抽出(キャラ自身の記憶として記録・LlmComplete 注入・2026-06-21改訂)
-│   │   ├── extraction-trigger.ts  ← overflow/shutdown 抽出トリガ
-│   │   ├── extraction-scheduler.ts ← 抽出を応答クリティカルパスから外すスケジューラ(B-01/B-02)
-│   │   ├── forgetting.ts          ← 忘却機構の orchestrator(B-13・§11.6)
-│   │   ├── consolidation-policy.ts ← 忘却の計画(純粋ロジック・段階的記憶縮退・§11.6)
-│   │   ├── consolidation-state.ts ← 忘却機構の実行記録(最終実行時刻・§11.6)
-│   │   ├── summarizer.ts          ← 期間サマリ生成(月次/年次の再要約・§11.6)
-│   │   ├── schema-validation.ts   ← Semantic のスキーマ検証
-│   │   ├── open-loops.ts          ← 「気にかけ」(open loop)の選択・状態(存在感P・引き際の上限管理)
-│   │   ├── knowledge-gaps.ts      ← 知識ギャップ(名前など未取得情報)の判定(尋ねて埋める)
-│   │   └── user-birthday.ts       ← ユーザー誕生日の判定・記録(誕生日反応)
+│   │   ← 記憶ファカルティを「動詞」で層化(N-ARCH-6・2026-07)。層序は下向きのみ:
+│   │   ← core → { recall, open-loops } → { remember, readout, forget }
+│   │   ← 動詞3フォルダの相互依存は0(依存図から機械導出)。dependency-cruiser で強制。
+│   │   ├── core/                  ← 基盤: ストア/索引/永続化/型(2クラスタ以上が参照=昇格不可)
+│   │   │   ├── episodic.ts        ← 中期記憶ストア(ID=相対パス・非破壊更新)
+│   │   │   ├── index-inverted.ts  ← entity/keyword 逆引き索引(派生キャッシュ)
+│   │   │   ├── index-vector.ts    ← 意味検索ベクトル索引(派生キャッシュ・Phase B)
+│   │   │   ├── recall-pool.ts     ← user episodic ＋ canon の統合プール(task_16)
+│   │   │   ├── life-memory.ts     ← 人生記憶 canon ローダ(task_16・provenance:self)
+│   │   │   ├── semantic.ts        ← Semantic 記憶の読書
+│   │   │   ├── schema-validation.ts ← Semantic のスキーマ検証
+│   │   │   └── short-term.ts      ← 短期記憶バッファ
+│   │   ├── recall/                ← 思い出す: 想起アルゴリズム(core だけに依存)
+│   │   │   ├── retriever.ts       ← 想起(語彙+entity+ベクトルRRF・task_15)
+│   │   │   └── recall-select.ts   ← 想起の多様性選抜(トピック偏り抑制・純粋・P2)
+│   │   ├── remember/              ← 覚える: 会話→記憶の書き込みパイプライン
+│   │   │   ├── extractor.ts       ← 会話から記憶抽出(キャラ自身の記憶として・LlmComplete 注入)
+│   │   │   ├── extraction-trigger.ts ← overflow/shutdown 抽出トリガ(束ね役)
+│   │   │   ├── extraction-scheduler.ts ← 抽出を応答クリティカルパスから外す(B-01/B-02)
+│   │   │   ├── episodic-write.ts  ← 書き込み窓口(保存＋逆引き索引付けの facade・§4.4)
+│   │   │   ├── episodic-dedup.ts  ← 書込時の近似重複マージ(純粋・P3)
+│   │   │   ├── update.ts          ← 非破壊更新 supersede/refine/reattribute(task_15/P1)
+│   │   │   └── correction-cues.ts ← 訂正の合図検出＋直近補強(純粋・P4)
+│   │   ├── readout/               ← 語る: 記憶→プロンプト文脈の組み立て
+│   │   │   ├── context-builder.ts ← MemoryContext 組み立て(集約役)
+│   │   │   ├── presence-reads.ts  ← 存在感向け読み取り窓口(§4.4 読み取り側 facade)
+│   │   │   ├── familiarity.ts     ← 親しさ段階の導出(task_16・接触の事実)
+│   │   │   ├── knowledge-gaps.ts  ← 知識ギャップ(名前など未取得情報)の判定
+│   │   │   ├── mood-cues.ts       ← 落ち込みの cue 検出→明るい話題ヒント(純粋・③b)
+│   │   │   └── user-birthday.ts   ← ユーザー誕生日の判定・記録(誕生日反応)
+│   │   ├── forget/                ← 忘れる: 圧縮・忘却(core だけに依存)
+│   │   │   ├── forgetting.ts      ← 忘却機構の orchestrator(B-13・§11.6)
+│   │   │   ├── consolidation-policy.ts ← 忘却の計画(純粋・段階的記憶縮退・§11.6)
+│   │   │   ├── consolidation-state.ts ← 忘却機構の実行記録(§11.6)
+│   │   │   └── summarizer.ts      ← 期間サマリ生成(月次/年次の再要約・§11.6)
+│   │   └── open-loops.ts          ← 「気にかけ」(独立層・remember/readout が下向き使用・フォルダ化せず層ルールで強制)
+│   │
+│   ├── offscreen-life/            ← キャラ自身の「画面の外の暮らし」(memory から昇格・N-ARCH-6)
+│   │   ├── pack.ts                ← 季節/常緑パックのロード(I/O 窓口・旧 memory/offscreen-life-pack)
+│   │   └── select.ts             ← 週次 beat の選択(純粋・electron 非依存・旧 memory/offscreen-life-select)
 │   │
 │   ├── conversation/              ← あり方④:語り口=言葉(Conversation Layer)
 │   │   ├── client.ts              ← Claude APIクライアント(chat / makeLlmComplete)
+│   │   ├── birthday-checker.ts    ← 誕生日判定(結果 birthdayHint は挨拶/プロンプトへ・旧 character/・N-ARCH-6)
 │   │   ├── prompt-builder.ts      ← 統合プロンプト構築(出力形式付与・交互列正規化)
 │   │   ├── response-parser.ts     ← JSON応答の三段構えパース
 │   │   ├── fallback.ts            ← キャラ口調フォールバック応答
@@ -603,8 +615,8 @@ export function buildCharacterContext(
   currentDate: Date
 ): CharacterContext;
 
-// src/character/birthday-checker.ts
-// 戻り値は CharacterContext.birthdayHint と一致(today / forgotten / null)。
+// src/conversation/birthday-checker.ts(N-ARCH-6 で character/ から移設)
+// 戻り値は CharacterContext.birthdayHint と一致(today / forgotten / null)。呼び出しは app/main/lifecycle。
 // todayLocal は §5.6 の todayLocalYmd()(1-indexed の月)を渡す。
 export function checkBirthday(
   identity: CharacterIdentity,

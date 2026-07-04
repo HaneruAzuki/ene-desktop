@@ -17,8 +17,8 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { saveEpisodic } from '../../src/memory/episodic';
-import { retrieve } from '../../src/memory/retriever';
+import { saveEpisodic } from '../../src/memory/core/episodic';
+import { retrieve } from '../../src/memory/recall/retriever';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {

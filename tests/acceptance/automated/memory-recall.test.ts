@@ -22,8 +22,8 @@ vi.mock('../../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { updateSemantic } from '../../../src/memory/semantic';
-import { buildMemoryContext } from '../../../src/memory/context-builder';
+import { updateSemantic } from '../../../src/memory/core/semantic';
+import { buildMemoryContext } from '../../../src/memory/readout/context-builder';
 import { buildPrompt } from '../../../src/conversation/prompt-builder';
 import { makeCharContext, makeRouterResult, systemText } from '../../unit/fixtures';
 

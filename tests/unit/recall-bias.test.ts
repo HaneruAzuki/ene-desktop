@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchesInterest, interestBoost } from '../../src/memory/retriever';
+import { matchesInterest, interestBoost } from '../../src/memory/recall/retriever';
 import { INTEREST_AFFINITY_WEIGHT } from '../../src/shared/constants';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
 

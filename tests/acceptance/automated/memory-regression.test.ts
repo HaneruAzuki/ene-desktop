@@ -32,12 +32,12 @@ vi.mock('../../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { buildConversationMemory } from '../../../src/memory/context-builder';
+import { buildConversationMemory } from '../../../src/memory/readout/context-builder';
 import { buildPrompt } from '../../../src/conversation/prompt-builder';
-import { saveEpisodic } from '../../../src/memory/episodic';
-import { rebuildInvertedIndex } from '../../../src/memory/index-inverted';
-import { updateSemantic } from '../../../src/memory/semantic';
-import { appendShortTerm } from '../../../src/memory/short-term';
+import { saveEpisodic } from '../../../src/memory/core/episodic';
+import { rebuildInvertedIndex } from '../../../src/memory/core/index-inverted';
+import { updateSemantic } from '../../../src/memory/core/semantic';
+import { appendShortTerm } from '../../../src/memory/core/short-term';
 import { saveActiveCharacter } from '../../../src/character/active-character';
 import { makeCharContext, makeRouterResult, systemText, lastUserText } from '../../unit/fixtures';
 import { nowLocalIso } from '../../../src/shared/datetime';

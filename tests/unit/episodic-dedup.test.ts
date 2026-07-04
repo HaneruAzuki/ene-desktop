@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findNearDuplicate, mergeEpisodic } from '../../src/memory/episodic-dedup';
+import { findNearDuplicate, mergeEpisodic } from '../../src/memory/remember/episodic-dedup';
 import { DAILY_LIFE_CATEGORY } from '../../src/shared/constants';
 import type { Embedder } from '../../src/shared/node/embedder';
 import type { EpisodicMemory, EpisodicRecord } from '../../src/shared/types/memory';

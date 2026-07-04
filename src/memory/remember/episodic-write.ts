@@ -1,6 +1,6 @@
-import { saveEpisodic } from './episodic';
-import { indexEpisodic } from './index-inverted';
-import type { EpisodicMemory } from '../shared/types/memory';
+import { saveEpisodic } from '../core/episodic';
+import { indexEpisodic } from '../core/index-inverted';
+import type { EpisodicMemory } from '../../shared/types/memory';
 
 // 中期記憶の書き込み窓口(memory 層の公開 facade)。
 //

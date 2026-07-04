@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { extractMemoryFromConversation } from '../../src/memory/extractor';
+import { extractMemoryFromConversation } from '../../src/memory/remember/extractor';
 import type { EpisodicRecord, ShortTermEntry } from '../../src/shared/types/memory';
 
 // task_15 で拡張した抽出器(entities 抽出・corrections・relevantMemories 注入)の検証。API は使わない。

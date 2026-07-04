@@ -1,14 +1,14 @@
-import { nowLocalIso } from '../shared/datetime';
+import { nowLocalIso } from '../../shared/datetime';
 import {
   EPISODIC_SUMMARY_MAX_CHARS,
   EPISODIC_SCHEMA_VERSION,
   IMPORTANCE_MIN,
   IMPORTANCE_MAX,
   IMPORTANCE_DEFAULT,
-} from '../shared/constants';
-import { validateSemanticPatch } from './schema-validation';
-import { formatOpenLoopsForExtractor } from './open-loops';
-import { extractJsonObject, toStringArray } from '../shared/llm-parse';
+} from '../../shared/constants';
+import { validateSemanticPatch } from '../core/schema-validation';
+import { formatOpenLoopsForExtractor } from '../open-loops';
+import { extractJsonObject, toStringArray } from '../../shared/llm-parse';
 import type {
   Correction,
   EpisodicMemory,
@@ -17,8 +17,8 @@ import type {
   OpenLoop,
   SemanticMemory,
   ShortTermEntry,
-} from '../shared/types/memory';
-import type { LlmComplete } from '../shared/types/llm';
+} from '../../shared/types/memory';
+import type { LlmComplete } from '../../shared/types/llm';
 
 // 会話からの記憶抽出(設計書 §3.3 / task_15)。
 //

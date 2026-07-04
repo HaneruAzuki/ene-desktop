@@ -1,7 +1,7 @@
 import { DAY_MS, OPEN_LOOP_LOOKBACK_DAYS, OPEN_LOOP_SURFACE_MAX } from '../shared/constants';
 import { getOpenLoopStatePath } from '../shared/node/paths';
 import { readJson, writeJson } from '../shared/node/json-store';
-import { loadEpisodicById, updateEpisodicById } from './episodic';
+import { loadEpisodicById, updateEpisodicById } from './core/episodic';
 import type { EpisodicRecord } from '../shared/types/memory';
 
 // 気にかけエンジン(P4・open loops・N-PRES-4 / ⑦再設計 2026-06-24)。

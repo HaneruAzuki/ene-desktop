@@ -1,4 +1,4 @@
-import type { EpisodicRecord } from '../shared/types/memory';
+import type { EpisodicRecord } from '../../shared/types/memory';
 
 // 訂正リーチの拡張(P4・斜めの訂正でも対象記憶へ届かせる)。純粋・I/O 無し。
 //

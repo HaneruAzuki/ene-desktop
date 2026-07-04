@@ -1,8 +1,8 @@
-import { getSemantic } from './semantic';
-import { getShortTerm } from './short-term';
-import { loadAllEpisodicFiles } from './episodic';
-import { loadLifeMemory } from './life-memory';
-import { retrieve, type RetrieverDeps } from './retriever';
+import { getSemantic } from '../core/semantic';
+import { getShortTerm } from '../core/short-term';
+import { loadAllEpisodicFiles } from '../core/episodic';
+import { loadLifeMemory } from '../core/life-memory';
+import { retrieve, type RetrieverDeps } from '../recall/retriever';
 import { seemsDown, LOW_MOOD_HINT } from './mood-cues';
 import { deriveFamiliarityStage } from './familiarity';
 import {
@@ -10,27 +10,27 @@ import {
   loadOpenLoopState,
   saveOpenLoopState,
   type OpenLoopState,
-} from './open-loops';
+} from '../open-loops';
 import { selectKnowledgeGaps } from './knowledge-gaps';
 import { checkUserBirthdayToday } from './user-birthday';
-import { loadOrCreateActiveCharacter } from '../character/active-character';
-import { log } from '../shared/logger';
-import { nowLocalIso, todayLocalYmd } from '../shared/datetime';
-import { timeOfDayLabel, describeElapsed, finitenessHint } from '../shared/moment';
+import { loadOrCreateActiveCharacter } from '../../character/active-character';
+import { log } from '../../shared/logger';
+import { nowLocalIso, todayLocalYmd } from '../../shared/datetime';
+import { timeOfDayLabel, describeElapsed, finitenessHint } from '../../shared/moment';
 import {
   RECALL_DEBUG_ENV,
   OPEN_LOOP_GLOBAL_COOLDOWN_HOURS,
   KNOWLEDGE_GAP_COOLDOWN_HOURS,
   DAY_MS,
-} from '../shared/constants';
+} from '../../shared/constants';
 import type {
   MemoryContext,
   RetrievalQuery,
   EpisodicRecord,
   ConversationMoment,
   SemanticMemory,
-} from '../shared/types/memory';
-import type { ActiveCharacter } from '../shared/types/character';
+} from '../../shared/types/memory';
+import type { ActiveCharacter } from '../../shared/types/character';
 
 // MemoryContext の組み立て(設計書 §3.3 / task_15 / task_16)。
 // 長期(semantic)+ 短期(shortTerm)+ 関連する中期(retriever)を統合する。

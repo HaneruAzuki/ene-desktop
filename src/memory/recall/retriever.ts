@@ -5,14 +5,14 @@ import {
   RECALL_CANDIDATE_POOL,
   RECALL_TOPIC_MAX,
   INTEREST_AFFINITY_WEIGHT,
-} from '../shared/constants';
+} from '../../shared/constants';
 import { pickDiverse } from './recall-select';
-import { log } from '../shared/logger';
-import { loadRecallPool } from './recall-pool';
-import { queryInverted } from './index-inverted';
-import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../shared/node/embedder';
-import { searchVectors, syncVectorIndex } from './index-vector';
-import type { EpisodicMemory, EpisodicRecord, RetrievalQuery } from '../shared/types/memory';
+import { log } from '../../shared/logger';
+import { loadRecallPool } from '../core/recall-pool';
+import { queryInverted } from '../core/index-inverted';
+import { getDefaultEmbedder, isEmbeddingModelAvailable, type Embedder } from '../../shared/node/embedder';
+import { searchVectors, syncVectorIndex } from '../core/index-vector';
+import type { EpisodicMemory, EpisodicRecord, RetrievalQuery } from '../../shared/types/memory';
 
 // 想起エンジン(task_15 RRF ＋ 想起の個性化・開示ゲーティング)。
 // ユーザー発言を引き金に**想起プール(user episodic ＋ canon)**を全件横断で引く(Router 非依存)。

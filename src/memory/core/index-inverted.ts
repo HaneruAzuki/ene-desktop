@@ -1,7 +1,7 @@
-import { getInvertedIndexPath } from '../shared/node/paths';
-import { readJson, writeJson } from '../shared/node/json-store';
+import { getInvertedIndexPath } from '../../shared/node/paths';
+import { readJson, writeJson } from '../../shared/node/json-store';
 import { loadRecallPool } from './recall-pool';
-import type { EpisodicMemory } from '../shared/types/memory';
+import type { EpisodicMemory } from '../../shared/types/memory';
 
 // 逆引き索引(語彙・人物・design-revision-memory-v2 §1.3)。
 // entity / keyword(tags) → 記録ID[] の写像。派生キャッシュであり、真実の源ではない

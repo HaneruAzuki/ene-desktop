@@ -4,17 +4,17 @@ import {
   FORGET_MONTHLY_SUMMARY_DAY,
   FORGET_MONTHLY_SUMMARY_IMPORTANCE,
   FORGET_YEARLY_SUMMARY_IMPORTANCE,
-} from '../shared/constants';
-import { log } from '../shared/logger';
-import { localIsoFromParts, nowLocalIso, todayLocalYmd } from '../shared/datetime';
-import { loadAllEpisodicFiles, saveEpisodic, deleteEpisodicById } from './episodic';
-import { rebuildInvertedIndex } from './index-inverted';
-import { pruneVectorIndex } from './index-vector';
+} from '../../shared/constants';
+import { log } from '../../shared/logger';
+import { localIsoFromParts, nowLocalIso, todayLocalYmd } from '../../shared/datetime';
+import { loadAllEpisodicFiles, saveEpisodic, deleteEpisodicById } from '../core/episodic';
+import { rebuildInvertedIndex } from '../core/index-inverted';
+import { pruneVectorIndex } from '../core/index-vector';
 import { planConsolidation, type SummaryTier } from './consolidation-policy';
 import { summarizePeriod, type PeriodSummary } from './summarizer';
 import { saveConsolidationState } from './consolidation-state';
-import type { LlmComplete } from '../shared/types/llm';
-import type { EpisodicMemory } from '../shared/types/memory';
+import type { LlmComplete } from '../../shared/types/llm';
+import type { EpisodicMemory } from '../../shared/types/memory';
 
 // 忘却機構の orchestrator(B-13 / 設計書 §11.6)。純粋計画(consolidation-policy)を実行する:
 //   期間ごとに 再要約(summarizer・LLM) → サマリ保存 → 低重要度を物理削除 → 索引整合 → state 更新。

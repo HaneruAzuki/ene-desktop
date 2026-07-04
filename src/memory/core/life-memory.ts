@@ -1,7 +1,7 @@
-import { getLifeMemoryPath, getActiveCharacterId } from '../shared/node/paths';
-import { readJson } from '../shared/node/json-store';
+import { getLifeMemoryPath, getActiveCharacterId } from '../../shared/node/paths';
+import { readJson } from '../../shared/node/json-store';
 import { migrateEpisodic } from './episodic';
-import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
+import type { EpisodicMemory, EpisodicRecord } from '../../shared/types/memory';
 
 // 人生記憶 canon の読み込み(task_16・design-revision-character-heart §2)。
 //

@@ -2,11 +2,11 @@ import { nowLocalIso, currentIsoWeekParts, isoWeekParts } from '../../shared/dat
 import { log } from '../../shared/logger';
 import { detectAiSelfReference } from '../../shared/ai-self-check';
 import { loadOpenLoopState, saveOpenLoopState } from '../../memory/open-loops';
-import { readPresenceMemory } from '../../memory/presence-reads';
-import { saveAndIndexEpisodic } from '../../memory/episodic-write';
-import { deriveFamiliarityStage } from '../../memory/familiarity';
-import { loadOffscreenPacks } from '../../memory/offscreen-life-pack';
-import { selectWeeklyBeat, beatToEpisodic } from '../../memory/offscreen-life-select';
+import { readPresenceMemory } from '../../memory/readout/presence-reads';
+import { saveAndIndexEpisodic } from '../../memory/remember/episodic-write';
+import { deriveFamiliarityStage } from '../../memory/readout/familiarity';
+import { loadOffscreenPacks } from '../../offscreen-life/pack';
+import { selectWeeklyBeat, beatToEpisodic } from '../../offscreen-life/select';
 import type { LlmComplete } from '../../shared/types/llm';
 import type { ActiveCharacter, CharacterContext } from '../../shared/types/character';
 

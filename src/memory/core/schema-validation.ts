@@ -1,4 +1,4 @@
-import type { SemanticMemory, ExtraValue, UserBirthday } from '../shared/types/memory';
+import type { SemanticMemory, ExtraValue, UserBirthday } from '../../shared/types/memory';
 
 // SemanticMemory のスキーマ検証(設計書 §3.3「SemanticMemory のスキーマ検証方針」)。
 // 手書きの型ガードで実装する(zod 等は使わない・task_03 禁止事項)。

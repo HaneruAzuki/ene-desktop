@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectKnowledgeGaps } from '../../src/memory/knowledge-gaps';
+import { selectKnowledgeGaps } from '../../src/memory/readout/knowledge-gaps';
 import type { SemanticMemory } from '../../src/shared/types/memory';
 
 // P5: 知識ギャップ(まだ知らない相手の属性)を親密度ゲート付きで選ぶ。

@@ -14,7 +14,7 @@ import {
   saveEpisodic,
   loadEpisodicById,
   updateEpisodicById,
-} from '../../src/memory/episodic';
+} from '../../src/memory/core/episodic';
 import type { EpisodicMemory } from '../../src/shared/types/memory';
 
 function mem(part: Partial<EpisodicMemory> & { date: string }): EpisodicMemory {

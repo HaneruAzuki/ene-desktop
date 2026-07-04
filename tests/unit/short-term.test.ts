@@ -14,7 +14,7 @@ import {
   clearShortTerm,
   getUnextractedEntries,
   markAsExtracted,
-} from '../../src/memory/short-term';
+} from '../../src/memory/core/short-term';
 import { SHORT_TERM_MAX_ENTRIES } from '../../src/shared/constants';
 import type { ShortTermEntry } from '../../src/shared/types/memory';
 

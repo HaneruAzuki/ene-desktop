@@ -1,5 +1,5 @@
-import { KNOWLEDGE_GAP_GATES, KNOWLEDGE_GAP_SURFACE_MAX } from '../shared/constants';
-import type { SemanticMemory } from '../shared/types/memory';
+import { KNOWLEDGE_GAP_GATES, KNOWLEDGE_GAP_SURFACE_MAX } from '../../shared/constants';
+import type { SemanticMemory } from '../../shared/types/memory';
 
 // 知識ギャップ(P5・N-PRES-5)。「まだ知らない相手の属性」を、親しさ段階のゲート付きで選ぶ。
 //

@@ -4,8 +4,8 @@ import {
   FORGET_YEARLY_AGE_YEARS,
   FORGET_DAILY_LIFE_MIN_AGE_MONTHS,
   DAILY_LIFE_CATEGORY,
-} from '../shared/constants';
-import type { EpisodicRecord } from '../shared/types/memory';
+} from '../../shared/constants';
+import type { EpisodicRecord } from '../../shared/types/memory';
 
 // 忘却の「計画」を立てる純粋ロジック(§11.6・段階的記憶縮退)。I/O も LLM も持たない=決定論で単体テスト可能。
 // 実際の要約(LLM)・物理削除・索引更新は orchestrator(forgetting.ts)が本計画を実行する。

@@ -1,8 +1,8 @@
-import { loadAllEpisodicFiles } from './episodic';
-import { selectOpenLoops } from './open-loops';
-import { DAILY_LIFE_CATEGORY } from '../shared/constants';
-import type { OpenLoopState, OpenLoopSelection } from './open-loops';
-import type { EpisodicRecord } from '../shared/types/memory';
+import { loadAllEpisodicFiles } from '../core/episodic';
+import { selectOpenLoops } from '../open-loops';
+import { DAILY_LIFE_CATEGORY } from '../../shared/constants';
+import type { OpenLoopState, OpenLoopSelection } from '../open-loops';
+import type { EpisodicRecord } from '../../shared/types/memory';
 
 // 存在感(挨拶・自発発話)が必要とする中期記憶の読み取り窓口(memory 層の公開 facade)。
 //

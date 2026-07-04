@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickDiverse, topicKey } from '../../src/memory/recall-select';
+import { pickDiverse, topicKey } from '../../src/memory/recall/recall-select';
 import type { EpisodicMemory, EpisodicRecord } from '../../src/shared/types/memory';
 
 // 想起の多様性選抜(P2)の純関数検証。乱数・I/O を持たない決定論ロジック。

@@ -3,9 +3,9 @@ import { performance } from 'node:perf_hooks';
 import { nowLocalIso, todayLocalYmd } from '../../shared/datetime';
 import { log } from '../../shared/logger';
 import { VOICE_STREAMING_ENABLED_ENV, TWO_TIER_ENABLED_ENV } from '../../shared/constants';
-import { appendShortTerm } from '../../memory/short-term';
-import { buildConversationMemory } from '../../memory/context-builder';
-import { requestExtraction, enforceShortTermCap } from '../../memory/extraction-scheduler';
+import { appendShortTerm } from '../../memory/core/short-term';
+import { buildConversationMemory } from '../../memory/readout/context-builder';
+import { requestExtraction, enforceShortTermCap } from '../../memory/remember/extraction-scheduler';
 import { classifyTopicLocal } from '../../knowledge/local-classifier';
 import { chat, makeLlmComplete, MODEL_SONNET, MODEL_HAIKU } from '../../conversation/client';
 import { buildNameMishearHint, withNameMishearHint } from '../../conversation/prompt-builder';
@@ -17,8 +17,8 @@ import {
   recordUserBirthdayCelebrated,
   loadOrCreateActiveCharacter,
 } from '../../character/active-character';
-import { getSemantic } from '../../memory/semantic';
-import { isUserBirthdayToday } from '../../memory/user-birthday';
+import { getSemantic } from '../../memory/core/semantic';
+import { isUserBirthdayToday } from '../../memory/readout/user-birthday';
 import { handleApiAuthError } from './api-key-auto-recovery';
 import { speakResponse, streamVoiceChat } from './voice-runtime';
 import type { ConversationResponse } from '../../shared/types/conversation';

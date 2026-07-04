@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // 短期記憶・抽出器をモックし、スケジューラの「直列化ロック＋バッチ＋flush」だけを検証する。
-vi.mock('../../src/memory/short-term', () => ({
+vi.mock('../../src/memory/core/short-term', () => ({
   getUnextractedEntries: vi.fn(),
 }));
-vi.mock('../../src/memory/extraction-trigger', () => ({
+vi.mock('../../src/memory/remember/extraction-trigger', () => ({
   extractFromShortTerm: vi.fn(),
 }));
 
-import { requestExtraction, flushExtraction } from '../../src/memory/extraction-scheduler';
-import { getUnextractedEntries } from '../../src/memory/short-term';
-import { extractFromShortTerm } from '../../src/memory/extraction-trigger';
+import { requestExtraction, flushExtraction } from '../../src/memory/remember/extraction-scheduler';
+import { getUnextractedEntries } from '../../src/memory/core/short-term';
+import { extractFromShortTerm } from '../../src/memory/remember/extraction-trigger';
 import type { ShortTermEntry } from '../../src/shared/types/memory';
-import type { LlmComplete } from '../../src/memory/extractor';
+import type { LlmComplete } from '../../src/memory/remember/extractor';
 
 const getUnextracted = vi.mocked(getUnextractedEntries);
 const extract = vi.mocked(extractFromShortTerm);

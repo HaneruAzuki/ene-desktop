@@ -17,10 +17,10 @@ vi.mock('../../src/shared/node/paths', () => ({
   getActiveCharacterId: (): string => 'ene',
 }));
 
-import { extractFromShortTerm } from '../../src/memory/extraction-trigger';
-import { getShortTerm } from '../../src/memory/short-term';
-import { getSemantic } from '../../src/memory/semantic';
-import { loadAllEpisodicFiles } from '../../src/memory/episodic';
+import { extractFromShortTerm } from '../../src/memory/remember/extraction-trigger';
+import { getShortTerm } from '../../src/memory/core/short-term';
+import { getSemantic } from '../../src/memory/core/semantic';
+import { loadAllEpisodicFiles } from '../../src/memory/core/episodic';
 import { writeJson } from '../../src/shared/node/json-store';
 import type { ShortTermEntry } from '../../src/shared/types/memory';
 

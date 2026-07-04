@@ -30,7 +30,8 @@ describe('context-builder (設計書 §3.1)', () => {
     expect(ctx.fewshot.examples.tech_high.length).toBeGreaterThan(0);
     // systemPrompt に AI自称防止(neverCallsSelf)が含まれる
     expect(ctx.systemPrompt).toContain('アシスタント');
-    // 今日(環境上 2026-06-01)は ENE の誕生日(8/15)より前 → null
-    expect(ctx.birthdayHint).toBeNull();
+    // birthdayHint は「今日」に依存する起動時モーメントなので buildCharacterContext は設定しない
+    // (app/main/lifecycle が checkBirthday で設定・N-ARCH-6)。誕生日判定自体は birthday-checker.test.ts で検証。
+    expect(ctx.birthdayHint).toBeUndefined();
   });
 });

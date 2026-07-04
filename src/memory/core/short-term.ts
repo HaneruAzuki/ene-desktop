@@ -1,9 +1,9 @@
 import { promises as fs } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { getShortTermPath } from '../shared/node/paths';
-import { readJson, writeJson } from '../shared/node/json-store';
-import { SHORT_TERM_MAX_ENTRIES } from '../shared/constants';
-import type { ShortTermEntry } from '../shared/types/memory';
+import { getShortTermPath } from '../../shared/node/paths';
+import { readJson, writeJson } from '../../shared/node/json-store';
+import { SHORT_TERM_MAX_ENTRIES } from '../../shared/constants';
+import type { ShortTermEntry } from '../../shared/types/memory';
 
 // 短期記憶(設計書 §3.3)。セッション内の直近会話を保持する。
 // 逐語ログではなく、抽出済みフラグ付きの一時バッファ(終了時に削除される)。

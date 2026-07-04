@@ -1,7 +1,7 @@
-import { getSemanticPath } from '../shared/node/paths';
-import { readJson, writeJson } from '../shared/node/json-store';
+import { getSemanticPath } from '../../shared/node/paths';
+import { readJson, writeJson } from '../../shared/node/json-store';
 import { validateSemantic } from './schema-validation';
-import type { SemanticMemory } from '../shared/types/memory';
+import type { SemanticMemory } from '../../shared/types/memory';
 
 // 長期記憶(Semantic・設計書 §3.3)。性格・好み・価値観など変化の少ない情報。
 // 単一ファイル data/memory/{characterId}/semantic.json に平文保存。

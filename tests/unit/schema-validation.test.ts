@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateSemantic, validateSemanticPatch } from '../../src/memory/schema-validation';
+import { validateSemantic, validateSemanticPatch } from '../../src/memory/core/schema-validation';
 
 describe('schema-validation (設計書 §3.3)', () => {
   it('version の既定は 1', () => {

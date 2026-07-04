@@ -1,24 +1,24 @@
-import { log } from '../shared/logger';
-import { nowLocalIso } from '../shared/datetime';
+import { log } from '../../shared/logger';
+import { nowLocalIso } from '../../shared/datetime';
 import {
   RELEVANT_MEMORIES_CORRECTION_LIMIT,
   RECENT_RECORDS_FOR_CORRECTION,
-} from '../shared/constants';
-import { getUnextractedEntries, markAsExtracted } from './short-term';
-import { loadAllEpisodicFiles, updateEpisodicById } from './episodic';
-import { loadLifeMemory } from './life-memory';
+} from '../../shared/constants';
+import { getUnextractedEntries, markAsExtracted } from '../core/short-term';
+import { loadAllEpisodicFiles, updateEpisodicById } from '../core/episodic';
+import { loadLifeMemory } from '../core/life-memory';
 import { saveAndIndexEpisodic } from './episodic-write';
-import { indexEpisodic } from './index-inverted';
-import { retrieveRecords } from './retriever';
+import { indexEpisodic } from '../core/index-inverted';
+import { retrieveRecords } from '../recall/retriever';
 import { applyCorrections } from './update';
-import { resolveOpenLoop } from './open-loops';
-import { getSemantic, updateSemantic, lockOwnerName } from './semantic';
+import { resolveOpenLoop } from '../open-loops';
+import { getSemantic, updateSemantic, lockOwnerName } from '../core/semantic';
 import { extractMemoryFromConversation } from './extractor';
 import { hasCorrectionCue, augmentWithRecent } from './correction-cues';
 import { findNearDuplicate, mergeEpisodic } from './episodic-dedup';
-import { getDefaultEmbedder, isEmbeddingModelAvailable } from '../shared/node/embedder';
-import type { EpisodicMemory, EpisodicRecord } from '../shared/types/memory';
-import type { LlmComplete } from '../shared/types/llm';
+import { getDefaultEmbedder, isEmbeddingModelAvailable } from '../../shared/node/embedder';
+import type { EpisodicMemory, EpisodicRecord } from '../../shared/types/memory';
+import type { LlmComplete } from '../../shared/types/llm';
 
 // 抽出トリガの統合(設計書 §3.3 / §7.2 / task_15 の2層フロー)。
 // 呼出箇所: バックグラウンド抽出(extraction-scheduler の requestExtraction・未抽出が閾値以上で発火)、

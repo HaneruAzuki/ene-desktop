@@ -1,5 +1,5 @@
-import type { SemanticMemory, UserBirthday } from '../shared/types/memory';
-import type { ActiveCharacter } from '../shared/types/character';
+import type { SemanticMemory, UserBirthday } from '../../shared/types/memory';
+import type { ActiveCharacter } from '../../shared/types/character';
 
 // 相手(ユーザー)の誕生日判定(P5・N-PRES-5)。キャラ誕生日 birthday-checker の鏡像。
 // 二値の事実(userBirthdayHistory)だけを見る(§5.3)。誕生日そのものは semantic.userBirthday に持つ。

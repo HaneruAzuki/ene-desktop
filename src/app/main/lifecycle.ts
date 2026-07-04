@@ -10,10 +10,10 @@ import {
   markFirstLaunchCompleted,
 } from '../../character/active-character';
 import { buildCharacterContext } from '../../character/character-context';
-import { checkBirthday } from '../../character/birthday-checker';
-import { getUnextractedEntries, clearShortTerm } from '../../memory/short-term';
-import { extractFromShortTerm } from '../../memory/extraction-trigger';
-import { requestForgetting } from '../../memory/forgetting';
+import { checkBirthday } from '../../conversation/birthday-checker';
+import { getUnextractedEntries, clearShortTerm } from '../../memory/core/short-term';
+import { extractFromShortTerm } from '../../memory/remember/extraction-trigger';
+import { requestForgetting } from '../../memory/forget/forgetting';
 import { warmEmbedder } from '../../shared/node/embedder';
 import { warmSttWorker } from './stt-worker-client';
 import { warmLocalRouter } from '../../knowledge/local-classifier';

@@ -3,7 +3,7 @@ import {
   selectWeeklyBeat,
   beatToEpisodic,
   DEFAULT_GRACE_WEEKS,
-} from '../../src/memory/offscreen-life-select';
+} from '../../src/offscreen-life/select';
 import { isoWeekParts } from '../../src/shared/datetime';
 import type { OffscreenBeat, OffscreenLifePack } from '../../src/shared/types/offscreen-life';
 

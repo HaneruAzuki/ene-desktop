@@ -11,9 +11,9 @@ import {
   GREETING_GENERATION_TIMEOUT_MS,
   TURN_TIMEOUT_MS,
 } from '../../shared/constants';
-import { replaceLastAssistantText, appendShortTerm } from '../../memory/short-term';
+import { replaceLastAssistantText, appendShortTerm } from '../../memory/core/short-term';
 import { nowLocalIso } from '../../shared/datetime';
-import { getSemantic } from '../../memory/semantic';
+import { getSemantic } from '../../memory/core/semantic';
 import { warmPromptCache } from '../../conversation/client';
 import { loadVrmConfig, loadVrmModelBytes, buildVrmRenderConfig } from '../../character/vrm-loader';
 import { loadAppSettings, saveVrmDisplay, saveAudioPrefs } from '../../shared/node/app-settings';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveFamiliarityStage } from '../../src/memory/familiarity';
+import { deriveFamiliarityStage } from '../../src/memory/readout/familiarity';
 import type { RelationshipFacts } from '../../src/shared/types/character';
 
 // 開示ゲーティングの親しさ段階(task_16)。接触の事実3要素・連言・単調。
