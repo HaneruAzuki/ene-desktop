@@ -495,7 +495,7 @@ export const OPEN_LOOP_LOOKBACK_DAYS = 60;
  * 設計(⑦・2026-06-24): 能動提示は**1つの loop につき1回だけ**(提示済み id を surfaced 集合に記録し、以後は
  * 自分から蒸し返さない=人間の自然な引き際)。2回目以降は、関連話題が会話に出て想起(retriever)で再浮上した
  * 時に「まだ結末を聞いていない」ヒント付きで自然に尋ねる(prompt-builder)。
- * ※ 旧 OPEN_LOOP_COOLDOWN_DAYS / OPEN_LOOP_MAX_SURFACES(1ショットに対し過剰だった count/cooldown)は撤去。
+ * ※ 1ショット運用では count/cooldown 方式は過剰なため持たない。
  */
 export const OPEN_LOOP_SURFACE_MAX = 1;
 

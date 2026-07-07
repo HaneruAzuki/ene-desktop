@@ -12,7 +12,7 @@ import {
 
 // VRM 表示設定のロード(F・3D化)。
 // vrm.json が無い/不正・モデルファイルが読めない場合は null を返す(VRM 無効)。
-// 立ち絵フォールバックは 2026-06 に廃止=表示は VRM 一本(VRM を出せない時は一言メッセージのみ)。
+// 表示は VRM 一本(VRM を出せない時は一言メッセージのみ)。
 
 /** 数値フィールドを既定値で補完しつつ正規化する(不正値=既定)。 */
 function normalizeDisplay(raw: unknown): VrmDisplayParams {
@@ -68,7 +68,7 @@ export async function loadVrmConfig(characterId: string): Promise<VrmConfig | nu
 
 /**
  * VRM モデル本体(.vrm)のバイト列を読む。10MB 規模を base64 化せず、IPC で ArrayBuffer を渡す(§3.8)。
- * 読めなければ null(VRM 無効=表示できない。立ち絵フォールバックは廃止)。
+ * 読めなければ null(VRM 無効=表示できない)。
  */
 export async function loadVrmModelBytes(
   characterId: string,

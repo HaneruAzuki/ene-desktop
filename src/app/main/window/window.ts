@@ -18,7 +18,7 @@ export function createMainWindow(position?: Position): BrowserWindow {
     alwaysOnTop: true,
     resizable: false,
     hasShadow: false,
-    skipTaskbar: false, // 常にタスクバーに表示(トレイは廃止・UI改修 段階4。最小化/復帰・右クリック終了の入口にする)
+    skipTaskbar: false, // 常にタスクバーに表示(最小化/復帰・右クリック終了の入口)。
     icon: getTrayIconPath(), // タスクバーボタンのアイコン
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

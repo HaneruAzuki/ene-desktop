@@ -15,8 +15,8 @@ import type { AppRuntime } from './bootstrap/app-runtime';
 app.setName('project-ene');
 
 // NSIS 配布(N-REL-2): Electron の状態は既定の userData(= %APPDATA%/project-ene・上の app.setName で固定)
-// に置く。electron-updater による本体入れ替えを跨いでユーザーデータ(記憶/設定/APIキー)を残すため、
-// 旧ポータブル運用の「exe 隣 data/app へリダイレクト」は撤去した(getUserDataDir が userData を返す)。
+// に置く。electron-updater による本体入れ替えを跨いでユーザーデータ(記憶/設定/APIキー)を残すため
+// (getUserDataDir が userData を返す)。
 // 同梱アセット(モデル/音声エンジン)は install dir 隣の data/(getPortableDataDir)から読み取る。
 
 const runtime: AppRuntime = {

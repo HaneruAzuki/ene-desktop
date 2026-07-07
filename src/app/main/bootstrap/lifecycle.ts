@@ -170,7 +170,7 @@ export async function runStartupSequence(
   };
   runtime.charContext = charContext;
 
-  // Step 10: 透過ウィンドウ(位置復元)+ IPC(トレイは廃止・常時タスクバー表示=UI改修 段階4)
+  // Step 10: 透過ウィンドウ(位置復元)+ IPC
   const saved = await loadWindowPosition();
   const position = saved ? clampPositionToScreen(saved) : getDefaultPosition();
   const mainWindow = createMainWindow(position);

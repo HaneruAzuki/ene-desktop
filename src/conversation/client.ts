@@ -92,7 +92,7 @@ function makeDefaultDeps(
   const client = createClient(apiKey);
   return {
     callModel: async ({ system, messages }) => {
-      // プロンプトキャッシュは GA(N-REL-3 で 0.30.1→0.105 へ更新しベータ名前空間を撤去)。Tier0 を固定プレフィックスとして使い回す。
+      // プロンプトキャッシュ(GA)。固定プレフィックスを使い回してキャッシュヒットさせる。
       const resp = await client.messages.create(
         {
           model, // 二段生成(B-15b): Haiku/Sonnet をターンごとに切替可。既定=Sonnet。
